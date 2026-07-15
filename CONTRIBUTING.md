@@ -47,8 +47,11 @@ Config for all three lives in `pyproject.toml` (`[tool.ruff]`, `[tool.ty]`).
 
 ## Releasing
 
-1. Bump `version` in `pyproject.toml`.
-2. Push to `main`, then create a GitHub Release for tag `vX.Y.Z` (`gh release create vX.Y.Z`
-   or via the GitHub UI). Publishing the release triggers two workflows: `publish.yml` builds
-   and publishes to PyPI, and `changelog.yml` regenerates `CHANGELOG.md` from commits since the
-   previous tag and commits it back to `main`.
+Releases are fully automated by `publish.yml` -- there's no manual version bump or
+tag to create. From the Actions tab, run the "Publish" workflow on `main` with the
+desired `version_strategy` (`patch`/`minor`/`major`). It verifies `main` is releasable
+(lint, format, type check, full test suite), computes the next version from the latest
+`vX.Y.Z` tag, bumps `pyproject.toml` and `uv.lock`, prepends this release's entries to
+`CHANGELOG.md` via [git-cliff](https://git-cliff.org), commits and tags that, then
+builds, publishes to PyPI, and creates the matching GitHub Release with the freshly
+generated notes.
