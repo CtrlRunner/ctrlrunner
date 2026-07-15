@@ -122,7 +122,7 @@ class LineReporterTests(unittest.TestCase):
 
 class JsonReporterTests(unittest.TestCase):
     def test_writes_expected_schema(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             reporter.on_run_end(_results(), 2.5)
@@ -140,7 +140,7 @@ class JsonReporterTests(unittest.TestCase):
 
     def test_warnings_field_serialized(self):
         # Result.warnings reaches the JSON report.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             warns = [
@@ -162,7 +162,7 @@ class JsonReporterTests(unittest.TestCase):
     def test_tests_array_sorted_by_project_then_id(self):
         # Report order must not depend on worker completion
         # timing -- identical runs must produce diff-identical reports.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             results = [
@@ -174,7 +174,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual([t["id"] for t in payload["tests"]], ["mod::a", "mod::b"])
 
     def test_groups_field_is_serialized(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             results = [
@@ -191,7 +191,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(payload["tests"][0]["groups"], {"module": "mod", "team": "backend"})
 
     def test_project_field_and_top_level_projects_list(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             results = [
@@ -219,7 +219,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(by_id["[smoke] mod::a"]["project"], "smoke")
 
     def test_projects_list_empty_when_no_project_set(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             reporter.on_run_end(_results(), 1.0)
@@ -227,7 +227,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(payload["projects"], [])
 
     def test_stats_include_skipped_and_expected_failures(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             reporter.on_run_end(_results_with_annotations(), 1.0)
@@ -238,7 +238,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(payload["stats"]["failed"], 1)
 
     def test_worker_restart_overhead_field_is_serialized(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             results = [
@@ -262,7 +262,7 @@ class JsonReporterTests(unittest.TestCase):
         # over the final path means the final path only ever shows the
         # old complete file or the new complete file, never a partial
         # one.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             path.write_text('{"stats": {"total": 0}}')  # pre-existing "old" report
             reporter = JsonReporter(str(path))
@@ -283,7 +283,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(leftover, [])
 
     def test_write_still_produces_correct_file_on_success(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             reporter.on_run_end(_results(), 1.0)
@@ -293,7 +293,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(leftover, [])
 
     def test_coverage_summary_merged_into_stats_when_set(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             summary = SimpleNamespace(percent=87.5, by_file={"a.py": 90.0})
@@ -305,7 +305,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertEqual(payload["stats"]["coverageByFile"], {"a.py": 90.0})
 
     def test_coverage_summary_absent_by_default(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             reporter.on_run_end([], 1.0)
@@ -315,7 +315,7 @@ class JsonReporterTests(unittest.TestCase):
             self.assertNotIn("coverageByFile", payload["stats"])
 
     def test_coverage_by_file_omitted_when_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             reporter = JsonReporter(str(path))
             summary = SimpleNamespace(percent=100.0, by_file=None)
@@ -431,7 +431,7 @@ class CustomReporterLoaderTests(unittest.TestCase):
         self.addCleanup(sys.modules.pop, "custom_rep_mod", None)
 
     def test_loads_reporter_from_module_colon_class_spec(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._write_module(
                 tmp,
                 "class MyReporter:\n"
@@ -449,14 +449,14 @@ class CustomReporterLoaderTests(unittest.TestCase):
         self.assertIn("no_such_module_xyz", str(ctx.exception))
 
     def test_missing_class_raises_value_error(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._write_module(tmp, "x = 1\n")
             with self.assertRaises(ValueError) as ctx:
                 build_reporters(["custom_rep_mod:NoSuchClass"])
         self.assertIn("NoSuchClass", str(ctx.exception))
 
     def test_constructor_error_raises_value_error(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._write_module(
                 tmp,
                 "class NeedsArgs:\n    def __init__(self, required): pass\n",

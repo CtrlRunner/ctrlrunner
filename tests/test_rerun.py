@@ -29,14 +29,14 @@ class LoadFailedTestIdsTests(unittest.TestCase):
             load_failed_test_ids(Path("/nonexistent/results.json"))
 
     def test_malformed_json_raises_rerun_error(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             path.write_text("not valid json{{{")
             with self.assertRaises(RerunError):
                 load_failed_test_ids(path)
 
     def test_returns_only_failed_test_ids(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             path.write_text(
                 json.dumps(
@@ -58,7 +58,7 @@ class LoadFailedTestIdsTests(unittest.TestCase):
         # the missing-file and malformed-json paths above); a failed test
         # entry without an "id" key is the same class of malformed report
         # and must not leak a raw KeyError to the CLI.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             path.write_text(
                 json.dumps(
@@ -74,7 +74,7 @@ class LoadFailedTestIdsTests(unittest.TestCase):
                 load_failed_test_ids(path)
 
     def test_no_failed_tests_returns_empty_list(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "results.json"
             path.write_text(json.dumps({"tests": [{"id": "mod::a", "outcome": "passed"}]}))
             self.assertEqual(load_failed_test_ids(path), [])
@@ -90,40 +90,43 @@ class ResolveChangedFilesTests(unittest.TestCase):
         subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=tmp, check=True)
 
     def test_returns_changed_files_since_ref(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             (Path(tmp) / "test_a.py").write_text("# changed\n")
             changed = resolve_changed_files("HEAD", cwd=tmp)
             self.assertEqual(changed, ["test_a.py"])
 
     def test_no_changes_returns_empty_list(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             changed = resolve_changed_files("HEAD", cwd=tmp)
             self.assertEqual(changed, [])
 
     def test_invalid_ref_raises_rerun_error(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             with self.assertRaises(RerunError):
                 resolve_changed_files("not-a-real-ref-xyz", cwd=tmp)
 
     def test_git_not_available_raises_rerun_error(self):
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(RerunError):
+        with (
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            self.assertRaises(RerunError),
+        ):
             resolve_changed_files("HEAD", cwd=tmp)  # not a git repo at all -> git itself errors
 
     def test_ref_starting_with_dash_raises_rerun_error(self):
         # M1 (OWASP A03): a ref beginning with '-' would be parsed by git
         # as an option (argument injection) -- must be rejected outright,
         # before any subprocess runs.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             with self.assertRaises(RerunError):
                 resolve_changed_files("--output=/tmp/x", cwd=tmp)
 
     def test_normal_ref_still_resolves_after_validation(self):
         # The validation guard must not break the ordinary happy path.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             (Path(tmp) / "test_a.py").write_text("# changed\n")
             changed = resolve_changed_files("HEAD", cwd=tmp)
@@ -134,7 +137,7 @@ class ResolveChangedFilesTests(unittest.TestCase):
         # quoting) -- the splitlines() parse must hand it back verbatim,
         # or a changed file silently drops out of --changed-since
         # selection.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             spaced = Path(tmp) / "test dir with spaces"
             spaced.mkdir()
@@ -149,7 +152,7 @@ class ResolveChangedFilesTests(unittest.TestCase):
         # A brand-new, not-yet-`git add`ed test file must not be
         # invisible to --changed-since -- the plan guarantees "never
         # under-select".
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             (Path(tmp) / "test_brand_new.py").write_text("# new, untracked\n")
             changed = resolve_changed_files("HEAD", cwd=tmp)
@@ -159,7 +162,7 @@ class ResolveChangedFilesTests(unittest.TestCase):
         # Asymmetry fix: ensure the second subprocess call (git ls-files)
         # also raises RerunError (not raw FileNotFoundError) when git is unavailable.
         # Use mock to make only the second call fail, isolating that code path.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             original_run = subprocess.run
             call_count = [0]
@@ -194,7 +197,7 @@ class ResolveRepoRootTests(unittest.TestCase):
         # --changed-since must resolve paths against the actual
         # git repo root, not the process's cwd -- running ctrlrunner from
         # a subdirectory previously made every comparison miss.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._init_repo(tmp)
             subdir = Path(tmp) / "tests"
             subdir.mkdir()
@@ -203,13 +206,16 @@ class ResolveRepoRootTests(unittest.TestCase):
             self.assertEqual(Path(root).resolve(), Path(tmp).resolve())
 
     def test_not_a_git_repo_raises_rerun_error(self):
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(RerunError):
+        with (
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            self.assertRaises(RerunError),
+        ):
             resolve_repo_root(cwd=tmp)
 
 
 class MatchChangedFilesToTestIdsTests(unittest.TestCase):
     def test_matches_tests_whose_source_file_changed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             (Path(tmp) / "test_a.py").touch()
             (Path(tmp) / "test_b.py").touch()
             all_tests = [
@@ -220,7 +226,7 @@ class MatchChangedFilesToTestIdsTests(unittest.TestCase):
             self.assertEqual(matched, ["mod::test_x"])
 
     def test_multiple_tests_in_same_changed_file_all_match(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             (Path(tmp) / "test_a.py").touch()
             all_tests = [
                 _item("mod::test_x", source_path=str(Path(tmp) / "test_a.py")),
@@ -230,13 +236,13 @@ class MatchChangedFilesToTestIdsTests(unittest.TestCase):
             self.assertEqual(set(matched), {"mod::test_x", "mod::test_y"})
 
     def test_no_source_path_never_matches(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             all_tests = [_item("mod::test_x", source_path=None)]
             matched = match_changed_files_to_test_ids(["test_a.py"], all_tests, tmp)
             self.assertEqual(matched, [])
 
     def test_unrelated_changed_file_matches_nothing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             (Path(tmp) / "test_a.py").touch()
             all_tests = [_item("mod::test_x", source_path=str(Path(tmp) / "test_a.py"))]
             matched = match_changed_files_to_test_ids(["unrelated_file.py"], all_tests, tmp)

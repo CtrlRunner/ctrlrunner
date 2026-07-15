@@ -102,7 +102,7 @@ class UnifiedResultShapeTests(unittest.TestCase):
 
         self.assertEqual(Orchestrator._result_payload(result), expected)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             out = os.path.join(tmp, "results.json")
             JsonReporter(out).on_run_end([result], 2.0)
             with open(out, encoding="utf-8") as f:

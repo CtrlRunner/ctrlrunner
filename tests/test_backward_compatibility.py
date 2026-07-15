@@ -67,7 +67,7 @@ class SingleProjectRunUnchangedTests(unittest.TestCase):
         return web
 
     def test_run_projects_with_a_single_project_keeps_ids_unprefixed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web = self._make_layout(tmp)
             projects = {"smoke": ProjectConfig(name="smoke", tests_dir=[str(web)])}
             combined, multi = run_projects(
@@ -93,7 +93,7 @@ class NoHistoryStoreRoundRobinUnchangedTests(unittest.TestCase):
         registry.reset()
 
     def test_orchestrator_without_history_store_behaves_like_round_robin(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "backcompat_sharding_unaffected_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(6))
@@ -114,7 +114,7 @@ class ConfigNestingGotchaTests(unittest.TestCase):
     it. `[ctrlrunner.grouping]` is the correct nesting."""
 
     def test_correct_nesting_is_picked_up(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner.grouping]\n"
@@ -130,7 +130,7 @@ class ConfigNestingGotchaTests(unittest.TestCase):
             self.assertEqual([d.name for d in dims], ["module", "team"])
 
     def test_bare_grouping_header_is_silently_a_sibling_table_not_nested(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner]\n"
@@ -164,7 +164,7 @@ class CliEndToEndBackwardCompatibilityTests(unittest.TestCase):
         import json
         import xml.etree.ElementTree as ET
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_backcompat_cli_shape.py").write_text(

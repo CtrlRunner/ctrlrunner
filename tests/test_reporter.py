@@ -78,7 +78,7 @@ class ReporterTests(unittest.TestCase):
     def test_junit_properties_include_flaky_when_set(self):
         reporter = JUnitReporter()
         reporter.add_result("m::t", "passed", None, 0.1, flaky=True)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             tree = ET.parse(path)
@@ -107,7 +107,7 @@ class ReporterTests(unittest.TestCase):
             artifacts=("shot.png",),
         )
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path), suite_name="mysuite")
 
@@ -159,7 +159,7 @@ class ReporterTests(unittest.TestCase):
         ]
         reporter.add_result("mod::test_c", "failed", "boom", 0.6, steps=steps)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             tree = ET.parse(path)
@@ -173,7 +173,7 @@ class ReporterTests(unittest.TestCase):
         reporter = JUnitReporter()
         reporter.add_result("mod::plain", "passed", None, 0.1)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             tree = ET.parse(path)
@@ -185,7 +185,7 @@ class ReporterTests(unittest.TestCase):
         reporter.add_result("mod::test_skip", "skipped", "not applicable", 0.0)
         reporter.add_result("mod::test_fixme", "fixme", "needs fix", 0.0)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             root = ET.parse(path).getroot()
@@ -200,7 +200,7 @@ class ReporterTests(unittest.TestCase):
         reporter = JUnitReporter()
         reporter.add_result("mod::test_xfail", "expected_failure", "JIRA-1: known bug", 0.1)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             root = ET.parse(path).getroot()
@@ -215,7 +215,7 @@ class ReporterTests(unittest.TestCase):
         reporter.add_result(
             "mod::test_x", "passed", None, 0.1, properties={"unexpected_pass": "true"}
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             root = ET.parse(path).getroot()
@@ -231,7 +231,7 @@ class MultiProjectJUnitTests(unittest.TestCase):
         # byte-shape backward compatibility: even if Result.project
         # happens to be populated, multi_project=False (the default)
         # must produce today's exact single-<testsuite> root.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter = JUnitReporter()
             reporter.add_result("mod::test_a", "passed", None, 0.1, project="smoke")
@@ -240,7 +240,7 @@ class MultiProjectJUnitTests(unittest.TestCase):
             self.assertEqual(root.tag, "testsuite")
 
     def test_multi_project_true_wraps_in_testsuites_per_project(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter = JUnitReporter()
             reporter.add_result("[smoke] mod::test_a", "passed", None, 0.1, project="smoke")
@@ -263,7 +263,7 @@ class MultiProjectJUnitTests(unittest.TestCase):
     def test_multi_project_testcase_classname_unaffected_by_id_prefix(self):
         # the [project] prefix sits before the module::name split point,
         # so classname/name parsing (rpartition on "::") is unaffected.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter = JUnitReporter()
             reporter.add_result("[smoke] pkg.mod::test_x", "passed", None, 0.1, project="smoke")
@@ -274,7 +274,7 @@ class MultiProjectJUnitTests(unittest.TestCase):
             self.assertEqual(case.get("name"), "test_x")
 
     def test_multi_project_missing_project_falls_back_to_suite_name(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter = JUnitReporter()
             reporter.add_result("mod::test_a", "passed", None, 0.1)  # no project set
@@ -326,7 +326,7 @@ class JUnitGoldenBytesTests(unittest.TestCase):
         reporter.add_result("mod::test_fail", "failed", "AssertionError: boom", 0.456)
         reporter.add_result("mod::test_skip", "skipped", "not implemented", 0.0)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             with unittest.mock.patch(
                 "ctrlrunner.reporting.reporter.socket.gethostname", return_value="golden-host"
@@ -360,7 +360,7 @@ class XmlSanitizationTests(unittest.TestCase):
             kwargs.pop("duration"),
             **kwargs,
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             return ET.parse(path)
@@ -420,7 +420,7 @@ class AtomicWriteTests(unittest.TestCase):
                 Path(dest).write_bytes(b"<partial")
             raise OSError("disk full")
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             original = path.read_bytes()
@@ -438,7 +438,7 @@ class AtomicWriteTests(unittest.TestCase):
     def test_written_report_still_parses(self):
         reporter = JUnitReporter()
         reporter.add_result("mod::test_a", "failed", "boom", 0.1)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             tree = ET.parse(path)
@@ -450,7 +450,7 @@ class SuiteMetadataTests(unittest.TestCase):
     timestamp/hostname/errors on <testsuite>; ctrlrunner emitted none."""
 
     def _suite_element(self, reporter):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             return ET.parse(path).getroot()
@@ -487,7 +487,7 @@ class DeterministicOrderTests(unittest.TestCase):
         reporter = JUnitReporter()
         reporter.add_result("mod::test_b", "passed", None, 0.1)
         reporter.add_result("mod::test_a", "passed", None, 0.1)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             names = [c.get("name") for c in ET.parse(path).getroot().findall("testcase")]
@@ -498,7 +498,7 @@ class DeterministicOrderTests(unittest.TestCase):
         reporter.add_result("mod::test_x", "passed", None, 0.1, project="web")
         reporter.add_result("mod::test_b", "passed", None, 0.1, project="api")
         reporter.add_result("mod::test_a", "passed", None, 0.1, project="api")
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path), multi_project=True)
             root = ET.parse(path).getroot()
@@ -533,7 +533,7 @@ class JunitLogsTests(unittest.TestCase):
 
     def _case(self, reporter):
         reporter.add_result("mod::test_a", "failed", "boom", 0.1, logs=self.LOGS)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             return ET.parse(path).getroot().find("testcase")
@@ -572,7 +572,7 @@ class JunitLogsTests(unittest.TestCase):
             steps=[{"name": "step one", "outcome": "passed", "duration": 0.0}],
             logs=self.LOGS,
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             text = ET.parse(path).getroot().find("testcase/system-out").text
@@ -593,7 +593,7 @@ class JunitInfraErrorsTests(unittest.TestCase):
     def _root(self, reporter):
         reporter.add_result("mod::test_real", "failed", "assert boom", 0.1)
         reporter.add_result("mod::test_killed", "failed", "Hard-killed", 0.1, infra_error=True)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             return ET.parse(path).getroot()

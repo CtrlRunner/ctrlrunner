@@ -38,7 +38,7 @@ def _result(
 
 class HistoryStoreTests(unittest.TestCase):
     def test_creates_db_file_and_parent_dirs(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "nested" / "history.db")
             store = HistoryStore(db_path)
             store.close()
@@ -48,7 +48,7 @@ class HistoryStoreTests(unittest.TestCase):
     def test_db_file_is_owner_read_write_only(self):
         # M2 (OWASP A04): the history db must not be left
         # group/world-readable on a shared machine/CI runner.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             store = HistoryStore(db_path)
             store.close()
@@ -61,7 +61,7 @@ class HistoryStoreTests(unittest.TestCase):
         # posture ("hardening the history file must never crash an
         # otherwise-successful run") demands it recovers: quarantine the
         # unreadable file and start fresh.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             Path(db_path).write_bytes(b"this is not a sqlite database at all")
             with HistoryStore(db_path) as store:
@@ -75,7 +75,7 @@ class HistoryStoreTests(unittest.TestCase):
             )
 
     def test_record_run_writes_runs_and_test_runs_rows(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 run_id = store.record_run([_result("mod::a"), _result("mod::b", outcome="failed")])
@@ -87,7 +87,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(cur.fetchone()[0], 2)
 
     def test_empty_results_records_nothing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([])
@@ -95,7 +95,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(cur.fetchone()[0], 0)
 
     def test_get_durations_returns_newest_first_within_window(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 for i, dur in enumerate([1.0, 2.0, 3.0]):
@@ -104,7 +104,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(durations, [3.0, 2.0, 1.0])
 
     def test_get_durations_respects_window_limit(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 for i in range(5):
@@ -114,7 +114,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(durations, [4.0, 3.0])
 
     def test_get_durations_scoped_by_project(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", duration=1.0, project="smoke")])
@@ -123,13 +123,13 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(store.get_durations("mod::a", project="regression"), [99.0])
 
     def test_get_durations_unknown_test_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 self.assertEqual(store.get_durations("mod::nonexistent"), [])
 
     def test_get_outcomes_includes_retries_configured(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run(
@@ -143,7 +143,7 @@ class HistoryStoreTests(unittest.TestCase):
     def test_multiple_runs_accumulate_not_overwrite(self):
         # the key property that makes HistoryReporter safe to reuse
         # across multiple project runs unlike JsonReporter
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a")])
@@ -152,7 +152,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(cur.fetchone()[0], 2)
 
     def test_list_test_ids_returns_distinct_ids(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a")])
@@ -161,7 +161,7 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(store.list_test_ids(), ["mod::a", "mod::b"])
 
     def test_list_test_ids_scoped_by_project(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", project="smoke")])
@@ -170,13 +170,13 @@ class HistoryStoreTests(unittest.TestCase):
                 self.assertEqual(store.list_test_ids(project="regression"), ["mod::b"])
 
     def test_list_test_ids_empty_store_returns_empty_list(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 self.assertEqual(store.list_test_ids(), [])
 
     def test_worker_id_column_is_recorded(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 run_id = store.record_run([_result("mod::a", worker_id=2)])
@@ -193,7 +193,7 @@ class HistoryStoreTests(unittest.TestCase):
         # "accumulate across many runs over time") and calling
         # record_run() used to raise sqlite3.OperationalError: table
         # test_runs has no column named worker_id.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
 
             # Simulate an old pre-Task-10 database: create the schema
@@ -251,7 +251,7 @@ class HistoryStoreTests(unittest.TestCase):
             def commit(self):
                 self._real.commit()
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path):
                 pass  # first open fully migrates: worker_id column now exists on disk
@@ -264,7 +264,7 @@ class HistoryStoreTests(unittest.TestCase):
         # A fail-fast run writes 0.0-duration not_run/cancelled rows
         # for the whole remainder of the suite; those rows never
         # actually executed and must not drag the median toward zero.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", outcome="passed", duration=9.0)])
@@ -278,7 +278,7 @@ class HistoryStoreTests(unittest.TestCase):
         # duration~0.0 rows; those must not drag its LPT median toward
         # zero. get_outcomes keeps seeing them (flake-score denominator
         # semantics unchanged).
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", outcome="passed", duration=5.0)])
@@ -292,7 +292,7 @@ class HistoryStoreTests(unittest.TestCase):
         self.assertIn("fixme", outcomes)
 
     def test_get_outcomes_excludes_not_run_and_cancelled_rows(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run(
@@ -308,7 +308,7 @@ class HistoryStoreTests(unittest.TestCase):
     def test_get_durations_default_window_matches_standardized_default(self):
         # get_durations() kept a dead window=10 default while
         # every other default in this codebase standardized on 20.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 for i in range(25):
@@ -361,7 +361,7 @@ class ResolveHistoryConfigTests(unittest.TestCase):
 
 class HistoryReporterTests(unittest.TestCase):
     def test_on_run_end_writes_to_the_store(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             reporter = HistoryReporter(db_path)
             reporter.on_run_end([_result("mod::a"), _result("mod::b")], 1.5)
@@ -371,7 +371,7 @@ class HistoryReporterTests(unittest.TestCase):
                 self.assertEqual(cur.fetchone()[0], 2)
 
     def test_reused_across_multiple_calls_accumulates(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             reporter = HistoryReporter(db_path)
             reporter.on_run_end([_result("mod::a", project="p1")], 1.0)
@@ -384,7 +384,7 @@ class HistoryReporterTests(unittest.TestCase):
                 self.assertEqual([r[0] for r in cur.fetchall()], ["p1", "p2"])
 
     def test_empty_results_does_not_create_a_run_row(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             reporter = HistoryReporter(db_path)
             reporter.on_run_end([], 0.0)
@@ -395,7 +395,7 @@ class HistoryReporterTests(unittest.TestCase):
 
 class ComputeNearTimeoutTestIdsTests(unittest.TestCase):
     def test_flags_tests_above_80_percent_of_timeout(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::slow", duration=9.0)])
@@ -410,7 +410,7 @@ class ComputeNearTimeoutTestIdsTests(unittest.TestCase):
         self.assertEqual(flags, {"mod::slow"})
 
     def test_no_history_flags_nothing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 flags = compute_near_timeout_test_ids(
@@ -423,7 +423,7 @@ class ComputeNearTimeoutTestIdsTests(unittest.TestCase):
         self.assertEqual(flags, set())
 
     def test_custom_threshold_is_respected(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", duration=6.0)])
@@ -446,7 +446,7 @@ class ComputeNearTimeoutTestIdsTests(unittest.TestCase):
         self.assertEqual(flags_strict, {"mod::a"})  # 0.6 >= 0.5
 
     def test_uses_median_across_recent_durations(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 # median of [1.0, 9.0, 9.0] = 9.0 -> flagged;
@@ -464,7 +464,7 @@ class ComputeNearTimeoutTestIdsTests(unittest.TestCase):
         self.assertEqual(flags, {"mod::a"})
 
     def test_missing_timeout_is_never_flagged(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             with HistoryStore(db_path) as store:
                 store.record_run([_result("mod::a", duration=100.0)])
@@ -504,7 +504,7 @@ class HistoryWriteProcessBoundaryTests(unittest.TestCase):
         # a worker-facing path, per-test hooks are no-ops -- only
         # on_run_end (called exactly once, in the main process, after
         # workers have already finished) actually writes.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "history.db")
             reporter = HistoryReporter(db_path)
             reporter.on_run_start(5)  # must not raise, must not touch a db

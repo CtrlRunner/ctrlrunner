@@ -328,7 +328,7 @@ class ArtifactModeTests(unittest.TestCase):
         return image_path, trace_path
 
     def test_files_mode_copies_both_images_and_traces_into_report_dir(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             image_path, trace_path = self._make_artifact_files(tmp)
             report_dir = Path(tmp) / "report"
             report_dir.mkdir()
@@ -351,7 +351,7 @@ class ArtifactModeTests(unittest.TestCase):
                 self.assertTrue((report_dir / a["href"]).exists())
 
     def test_trace_zip_bundles_trace_viewer_into_report_dir(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             _image_path, trace_path = self._make_artifact_files(tmp)
             report_dir = Path(tmp) / "report"
             report_dir.mkdir()
@@ -371,7 +371,7 @@ class ArtifactModeTests(unittest.TestCase):
             self.assertTrue((report_dir / "trace" / "assets").is_dir())
 
     def test_no_trace_zip_skips_trace_viewer_bundle(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             image_path, _trace_path = self._make_artifact_files(tmp)
             report_dir = Path(tmp) / "report"
             report_dir.mkdir()
@@ -390,7 +390,7 @@ class ArtifactModeTests(unittest.TestCase):
             self.assertFalse((report_dir / "trace").exists())
 
     def test_base64_mode_embeds_images_but_copies_traces(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             image_path, trace_path = self._make_artifact_files(tmp)
             report_dir = Path(tmp) / "report"
             report_dir.mkdir()
@@ -458,7 +458,7 @@ class ArtifactModeTests(unittest.TestCase):
         self.assertFalse(artifact["href"].startswith("javascript:"))
 
     def test_no_report_dir_leaves_paths_unchanged_in_files_mode(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             image_path, _ = self._make_artifact_files(tmp)
             results = [
                 Result(

@@ -38,7 +38,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         return module_name
 
     def test_last_failed_reruns_only_previously_failed_tests(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             mod = self._make_suite(tmp, "last_failed_demo")
             os.chdir(tmp)
             self._run_cli(["--reporter", "dots,json"])  # full run: 1 passed, 2 failed
@@ -51,14 +51,14 @@ class RerunCliIntegrationTests(unittest.TestCase):
         self.assertEqual(ids, {f"tests.test_{mod}::test_b", f"tests.test_{mod}::test_c"})
 
     def test_last_failed_with_no_previous_report_fails_clearly(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "no_report_demo")
             os.chdir(tmp)
             self._run_cli(["--last-failed"])
             self.assertFalse(Path("reports/html-report/results.json").exists())
 
     def test_results_json_written_even_without_json_reporter(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             mod = self._make_suite(tmp, "always_json_demo")
             os.chdir(tmp)
             self._run_cli(["--reporter", "dots"])  # no 'json' requested
@@ -74,7 +74,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         self.assertEqual(ids, {f"tests.test_{mod}::test_b", f"tests.test_{mod}::test_c"})
 
     def test_failed_from_explicit_path(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             mod = self._make_suite(tmp, "failed_from_demo")
             os.chdir(tmp)
             self._run_cli(["--reporter", "json", "--json-output", "saved.json"])
@@ -90,7 +90,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         # An empty rerun match must never fall through
         # to "run the whole suite" -- that's the exact inverted
         # semantics --test-id nonexistent correctly avoids (0 tests).
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             mod = self._make_suite(tmp, "last_failed_clean_demo")
             os.chdir(tmp)
             # Overwrite the demo suite so every test passes -- a clean run.
@@ -110,7 +110,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
     def test_changed_since_reruns_only_tests_in_changed_files(self):
         import subprocess
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_changedsince_a.py").write_text(
@@ -145,7 +145,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "mutual_excl_demo")
             os.chdir(tmp)
             self._run_cli(["--reporter", "json"])  # seed a previous run
@@ -166,7 +166,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         # locks in that --list --last-failed lists the FULL suite (rerun
         # flags are silently not applied to --list), matching documented
         # behavior rather than leaving it an untested implicit accident.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "list_rerun_demo")
             os.chdir(tmp)
             self._run_cli(["--reporter", "json"])
@@ -182,7 +182,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
         self.assertEqual(len(data["tests"]), 3)  # all 3 tests, rerun flag not applied to --list
 
     def test_logs_flag_populates_result_logs_field(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -231,7 +231,7 @@ class ListProjectScopingTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_project_layout(tmp)
             os.chdir(tmp)
             buf = io.StringIO()
@@ -252,7 +252,7 @@ class ListProjectScopingTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -280,7 +280,7 @@ class ListProjectScopingTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -348,7 +348,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         # through as a per-project console reporter meant the final
         # results.json only ever showed the LAST project's tests, with
         # every earlier project's data silently lost.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_project_layout(tmp)
             os.chdir(tmp)
             self._run_cli(["--project", "smoke,regression", "--reporter", "json"])
@@ -364,7 +364,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         self.assertEqual(projects_seen, {"smoke", "regression"})
 
     def test_junit_xml_wraps_testsuites_for_multi_project(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_project_layout(tmp)
             os.chdir(tmp)
             self._run_cli(["--project", "smoke,regression"])
@@ -375,7 +375,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         self.assertEqual(names, {"smoke", "regression"})
 
     def test_single_project_run_keeps_single_testsuite_and_unprefixed_ids(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_project_layout(tmp)
             os.chdir(tmp)
             self._run_cli(["--project", "smoke", "--reporter", "json"])
@@ -387,7 +387,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         self.assertTrue(all(not i.startswith("[") for i in ids))
 
     def test_unknown_project_name_fails_fast_with_no_report_written(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_project_layout(tmp)
             os.chdir(tmp)
             self._run_cli(["--project", "typo-project"])
@@ -397,7 +397,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         # today's exact single-Orchestrator path, sanity-checked through
         # the real CLI entry point rather than only through Orchestrator
         # directly.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -434,7 +434,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         )
 
     def test_dash_n_auto_is_accepted(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "nauto_demo")
             os.chdir(tmp)
             code = self._run_cli(["-n", "auto", "--reporter", "json"])
@@ -443,28 +443,28 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertEqual(len(data["tests"]), 1)
 
     def test_dash_n_percent_is_accepted(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "npercent_demo")
             os.chdir(tmp)
             code = self._run_cli(["-n", "50%", "--reporter", "json"])
             self.assertEqual(code, 0)
 
     def test_dash_n_zero_rejected_at_parse_time(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "nzero_demo")
             os.chdir(tmp)
             code = self._run_cli(["-n", "0"])
             self.assertEqual(code, 2)  # argparse usage error
 
     def test_dash_n_garbage_rejected_at_parse_time(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "ngarbage_demo")
             os.chdir(tmp)
             code = self._run_cli(["-n", "banana"])
             self.assertEqual(code, 2)
 
     def test_config_num_workers_auto_is_accepted(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "cfgauto_demo")
             os.chdir(tmp)
             Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "auto"\n')
@@ -472,7 +472,7 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertEqual(code, 0)
 
     def test_config_num_workers_percent_is_accepted(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "cfgpercent_demo")
             os.chdir(tmp)
             Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "50%"\n')
@@ -480,7 +480,7 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertEqual(code, 0)
 
     def test_invalid_config_num_workers_exits_one(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "cfgbadworkers_demo")
             os.chdir(tmp)
             Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "fast"\n')
@@ -489,7 +489,7 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertFalse(Path("reports/html-report/results.json").exists())
 
     def test_invalid_workers_table_exits_one(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "cfgbadtable_demo")
             os.chdir(tmp)
             Path("ctrlrunner.toml").write_text('[ctrlrunner.workers]\n"tests/test_x.py" = 0\n')
@@ -497,7 +497,7 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertEqual(code, 1)
 
     def test_invalid_fully_parallel_exits_one(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, "cfgbadfp_demo")
             os.chdir(tmp)
             Path("ctrlrunner.toml").write_text('[ctrlrunner]\nfully_parallel = "yes"\n')
@@ -505,7 +505,7 @@ class WorkerConfigCliTests(unittest.TestCase):
             self.assertEqual(code, 1)
 
     def test_workers_table_cap_run_end_to_end(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_capped_cli.py").write_text(
@@ -541,7 +541,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -562,7 +562,10 @@ class ConfigValidationCliTests(unittest.TestCase):
         # a string/zero/negative value must die at config validation,
         # not mid-run inside the orchestrator's watchdog arithmetic.
         for bad in ('"fast"', "0", "true"):
-            with self.subTest(value=bad), tempfile.TemporaryDirectory() as tmp:
+            with (
+                self.subTest(value=bad),
+                tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            ):
                 root = Path(tmp) / "tests"
                 root.mkdir()
                 (root / "test_a.py").write_text(
@@ -587,7 +590,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         # The CLI-level TagValidationError catch: with --strict-tags an
         # unregistered tag must abort before ANY test runs (exit 1, the
         # "collection stopped" message, no report written).
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -618,7 +621,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_cfgwarn_demo.py").write_text(
@@ -641,7 +644,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         # stdout into <system-out> in report.xml.
         import xml.etree.ElementTree as ET
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_junitlogs_demo.py").write_text(
@@ -668,7 +671,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         # Rerunning only the failed member of a serial class
         # must pull in the whole class -- a partial serial group runs
         # skip-on-fail over a subset the author never intended.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_serialrerun_demo.py").write_text(
@@ -720,7 +723,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_badpath_demo.py").write_text(
@@ -767,7 +770,7 @@ class HistoryDbPathDerivationTests(unittest.TestCase):
         # TestCase classes (each with its own tempdir) can leave a
         # LATER test's registry empty even after registry.reset(),
         # since the module's @test() decorators never re-run.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_history_db_path_derivation.py").write_text(
@@ -794,7 +797,7 @@ class ListRiskFlagTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             # timeout=2 / sleep=1.8 keeps the 90%-of-timeout ratio while
@@ -836,7 +839,7 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
         return str(cfg)
 
     def test_no_headed_flag_forces_headless_over_truthy_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cfg_path = self._config(tmp, "true")
             with (
                 patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
@@ -851,7 +854,7 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
         self.assertTrue(kwargs["playwright_config"]["headless"])
 
     def test_headed_flag_still_overrides_falsy_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cfg_path = self._config(tmp, "false")
             with (
                 patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
@@ -864,7 +867,7 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
         self.assertFalse(kwargs["playwright_config"]["headless"])
 
     def test_absent_flag_falls_back_to_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cfg_path = self._config(tmp, "true")
             with (
                 patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
@@ -930,7 +933,7 @@ class BindHostGuardCliTests(unittest.TestCase):
         # at an empty directory so the real serve_report raises.
         stderr = io.StringIO()
         with (
-            tempfile.TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as ctx,
         ):
@@ -963,15 +966,17 @@ class FlakyReportCliTests(unittest.TestCase):
         return ctx.exception.code, stdout.getvalue(), stderr.getvalue()
 
     def test_history_disabled_exits_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cfg = self._write_config(tmp, "[ctrlrunner.history]\nenabled = false\n")
             code, _, err = self._run(["--config", cfg])
         self.assertEqual(code, 1)
         self.assertIn("history] is disabled", err)
 
     def test_missing_history_db_exits_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            cfg = self._write_config(tmp, f'[ctrlrunner]\nreports_dir = "{tmp}/reports"\n')
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            cfg = self._write_config(
+                tmp, f'[ctrlrunner]\nreports_dir = "{Path(tmp).as_posix()}/reports"\n'
+            )
             code, _, err = self._run(["--config", cfg])
         self.assertEqual(code, 1)
         self.assertIn("no history database found", err)
@@ -980,7 +985,7 @@ class FlakyReportCliTests(unittest.TestCase):
         from ctrlrunner.reporting.history import HistoryStore
         from ctrlrunner.reporting.reporter import Result
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db_path = str(Path(tmp) / "reports" / ".history.db")
             with HistoryStore(db_path) as store:
                 store.record_run(
@@ -995,7 +1000,9 @@ class FlakyReportCliTests(unittest.TestCase):
                         )
                     ]
                 )
-            cfg = self._write_config(tmp, f'[ctrlrunner]\nreports_dir = "{tmp}/reports"\n')
+            cfg = self._write_config(
+                tmp, f'[ctrlrunner]\nreports_dir = "{Path(tmp).as_posix()}/reports"\n'
+            )
             out_path = str(Path(tmp) / "flaky.json")
             code, out, _ = self._run(["--config", cfg, "--format", "json", "--output", out_path])
             self.assertEqual(code, 0)
@@ -1020,7 +1027,7 @@ class ReportTimestampCliOverrideTests(unittest.TestCase):
         # report_timestamp=true in config used to be unforceable back to
         # off from the CLI, since --report-timestamp was a plain
         # store_true flag with no way to express "explicitly False".
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -1053,7 +1060,7 @@ class MultiProjectDurationTests(unittest.TestCase):
             main()
 
     def test_combined_duration_is_wall_clock_not_sum_of_test_durations(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             for name in ("a", "b"):
                 root = Path(tmp) / f"tests_{name}"
                 root.mkdir()
@@ -1104,7 +1111,7 @@ class MultiProjectLineReporterResetTests(unittest.TestCase):
         import io
         import re
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root_a = Path(tmp) / "tests_a"
             root_a.mkdir()
             (root_a / "test_a.py").write_text(
@@ -1165,7 +1172,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
             )
 
     def test_coverage_flag_adds_percent_to_json_report(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             code = self._run_cli(["--coverage", "--reporter", "json"])
@@ -1175,7 +1182,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
         self.assertIn("coveragePercent", data["stats"])
 
     def test_coverage_fail_under_fails_run_when_below_threshold(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner.coverage]\nfail_under = 100\n")
             os.chdir(tmp)
@@ -1187,7 +1194,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
         import contextlib
         import io
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp, two_tests=True)
             (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner.coverage]\nfail_under = 100\n")
             os.chdir(tmp)
@@ -1207,7 +1214,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
         self.assertIn("fail-under not enforced", buf.getvalue())
 
     def test_coverage_off_by_default_no_json_change(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             code = self._run_cli(["--reporter", "json"])
@@ -1229,7 +1236,7 @@ class TagNotCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def test_tag_not_excludes_matching_tests(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_tagnot_demo.py").write_text(
@@ -1259,7 +1266,7 @@ class RunManifestCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def test_run_manifest_written_next_to_results_json(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_manifest_demo.py").write_text(
@@ -1297,7 +1304,7 @@ class OrderSeedCliTests(unittest.TestCase):
         )
 
     def test_random_order_seed_lands_in_junit_properties(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             with (
@@ -1315,7 +1322,7 @@ class OrderSeedCliTests(unittest.TestCase):
         self.assertEqual(props.get("seed"), "99")
 
     def test_declared_order_default_has_no_order_property(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             with (
@@ -1356,14 +1363,14 @@ class FailOnFlakyCliTests(unittest.TestCase):
         )
 
     def test_fail_on_flaky_makes_a_flaky_pass_fail_the_run(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_flaky_suite(tmp)
             os.chdir(tmp)
             code = self._run_cli_code(["--fail-on-flaky", "--reporter", "dots"])
         self.assertEqual(code, 1)
 
     def test_without_fail_on_flaky_a_flaky_pass_exits_zero(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_flaky_suite(tmp)
             os.chdir(tmp)
             code = self._run_cli_code(["--reporter", "dots"])
@@ -1392,7 +1399,7 @@ class GrepCliTests(unittest.TestCase):
         )
 
     def test_grep_selects_only_matching_tests(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             self._run_cli(["--grep", "login", "--reporter", "dots"])
@@ -1401,7 +1408,7 @@ class GrepCliTests(unittest.TestCase):
         self.assertEqual(ids, {"tests.test_grep_cli_demo::test_login"})
 
     def test_bad_grep_regex_exits_cleanly_via_argparse(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_suite(tmp)
             os.chdir(tmp)
             with (
@@ -1423,7 +1430,7 @@ class UnknownReporterCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def test_unknown_reporter_exits_cleanly_without_traceback(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_unknown_reporter_demo.py").write_text(
@@ -1464,14 +1471,14 @@ class EmptySelectionExitCodeTests(unittest.TestCase):
         return ctx.exception.code
 
     def test_no_tests_matching_tag_filter_exits_4(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_passing_suite(tmp, "empty_tag_demo")
             os.chdir(tmp)
             code = self._run_cli_code(["--tag", "nonexistent", "--reporter", "dots"])
         self.assertEqual(code, 4)
 
     def test_empty_root_with_no_filters_exits_4(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             (Path(tmp) / "tests").mkdir()
             os.chdir(tmp)
             code = self._run_cli_code(["--reporter", "dots"])
@@ -1480,7 +1487,7 @@ class EmptySelectionExitCodeTests(unittest.TestCase):
     def test_last_failed_matching_zero_still_exits_0(self):
         # "--last-failed matched nothing" means the previous run had no
         # failures -- a legitimate success, never exit 4.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._make_passing_suite(tmp, "lf_zero_demo")
             os.chdir(tmp)
             self.assertEqual(self._run_cli_code(["--reporter", "dots"]), 0)
@@ -1498,7 +1505,7 @@ class HtmlReportTimelineFieldsTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def test_html_report_embeds_run_started_at_and_num_workers(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_timeline_demo.py").write_text(

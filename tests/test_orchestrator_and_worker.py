@@ -37,7 +37,7 @@ class NearTimeoutBadgeTests(unittest.TestCase):
         registry.reset()
 
     def test_a_test_finishing_close_to_its_timeout_is_flagged_near_timeout(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "near_timeout_suite"
             root.mkdir()
             # timeout=2 / sleep=1.8 = 90% of the timeout, comfortably
@@ -65,7 +65,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
         registry.reset()
 
     def test_per_param_xfail_and_skip_outcomes(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "param_meta_suite"
             root.mkdir()
             (root / "test_params.py").write_text(
@@ -102,7 +102,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
         # improve (pytest-rerunfailures and Playwright both treat
         # expected failures as final). The retry loop must break on
         # 'expected_failure' the same way it breaks on skipped/fixme.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "xfail_retry_suite"
             root.mkdir()
             (root / "test_xr.py").write_text(
@@ -126,7 +126,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
         self.assertIn("ran 1 times", r.error or "")
 
     def test_param_skip_never_resolves_fixtures(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "param_skip_suite"
             root.mkdir()
             (root / "test_skip.py").write_text(
@@ -161,7 +161,7 @@ class ChunkTests(unittest.TestCase):
 
 class DiscoverModulesTests(unittest.TestCase):
     def test_finds_test_files_as_dotted_module_names(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             (root / "sub").mkdir(parents=True)
             (root / "test_one.py").write_text("")
@@ -178,7 +178,7 @@ class DiscoverModulesTests(unittest.TestCase):
         # Regression: `ctrlrunner suite/test_one.py` (pytest-style single-file
         # selection) used to silently collect 0 tests -- rglob() on a file
         # path (not a directory) always returns empty, no error raised.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_one.py").write_text("")
@@ -191,7 +191,7 @@ class DiscoverModulesTests(unittest.TestCase):
 
 class DiscoverConftestsTests(unittest.TestCase):
     def test_finds_conftest_files_shallowest_first(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             (root / "sub").mkdir(parents=True)
             (root / "conftest.py").write_text("")
@@ -203,7 +203,7 @@ class DiscoverConftestsTests(unittest.TestCase):
             self.assertEqual(modules[1].resolve(), (root / "sub" / "conftest.py").resolve())
 
     def test_no_conftest_returns_empty_list(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_one.py").write_text("")
@@ -212,7 +212,7 @@ class DiscoverConftestsTests(unittest.TestCase):
     def test_file_path_root_finds_sibling_conftest(self):
         # A single-file root must still pick up the conftest.py that would
         # have been found had the containing directory been passed instead.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "conftest.py").write_text("")
@@ -232,7 +232,7 @@ class FilePathRootOrchestratorTests(unittest.TestCase):
         registry.reset()
 
     def test_orchestrator_runs_a_single_file_root(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_one.py").write_text(
@@ -260,7 +260,7 @@ class AlwaysCaptureOrderingRegressionTests(unittest.TestCase):
         registry.reset()
 
     def test_always_capture_runs_before_resource_is_torn_down(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_ordering.py").write_text(
@@ -320,7 +320,7 @@ class WallClockParallelismTests(unittest.TestCase):
         return root
 
     def test_two_workers_run_two_slow_tests_concurrently(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_sleep_suite(tmp, seconds=2, count=2, suite_name="par2w")
             orch = Orchestrator(str(root), 2, 30.0)
 
@@ -345,7 +345,7 @@ class WallClockParallelismTests(unittest.TestCase):
         # Sanity check of the measurement itself: with -n 1 the same two
         # tests MUST take >= 4s, proving the concurrent case above isn't
         # passing because the sleeps somehow didn't happen.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_sleep_suite(tmp, seconds=2, count=2, suite_name="par1w")
             orch = Orchestrator(str(root), 1, 30.0)
 
@@ -367,7 +367,7 @@ class SchedulingUnitsTests(unittest.TestCase):
         registry.reset()
 
     def test_same_file_tests_share_one_worker_by_default(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "filegroup_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
@@ -388,7 +388,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             )
 
     def test_fully_parallel_scatters_same_file_tests(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "fullypar_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
@@ -406,7 +406,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             )
 
     def test_class_fully_parallel_scatters_only_that_class(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "classpar_suite"
             root.mkdir()
             (root / "test_classpar.py").write_text(
@@ -427,7 +427,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             self.assertEqual(len(worker_ids), 2, "@test_class(fully_parallel=True) did not scatter")
 
     def test_workers_cap_one_serializes_the_class_onto_one_worker(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "capone_suite"
             root.mkdir()
             (root / "test_capped.py").write_text(
@@ -454,7 +454,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             )
 
     def test_dedicated_class_runs_alongside_pool_without_deadlock(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "dedicated_suite"
             root.mkdir()
             (root / "test_dedicated.py").write_text(
@@ -483,7 +483,7 @@ class SchedulingUnitsTests(unittest.TestCase):
     def test_config_worker_constraint_caps_a_file(self):
         from ctrlrunner.execution.worker_budget import WorkerConstraintSpec
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "configcap_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
@@ -529,7 +529,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
     def test_strict_mode_runs_zero_tests_and_raises(self):
         from ctrlrunner.config.tag_registry import TagRegistry, TagValidationError
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "strict_tags_suite")
             reg = TagRegistry(entries=["smoke"], strict=True)
             orch = Orchestrator(str(root), 1, 10.0, tag_registry=reg)
@@ -542,7 +542,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
     def test_warning_mode_still_runs_all_tests(self):
         from ctrlrunner.config.tag_registry import TagRegistry
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "warn_tags_suite")
             reg = TagRegistry(entries=["smoke"], strict=False)
             orch = Orchestrator(str(root), 1, 10.0, tag_registry=reg)
@@ -550,7 +550,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
             self.assertEqual(len(reporter.results), 2)
 
     def test_no_registry_is_fully_unaffected(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "no_registry_suite")
             orch = Orchestrator(str(root), 1, 10.0)  # tag_registry=None default
             reporter = orch.run()
@@ -587,7 +587,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "event_lifecycle_suite")
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[RecordingSubscriber()])
             orch.run()
@@ -615,7 +615,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "event_payload_suite")
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[RecordingSubscriber()])
             reporter = orch.run()
@@ -637,7 +637,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "restart_overhead_event_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -683,7 +683,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             def on_event(self, event):
                 pass
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "event_isolation_suite")
             orch = Orchestrator(
                 str(root),
@@ -706,7 +706,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         # _emit() should short-circuit before building anything if
         # nobody's listening -- not load-bearing behavior, but worth
         # locking in given the hot-loop concern noted in the plan.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "event_no_subscribers_suite")
             orch = Orchestrator(str(root), 1, 10.0)  # no event_subscribers
             reporter = orch.run()  # must not raise
@@ -728,7 +728,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 # everything else silently ignored
 
         sub = PickySubscriber()
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "event_unknown_type_suite")
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[sub])
             orch.run()
@@ -744,7 +744,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "worker_terminated":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "hang_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -768,7 +768,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "worker_terminated":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "cancel_event_suite"
             root.mkdir()
             (root / "test_cancel.py").write_text(
@@ -805,7 +805,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "test_end_timeout_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -829,7 +829,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "test_end_cancel_suite"
             root.mkdir()
             (root / "test_cancel.py").write_text(
@@ -866,7 +866,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "test_end_crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
@@ -891,7 +891,7 @@ class GroupingIntegrationTests(unittest.TestCase):
     def test_default_no_config_groups_by_module_only(self):
         from ctrlrunner.reporting.grouping import DEFAULT_DIMENSIONS
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "default_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -907,7 +907,7 @@ class GroupingIntegrationTests(unittest.TestCase):
     def test_custom_dimensions_computed_and_attached_to_results(self):
         from ctrlrunner.reporting.grouping import GroupingDimension
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "custom_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -926,7 +926,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             self.assertNotIn("module", result.groups)  # not force-injected
 
     def test_groups_present_on_cancelled_results_too(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "cancel_grouping_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -956,7 +956,7 @@ class GroupingIntegrationTests(unittest.TestCase):
                 if event.type == "test_end":
                     received.append(event.payload)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "event_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -994,7 +994,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
         return web, e2e
 
     def test_single_project_keeps_id_unprefixed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, _ = self._make_layout(tmp)
             projects = {"smoke": ProjectConfig(name="smoke", tests_dir=[str(web)])}
             combined, multi = run_projects(
@@ -1010,7 +1010,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             self.assertTrue(all(r.project == "smoke" for r in combined.results))
 
     def test_two_projects_with_overlapping_tests_dir_both_see_their_own_selection(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, e2e = self._make_layout(tmp)
             projects = {
                 "smoke": ProjectConfig(
@@ -1044,7 +1044,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             self.assertTrue(all(not i.startswith("[") for i in by_project["regression"]))
 
     def test_cli_tag_overrides_project_tags_filter(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, _ = self._make_layout(tmp)
             projects = {"smoke": ProjectConfig(name="smoke", tests_dir=[str(web)], tags=["smoke"])}
             # CLI --tag regression should override the project's own
@@ -1062,7 +1062,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             self.assertIn("test_checkout", ids[0])
 
     def test_project_timeout_and_num_workers_used_when_cli_not_given(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, _ = self._make_layout(tmp)
             projects = {
                 "smoke": ProjectConfig(name="smoke", tests_dir=[str(web)], timeout=1, num_workers=1)
@@ -1086,7 +1086,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             self.assertIn("timeout", hang_result.error.lower())
 
     def test_cli_num_workers_overrides_project_num_workers(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, _ = self._make_layout(tmp)
             projects = {"smoke": ProjectConfig(name="smoke", tests_dir=[str(web)], num_workers=1)}
             # cli_num_workers explicitly given should win over the
@@ -1110,7 +1110,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             web, _ = self._make_layout(tmp)
             projects = {"smoke": ProjectConfig(name="smoke", tests_dir=[str(web)])}
             run_projects(
@@ -1150,7 +1150,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_max_failures_stops_after_threshold_marks_rest_not_run(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_failing_suite(tmp, 5, suite_name="maxfail5")
             fp = FailPolicyState(max_failures=2)
             orch = Orchestrator(str(root), 1, 10.0, fail_policy=fp)
@@ -1165,7 +1165,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_max_failures_zero_means_unlimited(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_failing_suite(tmp, 4, suite_name="maxfailunlimited")
             fp = FailPolicyState(max_failures=0)
             orch = Orchestrator(str(root), 1, 10.0, fail_policy=fp)
@@ -1175,7 +1175,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertIsNone(fp.cancel_reason)
 
     def test_no_fail_policy_at_all_is_unaffected(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_failing_suite(tmp, 3, suite_name="nopolicy")
             orch = Orchestrator(str(root), 1, 10.0)  # fail_policy=None
             reporter = orch.run()
@@ -1185,7 +1185,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_max_timeouts_stops_after_first_timeout_kill(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "hang_suite"
             root.mkdir()
             (root / "test_hangs.py").write_text(
@@ -1208,7 +1208,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_stop_on_worker_crash_detects_real_crash_and_cancels(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
@@ -1235,7 +1235,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_worker_crash_without_stop_on_worker_crash_does_not_cancel(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "crash_suite2"
             root.mkdir()
             (root / "test_crash.py").write_text(
@@ -1257,7 +1257,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
     def test_retry_then_pass_does_not_count_toward_max_failures(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "flaky_suite"
             root.mkdir()
             (root / "test_flaky.py").write_text(
@@ -1291,7 +1291,7 @@ class ShardingIntegrationTests(unittest.TestCase):
         # correctly (batching is file-grouped by default now; with a
         # single file this is one batch on one worker).
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "sharding_unaffected_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(6))
@@ -1308,7 +1308,7 @@ class ShardingIntegrationTests(unittest.TestCase):
         # tests share one file and would serialize onto one worker.
         from ctrlrunner.reporting.history import HistoryStore
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "sharding_seeded_suite"
             root.mkdir()
             tests_src = (
@@ -1365,7 +1365,7 @@ class ShardingIntegrationTests(unittest.TestCase):
         # durations), keeping wall time near one file's sleep total.
         from ctrlrunner.reporting.history import HistoryStore
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "sharding_filegroup_suite"
             root.mkdir()
             for name in ("alpha", "beta"):
@@ -1407,7 +1407,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
         registry.reset()
 
     def test_no_retries_keeps_flat_step_tree_no_attempt_wrapper(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "profiling_flat_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1419,7 +1419,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             self.assertEqual(names, ["test body"])
 
     def test_retries_accumulate_all_attempts_under_numbered_parents(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "profiling_retry_suite"
             root.mkdir()
             (root / "test_flaky.py").write_text(
@@ -1443,7 +1443,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             self.assertEqual(result.steps[2]["children"][0]["outcome"], "passed")
 
     def test_capture_step_appears_alongside_fixture_setup_teardown_on_failure(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "profiling_capture_suite"
             root.mkdir()
             (root / "test_capture.py").write_text(
@@ -1473,7 +1473,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             )
 
     def test_worker_restart_overhead_measured_on_requeued_test(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "profiling_restart_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -1517,7 +1517,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
         self.assertNotIn("mod::stuck", orch._restart_overhead_for_result)
 
     def test_no_restart_means_overhead_stays_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "profiling_no_restart_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1541,7 +1541,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
     def test_quarantined_failure_gets_distinct_outcome_and_reason(self):
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_basic_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1560,7 +1560,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
     def test_quarantined_pass_stays_passed_but_flagged(self):
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_pass_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1576,7 +1576,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
     def test_unquarantined_test_unaffected(self):
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_unaffected_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1593,7 +1593,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
         from ctrlrunner.execution.fail_policy import FailPolicyState
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_failpolicy_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1617,7 +1617,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
             self.assertEqual(fp.cancel_reason, "max_failures")
 
     def test_no_quarantine_config_is_fully_unaffected(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_none_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1638,7 +1638,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
         from ctrlrunner.execution.fail_policy import FailPolicyState
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_timeout_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1669,7 +1669,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
         # counted.
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_flaky_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -1696,7 +1696,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
         # dependents.
         from ctrlrunner.execution.quarantine import QuarantineConfig
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "quarantine_serial_suite"
             root.mkdir()
             (root / "test_serial_q.py").write_text(
@@ -1726,7 +1726,7 @@ class CancellationTests(unittest.TestCase):
         registry.reset()
 
     def test_run_stops_promptly_and_marks_remaining_as_cancelled(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "cancel_suite"
             root.mkdir()
             (root / "test_slow.py").write_text(
@@ -1768,7 +1768,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         registry.reset()
 
     def test_finished_result_carries_worker_id(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_finished_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -1781,7 +1781,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         self.assertEqual(reporter.results[0].worker_id, 1)
 
     def test_timeout_kill_result_carries_worker_id(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_timeout_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -1797,7 +1797,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         self.assertEqual(reporter.results[0].worker_id, 1)
 
     def test_worker_crash_result_carries_worker_id(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
@@ -1816,7 +1816,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         # Drive _run_scheduler directly with num_workers=1 and two
         # batches so the second batch never gets a slot before the
         # cancel_event fires mid-first-batch.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_cancel_suite"
             root.mkdir()
             (root / "test_slow.py").write_text(
@@ -1871,7 +1871,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         # one slot must be reused after freeing up -- worker_id must
         # never exceed num_workers even though more than num_workers
         # batches were spawned over the run's lifetime.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_bounded_suite"
             root.mkdir()
             body = "from ctrlrunner import test\n\n" + "\n".join(
@@ -1890,7 +1890,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         # before it was hard-killed -- that timestamp must survive onto
         # the synthetic result instead of defaulting to None (which
         # would otherwise drop it from the Gantt timeline as a gap).
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "worker_id_timeout_started_at_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
@@ -1915,7 +1915,7 @@ class SerialClassTests(unittest.TestCase):
         registry.reset()
 
     def test_serial_class_runs_in_definition_order_on_one_worker(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_order_suite"
             root.mkdir()
             (root / "test_serial_order.py").write_text(
@@ -1940,7 +1940,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertEqual(names, ["test_c_first", "test_a_second", "test_b_third"])
 
     def test_failure_skips_all_subsequent_group_members(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_skip_suite"
             root.mkdir()
             (root / "test_serial_skip.py").write_text(
@@ -1967,7 +1967,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertIn("test_b", by_name["test_c"].error)
 
     def test_group_retries_rerun_whole_group_with_one_result_per_test(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_retry_suite"
             root.mkdir()
             (root / "test_serial_retry.py").write_text(
@@ -2000,7 +2000,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertTrue(all(r.attempts == 2 for r in reporter.results))
 
     def test_exhausted_group_retries_report_failure_and_skips(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_exhaust_suite"
             root.mkdir()
             (root / "test_serial_exhaust.py").write_text(
@@ -2026,7 +2026,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertEqual(by_name["test_c"].outcome, "skipped")
 
     def test_hard_kill_mid_group_without_budget_fails_stuck_and_skips_rest(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_kill_suite"
             root.mkdir()
             (root / "test_serial_kill.py").write_text(
@@ -2053,7 +2053,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertIn("hard-killed", by_name["test_c"].error)
 
     def test_hard_kill_mid_group_with_budget_requeues_whole_group_once(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_killretry_suite"
             root.mkdir()
             flag = (Path(tmp) / "first_attempt_done.flag").as_posix()
@@ -2090,7 +2090,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertEqual(len(test_ids), len(set(test_ids)), "duplicate results")
 
     def test_skipped_member_does_not_fail_the_group(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "serial_skipmember_suite"
             root.mkdir()
             (root / "test_serial_skipmember.py").write_text(
@@ -2246,7 +2246,7 @@ class ArtifactCaptureTests(unittest.TestCase):
         fixtures = {"page": Fixture(name="page", func=lambda: None, on_failure=on_failure)}
         resolved_all = {"page": {"url": "https://example.com"}}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             artifacts = capture_artifacts(
                 "mod::test_x", 1, resolved_all, fixtures, artifacts_root=Path(tmp)
             )
@@ -2265,7 +2265,7 @@ class ArtifactCaptureTests(unittest.TestCase):
             "\nAria snapshot:\n"
             '- heading "Playwright enables reliable web automation" [level=1]\n'
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             trimmed, path = _extract_aria_snapshot(tb, "mod::test_x", 1, artifacts_root=Path(tmp))
             self.assertIsNotNone(path)
             self.assertTrue(path.endswith("aria-snapshot.yml"))
@@ -2277,7 +2277,7 @@ class ArtifactCaptureTests(unittest.TestCase):
 
     def test_extract_aria_snapshot_leaves_plain_traceback_untouched(self):
         tb = "Traceback (most recent call last):\nAssertionError: nope\n"
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             trimmed, path = _extract_aria_snapshot(tb, "mod::test_x", 1, artifacts_root=Path(tmp))
             self.assertIsNone(path)
             self.assertEqual(trimmed, tb)
@@ -2316,7 +2316,7 @@ class ArtifactCaptureTests(unittest.TestCase):
         fixtures = {"page": Fixture(name="page", func=lambda: None, on_failure=broken_on_failure)}
         resolved_all = {"page": object()}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             artifacts = capture_artifacts(
                 "mod::test_x", 1, resolved_all, fixtures, artifacts_root=Path(tmp)
             )
@@ -2326,7 +2326,7 @@ class ArtifactCaptureTests(unittest.TestCase):
         fixtures = {"page": Fixture(name="page", func=lambda: None, on_failure=None)}
         resolved_all = {"page": object()}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             artifacts = capture_artifacts(
                 "mod::test_x", 1, resolved_all, fixtures, artifacts_root=Path(tmp)
             )
@@ -2346,7 +2346,7 @@ class ArtifactCaptureTests(unittest.TestCase):
         }
         resolved_all = {"page": "value"}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             artifacts = capture_artifacts(
                 "mod::test_x",
                 1,
@@ -2371,7 +2371,7 @@ class ArtifactCaptureTests(unittest.TestCase):
         }
         resolved_all = {"ctx": "trace-data"}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             artifacts = capture_artifacts(
                 "mod::test_x",
                 1,
@@ -2393,7 +2393,7 @@ class TimeoutSentinelResolutionTests(unittest.TestCase):
         registry.reset()
 
     def test_explicit_timeout_zero_hard_kills_almost_immediately(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "zero_timeout_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
@@ -2420,7 +2420,7 @@ class ImportPhaseTimeoutTests(unittest.TestCase):
         registry.reset()
 
     def test_slow_import_does_not_false_timeout_the_first_test(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "slow_import_suite"
             root.mkdir()
             # Importing this module alone takes 0.6s -- comfortably
@@ -2452,7 +2452,7 @@ class ProcessGroupKillTests(unittest.TestCase):
     def test_terminate_kills_the_whole_process_group_not_just_the_leader(self):
         from ctrlrunner.execution.jobobject import JobObject
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             pid_file = Path(tmp) / "child.pid"
             script = (
                 "import os, sys, time\n"
@@ -2531,7 +2531,7 @@ class NearTimeoutPerAttemptTests(unittest.TestCase):
         registry.reset()
 
     def test_retried_test_is_not_falsely_flagged_from_aggregate_duration(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "retry_near_timeout_suite"
             root.mkdir()
             # Two attempts of 0.5s each (50% of the 1.0s per-attempt
@@ -2588,7 +2588,7 @@ class SchedulerCrashSafetyTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event.type)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(
                 str(root),
@@ -2623,7 +2623,7 @@ class SchedulerCrashSafetyTests(unittest.TestCase):
             def on_run_end(self, results, duration):
                 seen_ends.append("run_end")
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp, "crash_safety_suite2")
             orch = Orchestrator(
                 str(root), 1, 10.0, console_reporters=[BrokenReporter(), GoodReporter()]
@@ -2657,7 +2657,7 @@ class GuardedOnRunEndTests(unittest.TestCase):
             def on_run_end(self, results, duration):
                 calls.append(len(results))
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "guarded_on_run_end_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -2805,7 +2805,7 @@ class EventPayloadFieldsTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "event_payload_fields_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -2842,7 +2842,7 @@ class EventOrderingTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "event_ordering_timeout_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -2870,7 +2870,7 @@ class EventOrderingTests(unittest.TestCase):
             def on_event(self, event):
                 received.append(event)
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "event_ordering_cancel_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
@@ -2921,7 +2921,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
         return root
 
     def test_assertion_failure_populates_assert_details(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -2935,7 +2935,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
         self.assertEqual(eq_result.assert_details["right"]["repr"], "2")
 
     def test_explicit_raise_leaves_assert_details_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -2944,7 +2944,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
         self.assertIsNone(by_id["test_explicit_raise"].assert_details)
 
     def test_passing_test_has_no_assert_details(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -2955,7 +2955,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
     def test_assert_details_survives_full_chain_into_html_report(self):
         from ctrlrunner.reporting.html_report import render_html
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -2986,7 +2986,7 @@ class LogCaptureIntegrationTests(unittest.TestCase):
         return root
 
     def test_logs_off_by_default_populates_nothing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -2995,7 +2995,7 @@ class LogCaptureIntegrationTests(unittest.TestCase):
             self.assertIsNone(r.logs)
 
     def test_logs_on_captures_both_passing_and_failing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0, logs_mode="on")
             reporter = orch.run()
@@ -3016,7 +3016,7 @@ class LogCaptureIntegrationTests(unittest.TestCase):
         )
 
     def test_logs_only_on_failure_keeps_failing_drops_passing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._make_suite(tmp)
             orch = Orchestrator(str(root), 1, 10.0, logs_mode="only-on-failure")
             reporter = orch.run()
@@ -3233,7 +3233,7 @@ class RecordPropertyE2ETests(unittest.TestCase):
         registry.reset()
 
     def test_record_property_and_suite_property_reach_the_report(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "recprop_suite"
             root.mkdir()
             (root / "test_props.py").write_text(
@@ -3273,7 +3273,7 @@ class TeardownErrorSurfacingTests(unittest.TestCase):
         registry.reset()
 
     def _run(self, suite_src, **orch_kwargs):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "td_suite"
             root.mkdir()
             (root / "test_td.py").write_text(suite_src)
@@ -3333,7 +3333,7 @@ class FilteredTracebackE2ETests(unittest.TestCase):
         registry.reset()
 
     def test_failure_traceback_has_no_runner_frames(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tb_suite"
             root.mkdir()
             (root / "test_tb.py").write_text(
@@ -3371,7 +3371,7 @@ class ReconciliationInvariantTests(unittest.TestCase):
         return root
 
     def test_normal_run_is_a_noop(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             orch = Orchestrator(str(self._make_suite(tmp)), 1, 10.0)
             reporter = orch.run()
         outcomes = {r.test_id.split("::")[-1]: r.outcome for r in reporter.results}
@@ -3380,7 +3380,7 @@ class ReconciliationInvariantTests(unittest.TestCase):
     def test_dropped_result_is_synthesized_as_failed(self):
         # Simulate a bookkeeping regression: the reporter silently drops
         # one specific test's real result.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             orch = Orchestrator(str(self._make_suite(tmp)), 1, 10.0)
             real_add = orch.reporter.add_result
             dropped = []
@@ -3410,7 +3410,7 @@ class WarningsCaptureTests(unittest.TestCase):
         registry.reset()
 
     def test_deprecation_warning_captured_on_result(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "warn_suite"
             root.mkdir()
             (root / "test_warns.py").write_text(
@@ -3453,7 +3453,7 @@ class DottedNameAliasTests(unittest.TestCase):
 
         from ctrlrunner.execution.worker import import_module_by_path, module_name_for_path
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             pkg = Path(tmp) / "alias_demo_pkg"
             pkg.mkdir()
             (pkg / "__init__.py").write_text("")
@@ -3480,7 +3480,7 @@ class DottedNameAliasTests(unittest.TestCase):
         # hash key; the alias stays pointing at whoever came first.
         from ctrlrunner.execution.worker import import_module_by_path, module_name_for_path
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "a"
             b = Path(tmp) / "b"
             for root in (a, b):
@@ -3510,7 +3510,7 @@ class StartedAtThreadingTests(unittest.TestCase):
         registry.reset()
 
     def test_result_started_at_is_set_from_a_real_run(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_started_at_demo.py").write_text(
@@ -3530,7 +3530,7 @@ class StartedAtThreadingTests(unittest.TestCase):
         # Exercises _run_serial_group's synthetic "finished" tuple for a
         # skipped member -- it must carry the SAME started_at as the
         # "started" message put right before it (worker.py:431), not None.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_serial_skip_demo.py").write_text(
@@ -3557,7 +3557,7 @@ class StartedAtThreadingTests(unittest.TestCase):
         self.assertLessEqual(skipped.started_at, after)
 
     def test_orchestrator_exposes_run_start(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_run_start_demo.py").write_text(
@@ -3583,7 +3583,7 @@ class CollectionSummaryPrintTests(unittest.TestCase):
         import io
         from contextlib import redirect_stdout
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_collection_summary_demo.py").write_text(
@@ -3613,7 +3613,7 @@ class GrepFilterOrchestratorTests(unittest.TestCase):
         )
 
     def test_grep_selects_matching_tests_only(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._write_suite(tmp)
             orch = Orchestrator(
                 str(Path(tmp) / "tests"), num_workers=1, default_timeout=30.0, grep="log"
@@ -3623,7 +3623,7 @@ class GrepFilterOrchestratorTests(unittest.TestCase):
         self.assertEqual(ids, {"test_login", "test_logout"})
 
     def test_grep_not_excludes_matching_tests(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self._write_suite(tmp)
             orch = Orchestrator(
                 str(Path(tmp) / "tests"), num_workers=1, default_timeout=30.0, grep_not="log"
@@ -3650,7 +3650,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
         return str(root)
 
     def test_default_order_stamps_no_suite_properties(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._write_suite(tmp)
             orch = Orchestrator(root, num_workers=1, default_timeout=30.0)
             orch.run()
@@ -3658,7 +3658,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
         self.assertNotIn("seed", orch.reporter.suite_properties)
 
     def test_random_order_stamps_order_and_seed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._write_suite(tmp)
             orch = Orchestrator(root, num_workers=1, default_timeout=30.0, order="random", seed=7)
             orch.run()
@@ -3666,7 +3666,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
         self.assertEqual(orch.reporter.suite_properties["seed"], "7")
 
     def test_alpha_order_stamps_order_without_seed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._write_suite(tmp)
             orch = Orchestrator(root, num_workers=1, default_timeout=30.0, order="alpha")
             orch.run()
@@ -3675,7 +3675,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
 
     def test_all_tests_still_run_under_random_order(self):
         # Reordering units must never drop or duplicate a test.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = self._write_suite(tmp)
             orch = Orchestrator(root, num_workers=2, default_timeout=30.0, order="random", seed=3)
             reporter = orch.run()

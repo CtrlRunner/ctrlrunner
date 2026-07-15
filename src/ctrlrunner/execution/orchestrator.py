@@ -43,6 +43,18 @@ _log = logging.getLogger(__name__)
 # *replacement* worker spawned after a hard-kill, not the original one.
 WORKER_RESTART_BUFFER = 5.0
 
+# _finalize_slot's ceiling for waiting on a terminated-but-not-yet-
+# reaped worker process. Windows process teardown (antivirus scanning
+# every process exit, OS handle release) can take far longer under CI
+# load than POSIX's near-instant SIGKILL reap. proc.join() already
+# returns the instant the process actually exits, so this only bounds
+# the rare slow-exit case -- it never slows the normal fast-exit path.
+# Short poll interval (rather than one join(timeout=CEILING) call) so
+# a run-level cancel can still cut the wait short instead of blocking
+# the scheduler loop for the full ceiling.
+FINALIZE_JOIN_CEILING = 10.0
+FINALIZE_JOIN_POLL_INTERVAL = 0.5
+
 # A generous, fixed upper bound for "still importing the suite's
 # modules", used as the watchdog deadline from spawn until the worker's
 # "ready" message arrives -- entirely separate from any per-test
@@ -1086,7 +1098,19 @@ class Orchestrator:
             )
             with contextlib.suppress(Exception):
                 slot.job.terminate()
-            slot.proc.join(timeout=2)
+            deadline = time.monotonic() + FINALIZE_JOIN_CEILING
+            while slot.proc.is_alive() and time.monotonic() < deadline:
+                if self._is_cancelled():
+                    break  # don't make a user-requested stop wait on this
+                slot.proc.join(timeout=FINALIZE_JOIN_POLL_INTERVAL)
+            if slot.proc.is_alive():
+                _log.warning(
+                    "Orchestrator: worker %s still alive %.0fs after "
+                    "termination -- giving up; process/handles may be "
+                    "reclaimed by the OS later",
+                    slot.worker_id,
+                    FINALIZE_JOIN_CEILING,
+                )
         slot.job.close()
         # Close the queue too -- otherwise its file descriptors
         # accumulate over a run with many timeout/requeue cycles.

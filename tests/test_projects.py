@@ -158,7 +158,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
 
     def test_project_num_workers_auto_resolves_to_concrete_int(self):
         with (
-            tempfile.TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
             mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=9),
         ):
             captured = self._run_two_projects(
@@ -171,7 +171,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
 
     def test_cli_num_workers_auto_beats_project_int(self):
         with (
-            tempfile.TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
             mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=5),
         ):
             captured = self._run_two_projects(
@@ -183,7 +183,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
         self.assertEqual(captured[1]["num_workers"], 4)
 
     def test_project_fully_parallel_overrides_base_in_both_directions(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             captured = self._run_two_projects(
                 tmp,
                 {"a": {"fully_parallel": True}},
@@ -195,7 +195,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
         from ctrlrunner.core import registry
 
         registry.reset()
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             captured = self._run_two_projects(
                 tmp,
                 {"a": {"fully_parallel": False}},
@@ -219,7 +219,7 @@ class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):
     def test_threshold_in_first_project_prevents_second_from_starting(self):
         from ctrlrunner.execution.fail_policy import FailPolicyState
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "sharedfp_a"
             b = Path(tmp) / "sharedfp_b"
             a.mkdir()
@@ -258,7 +258,7 @@ class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):
             self.assertEqual(len(combined.results), 3)
 
     def test_without_fail_policy_both_projects_run_normally(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "nofp_a"
             b = Path(tmp) / "nofp_b"
             a.mkdir()
@@ -294,7 +294,7 @@ class ModuleCollisionAcrossProjectsTests(unittest.TestCase):
         registry.reset()
 
     def test_two_projects_with_identically_named_relative_test_files_both_run_their_own(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "collision_a" / "tests"
             b = Path(tmp) / "collision_b" / "tests"
             a.mkdir(parents=True)
@@ -343,7 +343,7 @@ class FixtureRegistryClearedBetweenProjectsTests(unittest.TestCase):
         registry.reset()
 
     def test_project_2_does_not_see_project_1s_fixture(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "fixtureclear_a"
             b = Path(tmp) / "fixtureclear_b"
             a.mkdir()
@@ -397,7 +397,7 @@ class UpfrontStrictTagValidationTests(unittest.TestCase):
         from ctrlrunner.config.tag_registry import TagRegistry, TagValidationError
 
         marker = None
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             a = Path(tmp) / "strict_a"
             b = Path(tmp) / "strict_b"
             a.mkdir()

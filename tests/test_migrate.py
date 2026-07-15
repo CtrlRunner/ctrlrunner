@@ -24,7 +24,7 @@ def _write_tree(root: Path, files: dict):
 class MigrateTestCase(unittest.TestCase):
     def migrate(self, files: dict, write: bool = False, **kwargs):
         """Returns (report, {relative_name: new_source})."""
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)
         _write_tree(root, files)
@@ -1009,7 +1009,7 @@ class ConfigMigrationTests(MigrateTestCase):
             "spec/test_a.py": "def test_one():\n    assert True\n",
         }
         files.update(extra_files or {})
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)
         _write_tree(root, files)

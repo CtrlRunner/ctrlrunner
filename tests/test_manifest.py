@@ -44,14 +44,14 @@ class BuildManifestTests(unittest.TestCase):
         self.assertEqual(manifest["failedTestIds"], ["m::a", "m::b"])
 
     def test_git_sha_is_none_outside_a_repo(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             manifest = build_manifest(**self._kwargs(), cwd=tmp)
         self.assertIsNone(manifest["gitSha"])
 
     def test_git_sha_present_inside_a_repo(self):
         import subprocess
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
             subprocess.run(["git", "config", "user.email", "a@b.c"], cwd=tmp, check=True)
             subprocess.run(["git", "config", "user.name", "test"], cwd=tmp, check=True)
@@ -65,7 +65,7 @@ class BuildManifestTests(unittest.TestCase):
 
 class WriteManifestTests(unittest.TestCase):
     def test_writes_valid_json_to_the_given_path(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = str(Path(tmp) / "run-manifest.json")
             write_manifest(path, {"a": 1})
             data = json.loads(Path(path).read_text())
@@ -74,7 +74,7 @@ class WriteManifestTests(unittest.TestCase):
     def test_write_is_atomic_and_never_leaves_a_partial_file(self):
         # Same contract as JsonReporter: a crash mid-write must never
         # leave a truncated file at the final path.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = str(Path(tmp) / "run-manifest.json")
             write_manifest(path, {"a": 1})
             before = Path(path).read_text()

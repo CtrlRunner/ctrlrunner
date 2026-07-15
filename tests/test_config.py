@@ -17,7 +17,7 @@ class ConfigTests(unittest.TestCase):
         # with no filename; the module's posture is careful messaging
         # (warn on unknown keys, explain missing tomllib) -- a syntax
         # error deserves the same: a ValueError that says which file.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text('[ctrlrunner]\nroot = "unterminated\n')
             with self.assertRaises(ValueError) as ctx:
@@ -25,7 +25,7 @@ class ConfigTests(unittest.TestCase):
             self.assertIn("ctrlrunner.toml", str(ctx.exception))
 
     def test_parses_ctrlrunner_table(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner]\n"
@@ -41,7 +41,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(config["reporter"], ["dots", "json"])
 
     def test_missing_ctrlrunner_table_returns_empty_dict(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text("[other_tool]\nfoo = 1\n")
             self.assertEqual(load_config(str(path)), {})
@@ -49,7 +49,7 @@ class ConfigTests(unittest.TestCase):
     def test_workers_table_round_trips_through_load_config(self):
         from ctrlrunner.execution.worker_budget import load_worker_constraints
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner]\n"
@@ -79,7 +79,7 @@ class NestedGroupingTableTests(unittest.TestCase):
     elsewhere."""
 
     def test_correct_nesting_is_picked_up(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner.grouping]\n"
@@ -100,7 +100,7 @@ class NestedGroupingTableTests(unittest.TestCase):
         # [grouping] table is a sibling of [ctrlrunner], not nested in it,
         # so load_config() (which only returns data["ctrlrunner"]) never
         # sees it -- grouping silently falls back to the default.
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
                 "[ctrlrunner]\n"
@@ -122,7 +122,7 @@ class ConfigValidationTests(unittest.TestCase):
 
     def _load(self, toml_text):
         seen = []
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(toml_text)
             cfg = load_config(str(path), warn=seen.append)
@@ -161,7 +161,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(warns, [])
 
     def test_default_warn_goes_to_stderr(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"
             path.write_text("[ctrlrunner]\nbanana = 1\n")
             stderr = io.StringIO()
