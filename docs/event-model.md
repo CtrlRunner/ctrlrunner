@@ -1,0 +1,29 @@
+# Event model (for reporter/hook/plugin authors)
+
+[← Back to README](../README.md)
+
+Two independent, stable interfaces observe a run -- neither depends on
+or breaks the other:
+
+- **`ConsoleReporter`** (`pyrunner.reporting.reporters`) -- the existing
+  `on_run_start`/`on_test_start`/`on_test_end`/`on_run_end`, unchanged.
+  What `line`/`dots`/`json` already are; write your own the same way.
+- **`EventSubscriber`** (`pyrunner.reporting.events`) -- one method,
+  `on_event(envelope)`, receiving a versioned, JSON-serializable
+  `EventEnvelope` (`schemaVersion`, `type`, `timestamp`, `payload`) for
+  every lifecycle point, including `worker_spawned`/`worker_terminated`
+  which `ConsoleReporter` doesn't expose. This is the surface future
+  hooks/plugins/IDE integrations build on -- ignore any `type` you don't
+  recognize, since that's what keeps adding new event types additive
+  rather than breaking.
+
+```python
+from pyrunner.reporting.events import EventSubscriber
+
+class MySubscriber(EventSubscriber):
+    def on_event(self, event):
+        if event.type == "test_end":
+            print(event.payload["id"], event.payload["outcome"])
+
+orch = Orchestrator(root, num_workers, timeout, event_subscribers=[MySubscriber()])
+```

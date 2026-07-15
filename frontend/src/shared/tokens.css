@@ -1,0 +1,263 @@
+/* pyrunner design tokens. The palette grows out of the one that already
+   shipped in html_report.py's _CSS block (ours), extended with six label
+   hues. Theme is a .theme-light / .theme-dark class on <html>. */
+
+:root.theme-light {
+  --bg: #f6f8fa;
+  --fg: #1f2328;
+  --panel-bg: #ffffff;
+  --border: #d0d7de;
+  --border-muted: #e4e9ee;
+  --muted: #57606a;
+  --dim: #8b949e;
+  --hover-bg: #eef1f4;
+  --accent: #0969da;
+  --accent-soft: #0969da22;
+  --green: #1a7f37;
+  --red: #d1242f;
+  --amber: #9a6700;
+  --gray: #6e7781;
+  --error-bg: #fff0ef;
+  --error-fg: #82071e;
+  --code-bg: #f1f3f5;
+
+  --label-0-bg: #dbeafe;
+  --label-0-fg: #1e46a3;
+  --label-0-border: #93b4f8;
+  --label-1-bg: #dcfce7;
+  --label-1-fg: #14652f;
+  --label-1-border: #86dfac;
+  --label-2-bg: #ede9fe;
+  --label-2-fg: #5b21b6;
+  --label-2-border: #c4b5fd;
+  --label-3-bg: #fce7f3;
+  --label-3-fg: #9d174d;
+  --label-3-border: #f9a8d4;
+  --label-4-bg: #ffedd5;
+  --label-4-fg: #9a3412;
+  --label-4-border: #fdba74;
+  --label-5-bg: #ccf5f3;
+  --label-5-fg: #115e59;
+  --label-5-border: #67dcd6;
+}
+
+:root.theme-dark {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --panel-bg: #161b22;
+  --border: #30363d;
+  --border-muted: #262c33;
+  --muted: #8b949e;
+  --dim: #6e7681;
+  --hover-bg: #21262d;
+  --accent: #4493f8;
+  --accent-soft: #4493f833;
+  --green: #3fb950;
+  --red: #f85149;
+  --amber: #d29922;
+  --gray: #8b949e;
+  --error-bg: #3d1214;
+  --error-fg: #ffa198;
+  --code-bg: #1c2128;
+
+  --label-0-bg: #172a4d;
+  --label-0-fg: #9cc2ff;
+  --label-0-border: #2f5eab;
+  --label-1-bg: #12341d;
+  --label-1-fg: #8fe6ae;
+  --label-1-border: #23703c;
+  --label-2-bg: #2b2150;
+  --label-2-fg: #cdbcff;
+  --label-2-border: #5b43a8;
+  --label-3-bg: #46152e;
+  --label-3-fg: #ff9ecd;
+  --label-3-border: #96336a;
+  --label-4-bg: #43210c;
+  --label-4-fg: #ffbc85;
+  --label-4-border: #8f4a1d;
+  --label-5-bg: #0c3835;
+  --label-5-fg: #7fe0d9;
+  --label-5-border: #1d6e68;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code,
+pre,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.icon {
+  vertical-align: -2px;
+  flex-shrink: 0;
+}
+
+.chevron,
+.chevron-open {
+  transition: transform 0.12s ease;
+  color: var(--muted);
+}
+
+.chevron-open {
+  transform: rotate(90deg);
+}
+
+/* Status icon colors */
+.status-icon.status-passed,
+.status-icon.status-expected_failure {
+  color: var(--green);
+}
+.status-icon.status-failed {
+  color: var(--red);
+}
+.status-icon.status-quarantined_failure {
+  color: var(--amber);
+}
+.status-icon.status-skipped,
+.status-icon.status-fixme,
+.status-icon.status-cancelled,
+.status-icon.status-not_run {
+  color: var(--gray);
+}
+
+/* Chip: collapsible bordered card */
+.chip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.chip-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+
+.chip-header:hover {
+  background: var(--hover-bg);
+}
+
+.chip-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.chip-aside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.chip-body {
+  border-top: 1px solid var(--border-muted);
+}
+
+/* Label pills */
+.label {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 2em;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.label-0 {
+  background: var(--label-0-bg);
+  color: var(--label-0-fg);
+  border-color: var(--label-0-border);
+}
+.label-1 {
+  background: var(--label-1-bg);
+  color: var(--label-1-fg);
+  border-color: var(--label-1-border);
+}
+.label-2 {
+  background: var(--label-2-bg);
+  color: var(--label-2-fg);
+  border-color: var(--label-2-border);
+}
+.label-3 {
+  background: var(--label-3-bg);
+  color: var(--label-3-fg);
+  border-color: var(--label-3-border);
+}
+.label-4 {
+  background: var(--label-4-bg);
+  color: var(--label-4-fg);
+  border-color: var(--label-4-border);
+}
+.label-5 {
+  background: var(--label-5-bg);
+  color: var(--label-5-fg);
+  border-color: var(--label-5-border);
+}
+
+.label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Small outlined flags (quarantine / near-timeout / trace) */
+.flag {
+  font-size: 10.5px;
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 16px;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.flag-trace {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.flag-info {
+  border-color: var(--gray);
+  color: var(--gray);
+}

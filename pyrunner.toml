@@ -1,0 +1,64 @@
+[pyrunner]
+root = "examples"
+num_workers = "auto"   # "auto" = CPUs - 1 (the default); or an int, or "50%" of CPUs
+timeout = 30.0
+# import_timeout = 60.0  # watchdog budget (s) for a worker's suite-import phase
+# order = "declared"      # "declared" | "alpha" | "random" -- unit scheduling order
+# seed = 12345             # required (or auto-generated + printed) for order="random"
+reporter = ["line"]      # 'json' is always appended (results.json is written by
+                         # every run); custom reporters: "module.path:ClassName"
+
+# Scheduling default: tests in one FILE run in order in one worker;
+# files run in parallel across workers. Set true to distribute every
+# test individually instead (@test_class(fully_parallel=...) overrides
+# per class, projects override per project).
+fully_parallel = true
+
+# Optional: scoped worker budgets by file/glob/class. Note the nesting --
+# [pyrunner.workers], not a bare [workers] (a sibling table, silently
+# ignored). Plain int = cap mode (at most N workers run that group's
+# tests concurrently; 1 serializes the group). mode = "dedicated"
+# reserves N workers exclusively for the group instead.
+# [pyrunner.workers]
+# "tests/test_checkout.py" = 1
+# "tests/api/test_rate_*.py" = 2
+# "tests/test_login.py::LoginTests" = { count = 2, mode = "dedicated" }
+
+# Reports (JUnit XML, JSON, HTML) all live together under:
+#   <reports_dir>/<report_name>[-<timestamp>]/
+reports_dir = "reports"
+report_name = "html-report"
+report_timestamp = false
+keep_reports = 10
+artifact_mode = "files"  # or "base64" (images only; traces always stay as files)
+
+trace = "retain-on-failure"     # off | on | retain-on-failure | on-first-retry
+screenshot = "only-on-failure"   # off | on | only-on-failure
+browser = "chromium"             # chromium | firefox | webkit
+headed = false
+
+# Optional: catches typos in @test(tags=...). Absent entirely = zero
+# validation, zero behavior change. Prefix patterns like "team:*" match
+# any tag starting with "team:".
+# registered_tags = ["smoke", "regression", "team:*"]
+# strict_tags = false   # true = unregistered tag -> 0 tests run, non-zero exit
+
+# Uncomment to override where JUnit XML / JSON land instead of the
+# managed report directory above (e.g. if CI expects a fixed path):
+# junit_xml = "report.xml"
+# json_output = "results.json"
+
+# junit_logs = "off"            # "system-out"/"split": captured stdout/stderr into JUnit XML
+# junit_infra_errors = false    # true: timeout-kill/crash render as <error>, not <failure>
+# strict_teardown = true        # false: a broken fixture teardown no longer fails a passing test
+# full_trace = false            # true: keep pyrunner-internal frames in failure tracebacks
+
+# [pyrunner.fail_policy]
+# max_failures = 0
+# max_timeouts = 0
+# stop_on_worker_crash = false
+
+[pyrunner.history]
+enabled = true                    # default; stable across pruned report dirs
+db_path = "reports/.history.db"    # default: <reports_dir>/.history.db
+window_runs = 20

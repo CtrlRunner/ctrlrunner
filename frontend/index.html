@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pyrunner report</title>
+    <script>
+      // Applied before first paint to avoid a light-mode flash.
+      (function () {
+        var stored = localStorage.getItem('pyrunner-theme');
+        var dark =
+          stored === 'dark' ||
+          ((stored === null || stored === 'system') &&
+            matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'theme-dark' : 'theme-light');
+      })();
+    </script>
+    <!--PYRUNNER_DATA-->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/report/index.tsx"></script>
+  </body>
+</html>

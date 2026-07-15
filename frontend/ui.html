@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pyrunner UI Mode</title>
+    <script>
+      // Applied before first paint to avoid a light-mode flash.
+      (function () {
+        var stored = localStorage.getItem('pyrunner-theme');
+        var dark =
+          stored === 'dark' ||
+          ((stored === null || stored === 'system') &&
+            matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'theme-dark' : 'theme-light');
+      })();
+      // Per-launch session token, embedded server-side by render_ui_html()
+      // (see pyrunner/ui/localsec.py for the security model). The global's
+      // name deliberately differs from the placeholder: Python replaces
+      // EVERY occurrence of the placeholder string, so it must appear in
+      // this file exactly once -- as the value.
+      window.PYRUNNER_SESSION_TOKEN = '__PYRUNNER_SESSION_TOKEN__';
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/ui/index.tsx"></script>
+  </body>
+</html>
