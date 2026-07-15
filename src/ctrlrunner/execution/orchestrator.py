@@ -666,13 +666,13 @@ class Orchestrator:
                     self._finalize_slot(slot, timeouts)
 
     def _run_scheduler_loop(self, pending, slots, modules, timeouts):
-        cancelled_handled = False
-
         while pending or slots:
             # Cancellation: terminate everything alive, mark everything
             # not-yet-finished (both live remainders and never-started
             # pending batches) as 'cancelled', then stop scheduling.
-            if self._is_cancelled() and not cancelled_handled:
+            # The branch always `break`s below, so it can only ever run
+            # once per call -- no separate guard needed.
+            if self._is_cancelled():
                 for slot in slots:
                     slot.job.terminate()
                     slot.killed = True
@@ -690,7 +690,6 @@ class Orchestrator:
                 for batch in pending:
                     self._report_cancelled(batch.test_ids)
                 pending.clear()
-                cancelled_handled = True
                 break
 
             # Fill free slots from pending (first eligible batch under

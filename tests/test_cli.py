@@ -1107,10 +1107,6 @@ class MultiProjectLineReporterResetTests(unittest.TestCase):
             main()
 
     def test_progress_fraction_never_exceeds_its_own_projects_total(self):
-        import contextlib
-        import io
-        import re
-
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root_a = Path(tmp) / "tests_a"
             root_a.mkdir()

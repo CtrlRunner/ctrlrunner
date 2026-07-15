@@ -1,5 +1,5 @@
 from ctrlrunner import fixture, test
-from examples.advanced.conftest import module_setup_log, audit_log_calls
+from examples.advanced.conftest import audit_log_calls
 
 
 @fixture(scope="function", params=["chromium", "firefox", "webkit"])

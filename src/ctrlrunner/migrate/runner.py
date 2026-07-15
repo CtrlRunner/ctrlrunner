@@ -25,19 +25,6 @@ else:
         cst = None
         MetadataWrapper = None
 
-_CTRLRUNNER_NAMES = (
-    "test",
-    "fixture",
-    "parametrize",
-    "param",
-    "test_class",
-    "skip",
-    "fixme",
-    "fail",
-    "slow",
-    "record_property",
-)
-
 
 def _require_libcst():
     if cst is None:

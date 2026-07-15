@@ -300,7 +300,7 @@ def serve_ui(
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            pass
+            pass  # Ctrl+C is the normal way to stop this
         finally:
             # Without this, a run started just before Ctrl+C leaves its
             # non-daemon worker processes alive after the interpreter

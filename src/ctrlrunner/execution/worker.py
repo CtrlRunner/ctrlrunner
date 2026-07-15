@@ -150,7 +150,7 @@ def capture_artifacts(
             if path:
                 captured.append(str(path))
         except Exception:
-            pass
+            pass  # a broken capture callback must never affect the test result
     return captured
 
 
@@ -246,7 +246,6 @@ def _execute_test(
     max_attempts = (item.retries or 0) + 1
     first_attempt_start = time.time()
     attempt = 0
-    outcome, error, artifacts = "passed", None, []
     # near_timeout must compare a SINGLE attempt's own duration
     # to its own per-attempt timeout budget, not the sum across
     # every retry -- the orchestrator's watchdog deadline is reset

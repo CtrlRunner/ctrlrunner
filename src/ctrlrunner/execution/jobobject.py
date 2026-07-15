@@ -81,7 +81,7 @@ else:
             try:
                 os.killpg(self._pid, signal.SIGKILL)
             except ProcessLookupError:
-                pass
+                pass  # already gone -- nothing left to kill
             except PermissionError:
                 # The worker's own os.setpgid(0, 0) hasn't happened yet
                 # (killed extremely early, before it got to run) or

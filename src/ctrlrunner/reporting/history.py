@@ -97,7 +97,7 @@ class HistoryStore:
                 if os.path.exists(db_path):
                     os.chmod(db_path, 0o600)
             except OSError:
-                pass
+                pass  # best-effort hardening -- see comment above
 
     def _open(self, db_path: str) -> None:
         self._conn = sqlite3.connect(db_path, timeout=10.0)

@@ -108,7 +108,7 @@ def serve_report(
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            pass
+            pass  # Ctrl+C is the normal way to stop this
         finally:
             httpd.server_close()
         return None
