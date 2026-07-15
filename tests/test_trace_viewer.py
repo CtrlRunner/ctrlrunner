@@ -1,20 +1,20 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pyrunner.ui.trace_viewer import PersistentTraceViewer, open_trace, playwright_cli_available
+from ctrlrunner.ui.trace_viewer import PersistentTraceViewer, open_trace, playwright_cli_available
 
 
 class TraceViewerTests(unittest.TestCase):
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_cli_available_true_when_on_path(self, _mock_which):
         self.assertTrue(playwright_cli_available())
 
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value=None)
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value=None)
     def test_cli_available_false_when_missing(self, _mock_which):
         self.assertFalse(playwright_cli_available())
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_open_trace_launches_subprocess_when_cli_available(self, _mock_which, mock_popen):
         result = open_trace("trace.zip")
         self.assertTrue(result)
@@ -22,8 +22,8 @@ class TraceViewerTests(unittest.TestCase):
         args = mock_popen.call_args[0][0]
         self.assertEqual(args, ["playwright", "show-trace", "trace.zip"])
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value=None)
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value=None)
     def test_open_trace_returns_false_without_spawning_when_cli_missing(
         self, _mock_which, mock_popen
     ):
@@ -40,8 +40,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         proc.poll.return_value = None if running else 0
         return proc
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_start_parses_port_from_listening_line(self, _mock_which, mock_popen):
         mock_popen.return_value = self._mock_process(
             ["\n", "Listening on http://127.0.0.1:54321\n"]
@@ -58,16 +58,16 @@ class PersistentTraceViewerTests(unittest.TestCase):
             args, ["playwright", "show-trace", "--host", "127.0.0.1", "--port", "0", "--stdin"]
         )
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value=None)
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value=None)
     def test_start_returns_false_without_spawning_when_cli_missing(self, _mock_which, mock_popen):
         viewer = PersistentTraceViewer()
         self.assertFalse(viewer.start(timeout=2))
         mock_popen.assert_not_called()
         self.assertFalse(viewer.is_running)
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_start_returns_false_and_terminates_when_no_listening_line_before_timeout(
         self, _mock_which, mock_popen
     ):
@@ -79,8 +79,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         self.assertFalse(viewer.is_running)
         mock_popen.return_value.terminate.assert_called_once()
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_start_is_idempotent_when_already_running(self, _mock_which, mock_popen):
         mock_popen.return_value = self._mock_process(["\n", "Listening on http://127.0.0.1:1\n"])
         viewer = PersistentTraceViewer()
@@ -89,8 +89,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         self.assertTrue(viewer.start(timeout=2))
         mock_popen.assert_called_once()
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_load_trace_writes_path_and_flushes(self, _mock_which, mock_popen):
         mock_popen.return_value = self._mock_process(["\n", "Listening on http://127.0.0.1:1\n"])
         viewer = PersistentTraceViewer()
@@ -105,8 +105,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         viewer = PersistentTraceViewer()
         self.assertFalse(viewer.load_trace("some/trace.zip"))
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_load_trace_rejects_path_with_embedded_newline(self, _mock_which, mock_popen):
         # A newline in `path` would inject an extra line into the
         # --stdin protocol (each line is a separate "load this trace"
@@ -118,8 +118,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         self.assertFalse(viewer.load_trace("some/trace.zip\nmalicious-command"))
         mock_popen.return_value.stdin.write.assert_not_called()
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_load_trace_rejects_path_with_control_characters(self, _mock_which, mock_popen):
         mock_popen.return_value = self._mock_process(["\n", "Listening on http://127.0.0.1:1\n"])
         viewer = PersistentTraceViewer()
@@ -128,8 +128,8 @@ class PersistentTraceViewerTests(unittest.TestCase):
         self.assertFalse(viewer.load_trace("some/trace.zip\x00"))
         mock_popen.return_value.stdin.write.assert_not_called()
 
-    @patch("pyrunner.ui.trace_viewer.subprocess.Popen")
-    @patch("pyrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
+    @patch("ctrlrunner.ui.trace_viewer.subprocess.Popen")
+    @patch("ctrlrunner.ui.trace_viewer.shutil.which", return_value="/usr/bin/playwright")
     def test_stop_terminates_running_process(self, _mock_which, mock_popen):
         mock_popen.return_value = self._mock_process(["\n", "Listening on http://127.0.0.1:1\n"])
         viewer = PersistentTraceViewer()

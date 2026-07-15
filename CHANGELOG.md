@@ -21,4 +21,4 @@ Initial release.
 - Console, JUnit XML, and self-contained HTML reporters.
 - Code coverage integration.
 - UI Mode: local web server with live test tree, report viewer, and trace/screenshot artifacts.
-- `pytest` -> `pyrunner` source migration tool (`libcst`-based).
+- `pytest` -> `ctrlrunner` source migration tool (`libcst`-based).

@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from pyrunner.core.steps import begin_test, collect_steps, render_text, step
+from ctrlrunner.core.steps import begin_test, collect_steps, render_text, step
 
 
 class StepTests(unittest.TestCase):

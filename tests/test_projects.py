@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from pyrunner.config.projects import (
+from ctrlrunner.config.projects import (
     ProjectConfig,
     load_projects,
     resolve_project_names,
@@ -121,13 +121,13 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
     through the Orchestrators run_projects actually constructs."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
     def _run_two_projects(self, tmp, projects_kwargs, run_kwargs):
         captured = []
-        from pyrunner.execution.orchestrator import Orchestrator
+        from ctrlrunner.execution.orchestrator import Orchestrator
 
         real_init = Orchestrator.__init__
 
@@ -141,7 +141,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
             root = Path(tmp) / f"tests_{name}"
             root.mkdir()
             (root / f"test_{name}.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
 
         projects = {
@@ -159,7 +159,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
     def test_project_num_workers_auto_resolves_to_concrete_int(self):
         with (
             tempfile.TemporaryDirectory() as tmp,
-            mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=9),
+            mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=9),
         ):
             captured = self._run_two_projects(
                 tmp,
@@ -172,7 +172,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
     def test_cli_num_workers_auto_beats_project_int(self):
         with (
             tempfile.TemporaryDirectory() as tmp,
-            mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=5),
+            mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=5),
         ):
             captured = self._run_two_projects(
                 tmp,
@@ -192,7 +192,7 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
         self.assertIs(captured[0]["fully_parallel"], True)  # project override
         self.assertIs(captured[1]["fully_parallel"], False)  # inherits base
 
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
         with tempfile.TemporaryDirectory() as tmp:
@@ -212,12 +212,12 @@ class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):
     project's Orchestrator, not a fresh one per project."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
     def test_threshold_in_first_project_prevents_second_from_starting(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             a = Path(tmp) / "sharedfp_a"
@@ -225,12 +225,12 @@ class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):
             a.mkdir()
             b.mkdir()
             (a / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_1():\n    assert False\n\n"
                 "@test()\ndef test_2():\n    assert False\n"
             )
             (b / "test_b.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_3():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_3():\n    pass\n"
             )
             projects = {
                 "p1": ProjectConfig(name="p1", tests_dir=[str(a)]),
@@ -264,10 +264,10 @@ class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):
             a.mkdir()
             b.mkdir()
             (a / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_1():\n    assert False\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_1():\n    assert False\n"
             )
             (b / "test_b.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_2():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_2():\n    pass\n"
             )
             projects = {
                 "p1": ProjectConfig(name="p1", tests_dir=[str(a)]),
@@ -289,7 +289,7 @@ class ModuleCollisionAcrossProjectsTests(unittest.TestCase):
     force_reload must never end up re-running project A's module."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
@@ -304,10 +304,10 @@ class ModuleCollisionAcrossProjectsTests(unittest.TestCase):
             # the old dotted-name scheme made both resolve to the same
             # sys.modules key ("tests.test_x").
             (a / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_from_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_from_a():\n    pass\n"
             )
             (b / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_from_b():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_from_b():\n    pass\n"
             )
             projects = {
                 "proj_a": ProjectConfig(name="proj_a", tests_dir=[str(a)]),
@@ -338,7 +338,7 @@ class FixtureRegistryClearedBetweenProjectsTests(unittest.TestCase):
     'Unknown fixture' error."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
@@ -349,15 +349,15 @@ class FixtureRegistryClearedBetweenProjectsTests(unittest.TestCase):
             a.mkdir()
             b.mkdir()
             (a / "conftest.py").write_text(
-                "from pyrunner import fixture\n\n"
+                "from ctrlrunner import fixture\n\n"
                 "@fixture()\ndef only_in_a():\n    yield 'a-value'\n"
             )
             (a / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_uses_a_fixture(only_in_a):\n    assert only_in_a == 'a-value'\n"
             )
             (b / "test_b.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_uses_missing_fixture(only_in_a):\n    pass\n"
             )
             projects = {
@@ -389,12 +389,12 @@ class UpfrontStrictTagValidationTests(unittest.TestCase):
     invocation, discarding project 1's results."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
     def test_bad_tag_in_second_project_is_caught_before_first_project_runs(self):
-        from pyrunner.config.tag_registry import TagRegistry, TagValidationError
+        from ctrlrunner.config.tag_registry import TagRegistry, TagValidationError
 
         marker = None
         with tempfile.TemporaryDirectory() as tmp:
@@ -404,11 +404,11 @@ class UpfrontStrictTagValidationTests(unittest.TestCase):
             b.mkdir()
             marker = Path(tmp) / "project_1_ran.marker"
             (a / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 f"@test()\ndef test_1():\n    open({str(marker)!r}, 'w').close()\n"
             )
             (b / "test_b.py").write_text(
-                "from pyrunner import test\n\n@test(tags=['typo_tag'])\ndef test_2():\n    pass\n"
+                "from ctrlrunner import test\n\n@test(tags=['typo_tag'])\ndef test_2():\n    pass\n"
             )
             projects = {
                 "p1": ProjectConfig(name="p1", tests_dir=[str(a)]),
@@ -437,7 +437,7 @@ class CoverageConfigThreadingTests(unittest.TestCase):
     the same way fail_policy/history_store already are."""
 
     def setUp(self):
-        from pyrunner.core import registry
+        from ctrlrunner.core import registry
 
         registry.reset()
 
@@ -453,9 +453,9 @@ class CoverageConfigThreadingTests(unittest.TestCase):
 
         # Orchestrator is imported locally inside run_projects() (`from
         # ..execution.orchestrator import Orchestrator`), so it must be
-        # patched at its defining module, not at pyrunner.config.projects
+        # patched at its defining module, not at ctrlrunner.config.projects
         # (which never binds an `Orchestrator` name of its own).
-        with mock.patch("pyrunner.execution.orchestrator.Orchestrator", FakeOrchestrator):
+        with mock.patch("ctrlrunner.execution.orchestrator.Orchestrator", FakeOrchestrator):
             coverage_config = object()  # identity check only -- must be the same object
             projects = {"proj1": ProjectConfig(name="proj1", tests_dir=["."])}
             run_projects(

@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
-from pyrunner.reporting.reporter import JUnitReporter
+from ctrlrunner.reporting.reporter import JUnitReporter
 
 
 class ReporterTests(unittest.TestCase):
@@ -331,7 +331,7 @@ class JUnitGoldenBytesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "report.xml"
             with unittest.mock.patch(
-                "pyrunner.reporting.reporter.socket.gethostname", return_value="golden-host"
+                "ctrlrunner.reporting.reporter.socket.gethostname", return_value="golden-host"
             ):
                 reporter.write(str(path), suite_name="golden-suite")
             data = path.read_bytes()
@@ -446,7 +446,7 @@ class AtomicWriteTests(unittest.TestCase):
 
 class SuiteMetadataTests(unittest.TestCase):
     """JUnit consumers (Datadog CI, Allure, Jenkins) expect
-    timestamp/hostname/errors on <testsuite>; pyrunner emitted none."""
+    timestamp/hostname/errors on <testsuite>; ctrlrunner emitted none."""
 
     def _suite_element(self, reporter):
         with tempfile.TemporaryDirectory() as tmp:

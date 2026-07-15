@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.execution.quarantine import QuarantineConfig, resolve_quarantine_config
+from ctrlrunner.execution.quarantine import QuarantineConfig, resolve_quarantine_config
 
 
 class QuarantineConfigTests(unittest.TestCase):

@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pyrunner.core.registry import TestItem
-from pyrunner.execution.worker_budget import (
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.execution.worker_budget import (
     ExecUnit,
     WorkerConstraint,
     WorkerConstraintSpec,
@@ -56,27 +56,27 @@ def _spec(path, class_name=None, count=1, mode="cap", order=0):
 
 class ResolveNumWorkersTests(unittest.TestCase):
     def test_auto_is_cpu_count_minus_one(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=8):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=8):
             self.assertEqual(resolve_num_workers("auto"), 7)
 
     def test_auto_never_drops_below_one(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=1):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=1):
             self.assertEqual(resolve_num_workers("auto"), 1)
 
     def test_none_means_auto(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=8):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=8):
             self.assertEqual(resolve_num_workers(None), 7)
 
     def test_percent_of_cpu_count(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=8):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=8):
             self.assertEqual(resolve_num_workers("50%"), 4)
 
     def test_percent_over_100_allows_oversubscription(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=8):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=8):
             self.assertEqual(resolve_num_workers("150%"), 12)
 
     def test_small_percent_floors_at_one(self):
-        with mock.patch("pyrunner.execution.worker_budget._cpu_count", return_value=4):
+        with mock.patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=4):
             self.assertEqual(resolve_num_workers("10%"), 1)
 
     def test_positive_int_passes_through_unchanged(self):
@@ -403,7 +403,7 @@ class BuildUnitsTests(unittest.TestCase):
     def test_constraint_boundary_splits_a_file_unit(self):
         # a class-qualified constraint pulls that class's tests out of
         # the file's pool unit into its own constrained unit
-        from pyrunner.execution.worker_budget import WorkerConstraint
+        from ctrlrunner.execution.worker_budget import WorkerConstraint
 
         constraint = WorkerConstraint(group="tests/test_a.py::Login", count=1)
         tests = [
@@ -421,7 +421,7 @@ class BuildUnitsTests(unittest.TestCase):
         self.assertEqual(pool.test_ids, ("a::test_1", "a::test_3"))
 
     def test_constraints_by_unit_maps_serial_and_single_units_too(self):
-        from pyrunner.execution.worker_budget import WorkerConstraint
+        from ctrlrunner.execution.worker_budget import WorkerConstraint
 
         constraint = WorkerConstraint(group="tests/test_a.py", count=2)
         tests = [
@@ -455,7 +455,7 @@ class GroupAwareShardTests(unittest.TestCase):
     def test_singleton_units_no_constraints_no_history_match_chunk_exactly(self):
         # the fully_parallel degeneration guarantee: byte-identical
         # batches to today's round-robin _chunk()
-        from pyrunner.execution.orchestrator import _chunk
+        from ctrlrunner.execution.orchestrator import _chunk
 
         test_ids = [f"mod::test_{i}" for i in range(10)]
         units = [_single(tid) for tid in test_ids]

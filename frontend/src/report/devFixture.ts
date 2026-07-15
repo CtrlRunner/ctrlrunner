@@ -3,7 +3,7 @@
 import type { ReportData } from '../shared/types';
 
 export const devFixture: ReportData = {
-  suiteName: 'pyrunner dev fixture',
+  suiteName: 'ctrlrunner dev fixture',
   dimensions: ['module', 'suite', 'owner'],
   generatedAt: new Date().toISOString(),
   totalDuration: 74.2,

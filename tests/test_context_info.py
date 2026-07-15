@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.core import context_info
+from ctrlrunner.core import context_info
 
 
 class ContextInfoTests(unittest.TestCase):

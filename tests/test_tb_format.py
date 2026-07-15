@@ -1,9 +1,9 @@
 import unittest
 from contextlib import ExitStack
 
-from pyrunner.core import registry, tb_format
-from pyrunner.core import steps as steps_module
-from pyrunner.core.di import FixtureResolver
+from ctrlrunner.core import registry, tb_format
+from ctrlrunner.core import steps as steps_module
+from ctrlrunner.core.di import FixtureResolver
 
 
 def _user_code_that_raises():
@@ -19,7 +19,7 @@ def _user_code_chained():
 
 class TbFilterTests(unittest.TestCase):
     """Failure tracebacks start at the user's code -- frames
-    from inside the pyrunner package are display-filtered (pytest's
+    from inside the ctrlrunner package are display-filtered (pytest's
     __tracebackhide__ equivalent). The exception object is untouched."""
 
     def setUp(self):
@@ -28,7 +28,7 @@ class TbFilterTests(unittest.TestCase):
 
     def _formatted_through_di(self, user_fn):
         # Resolving a raising fixture routes the exception through real
-        # pyrunner-internal frames (di.py's _resolve_one and the step
+        # ctrlrunner-internal frames (di.py's _resolve_one and the step
         # context), exactly like a fixture failure in a real run.
         @registry.fixture(scope="function")
         def boom_fixture():
@@ -49,11 +49,11 @@ class TbFilterTests(unittest.TestCase):
         self.assertIn("user-level boom", text)
         self.assertIn("_user_code_that_raises", text)
         self.assertIn("boom_fixture", text)
-        self.assertNotIn("pyrunner/core/di.py", text)
+        self.assertNotIn("ctrlrunner/core/di.py", text)
         self.assertNotIn("_resolve_one", text)
 
     def test_all_internal_stack_kept_whole(self):
-        # an exception whose EVERY frame is pyrunner-internal (a runner
+        # an exception whose EVERY frame is ctrlrunner-internal (a runner
         # bug) must keep its full stack -- never filter to nothing.
         import traceback as tb
 
@@ -69,7 +69,7 @@ class TbFilterTests(unittest.TestCase):
         self.assertIn("KeyError", text)
         self.assertIn("RuntimeError: wrapper", text)
         self.assertIn("direct cause", text)  # the chaining banner survives
-        self.assertNotIn("pyrunner/core/di.py", text)
+        self.assertNotIn("ctrlrunner/core/di.py", text)
 
     def test_full_trace_mode_disables_filtering(self):
         tb_format.set_full_trace(True)

@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 
-from pyrunner.core.registry import TestItem
-from pyrunner.reporting.grouping import (
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.reporting.grouping import (
     DEFAULT_DIMENSIONS,
     UNGROUPED,
     GroupingDimension,
@@ -116,7 +116,7 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
             load_grouping_dimensions({"grouping": {"dimensions": []}})
 
     def test_empty_grouping_table_raises_same_as_explicit_empty_dimensions(self):
-        # A bare [pyrunner.grouping] header with no keys at all
+        # A bare [ctrlrunner.grouping] header with no keys at all
         # is falsy and today silently returns the module default -- but
         # an explicit `dimensions = []` already (correctly) raises.
         # Both are "the user configured grouping and got nothing usable"

@@ -225,10 +225,10 @@ body,
 }
 .dot-running {
   background: var(--accent);
-  animation: pyrunner-pulse 1s ease-in-out infinite;
+  animation: ctrlrunner-pulse 1s ease-in-out infinite;
 }
 
-@keyframes pyrunner-pulse {
+@keyframes ctrlrunner-pulse {
   0%,
   100% {
     opacity: 1;

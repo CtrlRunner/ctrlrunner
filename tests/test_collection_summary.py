@@ -1,7 +1,7 @@
 import unittest
 
-from pyrunner.core.registry import TestItem
-from pyrunner.reporting.collection_summary import format_collection_summary
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.reporting.collection_summary import format_collection_summary
 
 
 def _item(id_, tags=None):

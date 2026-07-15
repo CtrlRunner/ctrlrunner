@@ -11,7 +11,7 @@
 > distribution.
 
 ```toml
-[pyrunner]
+[ctrlrunner]
 num_workers = "auto"    # the default: CPUs - 1. Or an int, or "50%" of CPUs
 fully_parallel = false  # true = distribute every test individually
 ```
@@ -28,12 +28,12 @@ fully_parallel = false  # true = distribute every test individually
   when present) by whole scheduling units: a file, a serial class, or a
   single test under fully-parallel.
 
-### Scoped worker budgets (`[pyrunner.workers]`)
+### Scoped worker budgets (`[ctrlrunner.workers]`)
 
 Limit how many workers a file, glob, or class may occupy:
 
 ```toml
-[pyrunner.workers]                # NOTE: nested under [pyrunner] -- a bare
+[ctrlrunner.workers]                # NOTE: nested under [ctrlrunner] -- a bare
 "tests/test_checkout.py" = 1      # [workers] table is silently ignored
 "tests/api/test_rate_*.py" = 2
 "tests/test_login.py::LoginTests" = { count = 2, mode = "dedicated" }
@@ -48,7 +48,7 @@ Limit how many workers a file, glob, or class may occupy:
   and released as soon as the group drains).
 - The same cap can be declared in code: `@test_class(workers=1)` /
   `@test_class(workers=2, workers_mode="dedicated")`. A matching
-  `[pyrunner.workers]` entry always beats the decorator; among config
+  `[ctrlrunner.workers]` entry always beats the decorator; among config
   entries the most specific pattern wins (class-qualified > exact file
   > glob, ties by declaration order).
 
@@ -126,7 +126,7 @@ project's own `--tag-not` negation convention rather than Playwright's
 selection matches **zero tests exits with code 4** (a typo'd filter
 must never produce a green CI run that tested nothing); rerun flags
 matching zero stay exit 0. Implemented as a pure function
-(`pyrunner.core.selection.select_tests`) over the registered test list — no
+(`ctrlrunner.core.selection.select_tests`) over the registered test list — no
 collection hook, directly unit-testable.
 
 ```
@@ -155,9 +155,9 @@ Lists discovered (and selected) tests without running a single one --
 no worker spawned, no browser launched:
 
 ```
-pyrunner examples --tag smoke --list json --list-output selected.json
-pyrunner examples --case-id-prefix TC-100 --list text
-pyrunner examples --list md --list-fields id,timeout,retries
+ctrlrunner examples --tag smoke --list json --list-output selected.json
+ctrlrunner examples --case-id-prefix TC-100 --list text
+ctrlrunner examples --list md --list-fields id,timeout,retries
 ```
 
 ```

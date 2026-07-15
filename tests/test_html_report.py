@@ -5,12 +5,12 @@ import unittest
 from importlib import resources
 from pathlib import Path
 
-from pyrunner.reporting.html_report import render_html
-from pyrunner.reporting.reporter import Result
+from ctrlrunner.reporting.html_report import render_html
+from ctrlrunner.reporting.reporter import Result
 
 
 def _extract_embedded_data(html_str):
-    m = re.search(r"window\.__PYRUNNER_REPORT__ = (.*?);</script>", html_str, re.DOTALL)
+    m = re.search(r"window\.__CTRLRUNNER_REPORT__ = (.*?);</script>", html_str, re.DOTALL)
     # Undo the "</" -> "<\/" escaping applied to keep the JSON inert
     # inside its <script> tag; json.loads accepts "<\/" too, but be
     # explicit that the payload round-trips.
@@ -18,7 +18,7 @@ def _extract_embedded_data(html_str):
 
 
 class PrebuiltPageTests(unittest.TestCase):
-    """Guards for the committed Vite build (pyrunner/reporting/_static/).
+    """Guards for the committed Vite build (src/ctrlrunner/reporting/_static/).
 
     The page is built from frontend/ and committed; these catch the
     "changed frontend/src but forgot to run npm run build" failure mode.
@@ -26,14 +26,14 @@ class PrebuiltPageTests(unittest.TestCase):
 
     def _page(self):
         return (
-            resources.files("pyrunner.reporting")
+            resources.files("ctrlrunner.reporting")
             .joinpath("_static/report/index.html")
             .read_text(encoding="utf-8")
         )
 
     def test_prebuilt_page_exists_with_data_marker(self):
         page = self._page()
-        self.assertIn("<!--PYRUNNER_DATA-->", page)
+        self.assertIn("<!--CTRLRUNNER_DATA-->", page)
 
     def test_prebuilt_page_is_fully_inlined(self):
         # Match actual tags, not raw substrings: the inlined <style>
@@ -81,14 +81,14 @@ class HtmlReportTests(unittest.TestCase):
         out = render_html([], suite_name="<script>alert(1)</script>")
         data = _extract_embedded_data(out)
         self.assertEqual(data["suiteName"], "<script>alert(1)</script>")
-        payload = out.split("window.__PYRUNNER_REPORT__ = ", 1)[1]
+        payload = out.split("window.__CTRLRUNNER_REPORT__ = ", 1)[1]
         self.assertNotIn("<script>alert(1)</script>", payload.split("</script>")[0])
 
     def test_js_line_separators_in_error_text_stay_inert_in_script(self):
         # U+2028/U+2029 are valid inside JSON strings but are *line
         # terminators* in JavaScript source: unescaped inside the inline
         # <script>, they end the statement mid-string and the whole
-        # window.__PYRUNNER_REPORT__ assignment throws, blanking the
+        # window.__CTRLRUNNER_REPORT__ assignment throws, blanking the
         # report. json.dumps leaves them raw, so render_html must escape
         # them explicitly (same class of guard as the "</" escaping).
         results = [
@@ -120,7 +120,7 @@ class HtmlReportTests(unittest.TestCase):
         out = render_html(results)
         # the raw closing tag sequence must not appear unescaped inside the
         # embedded JSON blob (it's escaped to <\/script> to stay inside <script>)
-        payload = out.split("window.__PYRUNNER_REPORT__ = ", 1)[1]
+        payload = out.split("window.__CTRLRUNNER_REPORT__ = ", 1)[1]
         self.assertNotIn("</script><script>evil()", payload.split("</script>")[0])
 
     def test_produces_a_single_self_contained_html_document(self):
@@ -134,8 +134,8 @@ class HtmlReportTests(unittest.TestCase):
 
     def test_data_marker_is_consumed_by_injection(self):
         out = render_html([])
-        self.assertNotIn("<!--PYRUNNER_DATA-->", out)
-        self.assertIn("window.__PYRUNNER_REPORT__ = ", out)
+        self.assertNotIn("<!--CTRLRUNNER_DATA-->", out)
+        self.assertIn("window.__CTRLRUNNER_REPORT__ = ", out)
 
     def test_empty_results_still_renders_valid_document(self):
         out = render_html([], suite_name="empty")
@@ -319,7 +319,7 @@ class HtmlReportTests(unittest.TestCase):
 
 class ArtifactModeTests(unittest.TestCase):
     def _make_artifact_files(self, tmp):
-        source_dir = Path(tmp) / "pyrunner-artifacts" / "mod__test_x" / "attempt-1"
+        source_dir = Path(tmp) / "ctrlrunner-artifacts" / "mod__test_x" / "attempt-1"
         source_dir.mkdir(parents=True)
         image_path = source_dir / "page.png"
         image_path.write_bytes(b"\x89PNG\r\n\x1a\nfakepngbytes")

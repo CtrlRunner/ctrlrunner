@@ -1,5 +1,5 @@
 [project]
-name = "pyrunner"
+name = "ctrlrunner"
 version = "0.1.0"
 description = "A from-scratch Python test runner for Playwright: real OS-process workers, hard-kill timeouts via Windows Job Objects, no pytest dependency."
 readme = "README.md"
@@ -30,9 +30,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/alexneo2003/pyrunner"
-Repository = "https://github.com/alexneo2003/pyrunner"
-Issues = "https://github.com/alexneo2003/pyrunner/issues"
+Homepage = "https://github.com/CtrlRunner/ctrlrunner"
+Repository = "https://github.com/CtrlRunner/ctrlrunner"
+Issues = "https://github.com/CtrlRunner/ctrlrunner/issues"
 
 [project.optional-dependencies]
 playwright = ["playwright>=1.61.0"]
@@ -41,14 +41,14 @@ windows = ["pywin32; sys_platform == 'win32'"]
 coverage = ["coverage[toml]>=7"]
 
 [project.scripts]
-pyrunner = "pyrunner.cli:main"
+ctrlrunner = "ctrlrunner.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pyrunner"]
+packages = ["src/ctrlrunner"]
 
 [dependency-groups]
 dev = [
@@ -60,7 +60,7 @@ dev = [
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-extend-exclude = ["pyrunner-artifacts", "reports", "examples"]
+extend-exclude = ["ctrlrunner-artifacts", "reports", "examples"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
@@ -69,7 +69,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["pyrunner"]
+known-first-party = ["ctrlrunner"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -78,5 +78,5 @@ quote-style = "double"
 python-version = "3.12"
 
 [tool.ty.src]
-include = ["pyrunner"]
-exclude = ["pyrunner-artifacts", "reports", "examples", "tests"]
+include = ["src/ctrlrunner"]
+exclude = ["ctrlrunner-artifacts", "reports", "examples", "tests"]

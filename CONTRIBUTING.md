@@ -2,7 +2,7 @@
 
 ## Dev setup
 
-Clone the repo and sync it with [uv](https://docs.astral.sh/uv/) — this installs pyrunner
+Clone the repo and sync it with [uv](https://docs.astral.sh/uv/) — this installs ctrlrunner
 itself in editable mode plus its dev tooling:
 
 ```
@@ -15,7 +15,7 @@ uv run playwright install                    # browser binaries, if you don't ha
 
 ## Running the test suite
 
-pyrunner is tested with the standard library `unittest`, not itself or pytest —
+ctrlrunner is tested with the standard library `unittest`, not itself or pytest —
 avoids both the irony and a dependency on either:
 
 ```
@@ -27,7 +27,7 @@ uv run python -m unittest discover -s tests
 ```
 uv run ruff check .       # lint
 uv run ruff format .      # format
-uv run ty check           # type check (pyrunner/ only; see [tool.ty.src])
+uv run ty check           # type check (src/ctrlrunner/ only; see [tool.ty.src])
 ```
 
 Config for all three lives in `pyproject.toml` (`[tool.ruff]`, `[tool.ty]`).

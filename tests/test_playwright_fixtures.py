@@ -1,7 +1,7 @@
 import unittest
 
-from pyrunner.core import context_info
-from pyrunner.playwright import playwright_fixtures
+from ctrlrunner.core import context_info
+from ctrlrunner.playwright import playwright_fixtures
 
 
 class FakeTracing:
@@ -101,7 +101,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
     def test_trace_off_never_saves(self):
         playwright_fixtures.configure(trace_mode="off")
         ctx = FakeContext()
-        ctx._pyrunner_tracing_active = False  # "off" mode never starts tracing
+        ctx._ctrlrunner_tracing_active = False  # "off" mode never starts tracing
         result = playwright_fixtures._capture_trace(ctx, "prefix", "passed")
         self.assertIsNone(result)
         self.assertFalse(ctx.tracing.started)
@@ -110,7 +110,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
         playwright_fixtures.configure(trace_mode="on")
         for outcome in ("passed", "failed", "expected_failure"):
             ctx = FakeContext()
-            ctx._pyrunner_tracing_active = True
+            ctx._ctrlrunner_tracing_active = True
             result = playwright_fixtures._capture_trace(ctx, "prefix", outcome)
             self.assertEqual(result, "prefix.zip")
             self.assertEqual(ctx.tracing.stopped_with_path, "prefix.zip")
@@ -118,7 +118,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
     def test_retain_on_failure_discards_on_pass(self):
         playwright_fixtures.configure(trace_mode="retain-on-failure")
         ctx = FakeContext()
-        ctx._pyrunner_tracing_active = True
+        ctx._ctrlrunner_tracing_active = True
         result = playwright_fixtures._capture_trace(ctx, "prefix", "passed")
         self.assertIsNone(result)
         self.assertTrue(ctx.tracing.stopped_without_path)
@@ -127,7 +127,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
     def test_retain_on_failure_saves_on_failure(self):
         playwright_fixtures.configure(trace_mode="retain-on-failure")
         ctx = FakeContext()
-        ctx._pyrunner_tracing_active = True
+        ctx._ctrlrunner_tracing_active = True
         result = playwright_fixtures._capture_trace(ctx, "prefix", "failed")
         self.assertEqual(result, "prefix.zip")
 
@@ -135,7 +135,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
         for mode in ("on", "retain-on-failure", "off"):
             playwright_fixtures.configure(trace_mode=mode)
             ctx = FakeContext()
-            ctx._pyrunner_tracing_active = False
+            ctx._ctrlrunner_tracing_active = False
             result = playwright_fixtures._capture_trace(ctx, "prefix", "failed")
             self.assertIsNone(result)
             self.assertFalse(ctx.tracing.stopped_with_path)
@@ -144,7 +144,7 @@ class TraceCaptureLogicTests(unittest.TestCase):
     def test_on_first_retry_saves_when_active_regardless_of_outcome(self):
         playwright_fixtures.configure(trace_mode="on-first-retry")
         ctx = FakeContext()
-        ctx._pyrunner_tracing_active = True  # would only be True if attempt >= 2
+        ctx._ctrlrunner_tracing_active = True  # would only be True if attempt >= 2
         result = playwright_fixtures._capture_trace(ctx, "prefix", "passed")
         self.assertEqual(result, "prefix.zip")
 

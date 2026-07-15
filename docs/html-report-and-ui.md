@@ -8,20 +8,20 @@ Run different subsets of tests under different configs, like Playwright
 TS projects -- a named override bundle over base config:
 
 ```toml
-[pyrunner.projects.smoke]
+[ctrlrunner.projects.smoke]
 tests_dir = ["tests/web", "tests/e2e"]
 tags = ["smoke"]
 timeout = 15
 
-[pyrunner.projects.regression]
+[ctrlrunner.projects.regression]
 tests_dir = ["tests/web"]
 timeout = 30
 ```
 
 ```
-pyrunner --project smoke
-pyrunner --project smoke,regression
-pyrunner --project smoke --timeout 45   # CLI still overrides the project's timeout=15
+ctrlrunner --project smoke
+ctrlrunner --project smoke,regression
+ctrlrunner --project smoke --timeout 45   # CLI still overrides the project's timeout=15
 ```
 
 `tags` in a project is a **selection filter** ("only run tests matching
@@ -48,11 +48,11 @@ grouping dimension, no extra `[grouping]` config needed.
 
 Both the HTML report and UI Mode group tests by module by default --
 no config needed, identical to before. Add `[grouping]` to
-`pyrunner.toml` for additional ways to group, with a dropdown switcher
+`ctrlrunner.toml` for additional ways to group, with a dropdown switcher
 to pick between them:
 
 ```toml
-[pyrunner.grouping]
+[ctrlrunner.grouping]
 dimensions = [
   { name = "module", strategy = "module" },                  # today's default -- list explicitly to keep it alongside custom ones
   { name = "suite",  strategy = "path", depth = 1 },          # tests/web/cases/... -> "cases"
@@ -61,8 +61,8 @@ dimensions = [
 ]
 ```
 
-(Note the `[pyrunner.grouping]` nesting, not a bare `[grouping]` --
-everything in `pyrunner.toml` lives under the top-level `[pyrunner]`
+(Note the `[ctrlrunner.grouping]` nesting, not a bare `[grouping]` --
+everything in `ctrlrunner.toml` lives under the top-level `[ctrlrunner]`
 table, so a sub-table needs the dotted prefix to actually nest inside
 it rather than becoming its own unrelated top-level table that gets
 silently ignored.)
@@ -160,7 +160,7 @@ trace would bloat the report for no benefit (it can't be previewed
 inline anyway).
 
 ```
-python -m pyrunner show-report reports/html-report/report.html [--port 0] [--no-browser]
+python -m ctrlrunner show-report reports/html-report/report.html [--port 0] [--no-browser]
 ```
 
 Serves the report (and its `artifacts/` folder) over
@@ -180,15 +180,15 @@ double-clicking the file. No new dependency (stdlib `http.server`).
 
 Config file equivalent:
 ```toml
-[pyrunner.coverage]
+[ctrlrunner.coverage]
 enabled = true
-source = ["pyrunner"]              # passthrough to coverage.py; default: its own auto-detection
+source = ["ctrlrunner"]              # passthrough to coverage.py; default: its own auto-detection
 html_dir = "reports/coverage-html" # default: none (no HTML report)
 fail_under = 85                    # default: none (no threshold enforced)
 contexts = false                   # default; true calls cov.switch_context(test_id) per test
 ```
 
-Requires the optional `coverage` extra: `pip install pyrunner[coverage]`.
+Requires the optional `coverage` extra: `pip install ctrlrunner[coverage]`.
 
 Each spawned worker process runs its own `coverage.Coverage()` instance
 around its whole test batch; after every worker (across every project,
@@ -222,7 +222,7 @@ summary in the HTML report, never per-test.
 ## UI Mode
 
 ```
-python -m pyrunner ui [root] [--port 0] [--no-browser] [-n 4] [--timeout 30]
+python -m ctrlrunner ui [root] [--port 0] [--no-browser] [-n 4] [--timeout 30]
 ```
 
 A live, interactive local app: a

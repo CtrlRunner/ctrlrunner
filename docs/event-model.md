@@ -5,10 +5,10 @@
 Two independent, stable interfaces observe a run -- neither depends on
 or breaks the other:
 
-- **`ConsoleReporter`** (`pyrunner.reporting.reporters`) -- the existing
+- **`ConsoleReporter`** (`ctrlrunner.reporting.reporters`) -- the existing
   `on_run_start`/`on_test_start`/`on_test_end`/`on_run_end`, unchanged.
   What `line`/`dots`/`json` already are; write your own the same way.
-- **`EventSubscriber`** (`pyrunner.reporting.events`) -- one method,
+- **`EventSubscriber`** (`ctrlrunner.reporting.events`) -- one method,
   `on_event(envelope)`, receiving a versioned, JSON-serializable
   `EventEnvelope` (`schemaVersion`, `type`, `timestamp`, `payload`) for
   every lifecycle point, including `worker_spawned`/`worker_terminated`
@@ -18,7 +18,7 @@ or breaks the other:
   rather than breaking.
 
 ```python
-from pyrunner.reporting.events import EventSubscriber
+from ctrlrunner.reporting.events import EventSubscriber
 
 class MySubscriber(EventSubscriber):
     def on_event(self, event):

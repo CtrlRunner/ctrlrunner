@@ -3,7 +3,7 @@ Shared fixtures for every test_*.py under examples/advanced/. Discovered
 and imported automatically by the orchestrator before any test module --
 no explicit import needed in the test files themselves.
 """
-from pyrunner import fixture
+from ctrlrunner import fixture
 
 module_setup_log = []
 

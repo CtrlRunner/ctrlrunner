@@ -5,7 +5,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from pyrunner.ui.show_report import serve_report
+from ctrlrunner.ui.show_report import serve_report
 
 
 class NoPortProbeTests(unittest.TestCase):
@@ -18,7 +18,7 @@ class NoPortProbeTests(unittest.TestCase):
         # back the OS-assigned port atomically from the one socket that
         # actually stays bound, so the standalone probe helper should
         # no longer exist.
-        import pyrunner.ui.show_report as show_report_module
+        import ctrlrunner.ui.show_report as show_report_module
 
         self.assertFalse(hasattr(show_report_module, "_find_free_port"))
 
@@ -31,13 +31,13 @@ class ServeReportTests(unittest.TestCase):
     def test_serves_report_file_over_http(self):
         with tempfile.TemporaryDirectory() as tmp:
             report_path = Path(tmp) / "report.html"
-            report_path.write_text("<html>hello pyrunner</html>", encoding="utf-8")
+            report_path.write_text("<html>hello ctrlrunner</html>", encoding="utf-8")
 
             httpd, url = serve_report(str(report_path), port=0, open_browser=False, block=False)
             try:
                 resp = urllib.request.urlopen(url, timeout=2)
                 self.assertEqual(resp.status, 200)
-                self.assertIn("hello pyrunner", resp.read().decode())
+                self.assertIn("hello ctrlrunner", resp.read().decode())
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -57,7 +57,7 @@ class ServeReportTests(unittest.TestCase):
     def test_serves_artifacts_alongside_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "report.html").write_text("<html></html>", encoding="utf-8")
-            artifacts_dir = Path(tmp) / "pyrunner-artifacts"
+            artifacts_dir = Path(tmp) / "ctrlrunner-artifacts"
             artifacts_dir.mkdir()
             (artifacts_dir / "shot.png").write_bytes(b"fake-png-bytes")
 
@@ -65,7 +65,7 @@ class ServeReportTests(unittest.TestCase):
                 str(Path(tmp) / "report.html"), port=0, open_browser=False, block=False
             )
             try:
-                artifact_url = url.rsplit("/", 1)[0] + "/pyrunner-artifacts/shot.png"
+                artifact_url = url.rsplit("/", 1)[0] + "/ctrlrunner-artifacts/shot.png"
                 resp = urllib.request.urlopen(artifact_url, timeout=2)
                 self.assertEqual(resp.read(), b"fake-png-bytes")
             finally:

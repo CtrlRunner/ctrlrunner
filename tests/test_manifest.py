@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pyrunner.reporting.manifest import build_manifest, write_manifest
+from ctrlrunner.reporting.manifest import build_manifest, write_manifest
 
 
 class BuildManifestTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class BuildManifestTests(unittest.TestCase):
 
     def test_includes_versions_and_argv(self):
         manifest = build_manifest(**self._kwargs())
-        self.assertIn("pyrunnerVersion", manifest)
+        self.assertIn("ctrlrunnerVersion", manifest)
         self.assertIn("pythonVersion", manifest)
         self.assertIn("platform", manifest)
         self.assertEqual(manifest["argv"], ["--reporter", "dots"])

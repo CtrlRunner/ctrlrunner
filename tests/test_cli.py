@@ -10,8 +10,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
-from pyrunner.cli import main
-from pyrunner.core import registry
+from ctrlrunner.cli import main
+from ctrlrunner.core import registry
 
 
 class RerunCliIntegrationTests(unittest.TestCase):
@@ -23,14 +23,14 @@ class RerunCliIntegrationTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def _make_suite(self, tmp, module_name="rerun_demo"):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / f"test_{module_name}.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\ndef test_a():\n    pass\n\n"
             "@test()\ndef test_b():\n    assert False\n\n"
             "@test()\ndef test_c():\n    assert False\n"
@@ -95,7 +95,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
             os.chdir(tmp)
             # Overwrite the demo suite so every test passes -- a clean run.
             (Path(tmp) / "tests" / f"test_{mod}.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_a():\n    pass\n\n"
                 "@test()\ndef test_b():\n    pass\n"
             )
@@ -114,10 +114,10 @@ class RerunCliIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_changedsince_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             (root / "test_changedsince_b.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_b():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_b():\n    pass\n"
             )
             os.chdir(tmp)
             subprocess.run(["git", "init", "-q"], check=True)
@@ -127,7 +127,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
             subprocess.run(["git", "commit", "-q", "-m", "initial"], check=True)
 
             (root / "test_changedsince_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n\n"
                 "@test()\ndef test_a2():\n    pass\n"
             )
             self._run_cli(["--changed-since", "HEAD", "--reporter", "json"])
@@ -186,7 +186,7 @@ class RerunCliIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_x():\n"
                 "    print('cli logs test output')\n"
@@ -206,7 +206,7 @@ class ListProjectScopingTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def _make_project_layout(self, tmp):
@@ -215,15 +215,15 @@ class ListProjectScopingTests(unittest.TestCase):
         web.mkdir(parents=True)
         e2e.mkdir(parents=True)
         (web / "test_web.py").write_text(
-            "from pyrunner import test\n\n@test(tags={'smoke'})\ndef test_login():\n    pass\n"
+            "from ctrlrunner import test\n\n@test(tags={'smoke'})\ndef test_login():\n    pass\n"
         )
         (e2e / "test_e2e.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
         )
-        (Path(tmp) / "pyrunner.toml").write_text(
-            "[pyrunner.projects.smoke]\n"
+        (Path(tmp) / "ctrlrunner.toml").write_text(
+            "[ctrlrunner.projects.smoke]\n"
             'tests_dir = ["tests/web"]\n\n'
-            "[pyrunner.projects.e2e]\n"
+            "[ctrlrunner.projects.e2e]\n"
             'tests_dir = ["tests/e2e"]\n'
         )
 
@@ -256,12 +256,12 @@ class ListProjectScopingTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(tags={'smoke'})\ndef test_login():\n    pass\n\n"
                 "@test(tags={'regression'})\ndef test_checkout():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text(
-                '[pyrunner.projects.smoke]\ntests_dir = ["tests"]\ntags = ["smoke"]\n'
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner.projects.smoke]\ntests_dir = ["tests"]\ntags = ["smoke"]\n'
             )
             os.chdir(tmp)
             buf = io.StringIO()
@@ -284,13 +284,13 @@ class ListProjectScopingTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test(tags={'smoke'})\ndef test_login():\n    pass\n"
+                "from ctrlrunner import test\n\n@test(tags={'smoke'})\ndef test_login():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text(
-                "[pyrunner]\n"
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                "[ctrlrunner]\n"
                 "registered_tags = ['smoke']\n"
                 "strict_tags = true\n\n"
-                '[pyrunner.projects.typo]\ntests_dir = ["tests"]\ntags = ["smoke-typo"]\n'
+                '[ctrlrunner.projects.typo]\ntests_dir = ["tests"]\ntags = ["smoke-typo"]\n'
             )
             os.chdir(tmp)
             buf = io.StringIO()
@@ -302,7 +302,7 @@ class ListProjectScopingTests(unittest.TestCase):
 
 class ProjectCliIntegrationTests(unittest.TestCase):
     """First CLI-level tests in this project (prior verification was all
-    manual `python -m pyrunner ...` subprocess runs) -- added here
+    manual `python -m ctrlrunner ...` subprocess runs) -- added here
     specifically because the bug below was only ever caught by actually
     reading the file `cli.main()` produces, not by any unit test of
     run_projects() itself (which returns a combined Python object
@@ -322,23 +322,23 @@ class ProjectCliIntegrationTests(unittest.TestCase):
         web.mkdir(parents=True)
         e2e.mkdir(parents=True)
         (web / "test_web.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test(tags={'smoke'})\ndef test_login():\n    pass\n\n"
             "@test(tags={'regression'})\ndef test_checkout():\n    pass\n"
         )
         (e2e / "test_e2e.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
         )
-        (Path(tmp) / "pyrunner.toml").write_text(
-            "[pyrunner.projects.smoke]\n"
+        (Path(tmp) / "ctrlrunner.toml").write_text(
+            "[ctrlrunner.projects.smoke]\n"
             'tests_dir = ["tests/web", "tests/e2e"]\n'
             'tags = ["smoke"]\n\n'
-            "[pyrunner.projects.regression]\n"
+            "[ctrlrunner.projects.regression]\n"
             'tests_dir = ["tests/web"]\n'
         )
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_combined_json_includes_every_project_not_just_the_last(self):
@@ -401,7 +401,7 @@ class ProjectCliIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             os.chdir(tmp)
             self._run_cli(["--reporter", "json"])
@@ -422,7 +422,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
             main()
         return ctx.exception.code
 
@@ -430,7 +430,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / f"test_{module_name}.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
         )
 
     def test_dash_n_auto_is_accepted(self):
@@ -467,7 +467,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, "cfgauto_demo")
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text('[pyrunner]\nnum_workers = "auto"\n')
+            Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "auto"\n')
             code = self._run_cli(["--reporter", "json"])
             self.assertEqual(code, 0)
 
@@ -475,7 +475,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, "cfgpercent_demo")
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text('[pyrunner]\nnum_workers = "50%"\n')
+            Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "50%"\n')
             code = self._run_cli(["--reporter", "json"])
             self.assertEqual(code, 0)
 
@@ -483,7 +483,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, "cfgbadworkers_demo")
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text('[pyrunner]\nnum_workers = "fast"\n')
+            Path("ctrlrunner.toml").write_text('[ctrlrunner]\nnum_workers = "fast"\n')
             code = self._run_cli([])
             self.assertEqual(code, 1)
             self.assertFalse(Path("reports/html-report/results.json").exists())
@@ -492,7 +492,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, "cfgbadtable_demo")
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text('[pyrunner.workers]\n"tests/test_x.py" = 0\n')
+            Path("ctrlrunner.toml").write_text('[ctrlrunner.workers]\n"tests/test_x.py" = 0\n')
             code = self._run_cli([])
             self.assertEqual(code, 1)
 
@@ -500,7 +500,7 @@ class WorkerConfigCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, "cfgbadfp_demo")
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text('[pyrunner]\nfully_parallel = "yes"\n')
+            Path("ctrlrunner.toml").write_text('[ctrlrunner]\nfully_parallel = "yes"\n')
             code = self._run_cli([])
             self.assertEqual(code, 1)
 
@@ -509,14 +509,14 @@ class WorkerConfigCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_capped_cli.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_a():\n    pass\n\n"
                 "@test()\ndef test_b():\n    pass\n"
             )
             os.chdir(tmp)
-            Path("pyrunner.toml").write_text(
-                "[pyrunner]\nfully_parallel = true\n\n"
-                '[pyrunner.workers]\n"tests/test_capped_cli.py" = 1\n'
+            Path("ctrlrunner.toml").write_text(
+                "[ctrlrunner]\nfully_parallel = true\n\n"
+                '[ctrlrunner.workers]\n"tests/test_capped_cli.py" = 1\n'
             )
             code = self._run_cli(["-n", "4", "--reporter", "json"])
             self.assertEqual(code, 0)
@@ -534,7 +534,7 @@ class ConfigValidationCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_bad_fail_policy_config_fails_fast_with_no_report_written(self):
@@ -545,9 +545,9 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text('[pyrunner.fail_policy]\nmax_failures = "5"\n')
+            (Path(tmp) / "ctrlrunner.toml").write_text('[ctrlrunner.fail_policy]\nmax_failures = "5"\n')
             os.chdir(tmp)
             buf = io.StringIO()
             with contextlib.redirect_stderr(buf):
@@ -564,14 +564,14 @@ class ConfigValidationCliTests(unittest.TestCase):
                 root = Path(tmp) / "tests"
                 root.mkdir()
                 (root / "test_a.py").write_text(
-                    "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                    "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
                 )
-                (Path(tmp) / "pyrunner.toml").write_text(f"[pyrunner]\nimport_timeout = {bad}\n")
+                (Path(tmp) / "ctrlrunner.toml").write_text(f"[ctrlrunner]\nimport_timeout = {bad}\n")
                 os.chdir(tmp)
                 buf = io.StringIO()
                 with (
                     contextlib.redirect_stderr(buf),
-                    patch.object(sys, "argv", ["pyrunner"]),
+                    patch.object(sys, "argv", ["ctrlrunner"]),
                     self.assertRaises(SystemExit) as ctx,
                 ):
                     main()
@@ -587,15 +587,15 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(tags={'not_registered_anywhere'})\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text('[pyrunner]\nregistered_tags = ["smoke"]\n')
+            (Path(tmp) / "ctrlrunner.toml").write_text('[ctrlrunner]\nregistered_tags = ["smoke"]\n')
             os.chdir(tmp)
             buf = io.StringIO()
             with (
                 contextlib.redirect_stderr(buf),
-                patch.object(sys, "argv", ["pyrunner", "--strict-tags"]),
+                patch.object(sys, "argv", ["ctrlrunner", "--strict-tags"]),
                 self.assertRaises(SystemExit) as ctx,
             ):
                 main()
@@ -616,14 +616,14 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_cfgwarn_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text("[pyrunner]\nnum_wokers = 2\n")
+            (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner]\nnum_wokers = 2\n")
             os.chdir(tmp)
             buf = io.StringIO()
             with (
                 contextlib.redirect_stderr(buf),
-                patch.object(sys, "argv", ["pyrunner"]),
+                patch.object(sys, "argv", ["ctrlrunner"]),
                 self.assertRaises(SystemExit) as ctx,
             ):
                 main()
@@ -639,7 +639,7 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_junitlogs_demo.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_prints():\n"
                 '    print("captured-for-junit")\n'
@@ -649,7 +649,7 @@ class ConfigValidationCliTests(unittest.TestCase):
                 patch.object(
                     sys,
                     "argv",
-                    ["pyrunner", "--logs", "on", "--junit-logs", "system-out"],
+                    ["ctrlrunner", "--logs", "on", "--junit-logs", "system-out"],
                 ),
                 self.assertRaises(SystemExit) as ctx,
             ):
@@ -666,7 +666,7 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_serialrerun_demo.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -694,7 +694,7 @@ class ConfigValidationCliTests(unittest.TestCase):
                 patch.object(
                     sys,
                     "argv",
-                    ["pyrunner", "--failed-from", str(failed_json), "--reporter", "json"],
+                    ["ctrlrunner", "--failed-from", str(failed_json), "--reporter", "json"],
                 ),
                 self.assertRaises(SystemExit) as ctx,
             ):
@@ -718,7 +718,7 @@ class ConfigValidationCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_badpath_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             blocker = Path(tmp) / "blocker"
             blocker.write_text("")  # a FILE where a directory is needed
@@ -727,7 +727,7 @@ class ConfigValidationCliTests(unittest.TestCase):
             with (
                 contextlib.redirect_stderr(buf),
                 patch.object(
-                    sys, "argv", ["pyrunner", "--junit-xml", str(blocker / "sub" / "report.xml")]
+                    sys, "argv", ["ctrlrunner", "--junit-xml", str(blocker / "sub" / "report.xml")]
                 ),
                 self.assertRaises(SystemExit) as ctx,
             ):
@@ -745,7 +745,7 @@ class HistoryDbPathDerivationTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_history_db_follows_custom_reports_dir(self):
@@ -765,7 +765,7 @@ class HistoryDbPathDerivationTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_history_db_path_derivation.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             os.chdir(tmp)
             self._run_cli(["--reports-dir", "custom_reports"])
@@ -781,7 +781,7 @@ class ListRiskFlagTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_list_json_flags_a_test_with_history_near_its_timeout(self):
@@ -795,7 +795,7 @@ class ListRiskFlagTests(unittest.TestCase):
             # leaving 0.2s of absolute slack, so a slow CI runner can't
             # turn the seeding run's test_slow into an actual hard-kill.
             (root / "test_risk_flag_suite.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=2)\ndef test_slow():\n    time.sleep(1.8)\n\n"
                 "@test(timeout=10)\ndef test_fast():\n    pass\n"
             )
@@ -821,22 +821,22 @@ class ListRiskFlagTests(unittest.TestCase):
 class UICliHeadedFlagOverrideTests(unittest.TestCase):
     """`--headed` used to be a store_true flag defaulting to False --
     there was no way to express "explicitly force headless" from the
-    CLI when pyrunner.toml set `headed = true`. Exercised through
+    CLI when ctrlrunner.toml set `headed = true`. Exercised through
     `_ui()` with `serve_ui` mocked out so no server actually starts."""
 
     def _config(self, tmp, headed_value: str) -> str:
-        cfg = Path(tmp) / "pyrunner.toml"
-        cfg.write_text(f"[pyrunner]\nheaded = {headed_value}\n")
+        cfg = Path(tmp) / "ctrlrunner.toml"
+        cfg.write_text(f"[ctrlrunner]\nheaded = {headed_value}\n")
         return str(cfg)
 
     def test_no_headed_flag_forces_headless_over_truthy_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = self._config(tmp, "true")
             with (
-                patch("pyrunner.ui.ui_server.serve_ui") as mock_serve_ui,
-                patch.object(sys, "argv", ["pyrunner", "ui", "--config", cfg_path, "--no-headed"]),
+                patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
+                patch.object(sys, "argv", ["ctrlrunner", "ui", "--config", cfg_path, "--no-headed"]),
             ):
-                from pyrunner.cli import _ui
+                from ctrlrunner.cli import _ui
 
                 _ui(sys.argv[2:])
         kwargs = mock_serve_ui.call_args.kwargs
@@ -846,10 +846,10 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = self._config(tmp, "false")
             with (
-                patch("pyrunner.ui.ui_server.serve_ui") as mock_serve_ui,
-                patch.object(sys, "argv", ["pyrunner", "ui", "--config", cfg_path, "--headed"]),
+                patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
+                patch.object(sys, "argv", ["ctrlrunner", "ui", "--config", cfg_path, "--headed"]),
             ):
-                from pyrunner.cli import _ui
+                from ctrlrunner.cli import _ui
 
                 _ui(sys.argv[2:])
         kwargs = mock_serve_ui.call_args.kwargs
@@ -859,10 +859,10 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = self._config(tmp, "true")
             with (
-                patch("pyrunner.ui.ui_server.serve_ui") as mock_serve_ui,
-                patch.object(sys, "argv", ["pyrunner", "ui", "--config", cfg_path]),
+                patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
+                patch.object(sys, "argv", ["ctrlrunner", "ui", "--config", cfg_path]),
             ):
-                from pyrunner.cli import _ui
+                from ctrlrunner.cli import _ui
 
                 _ui(sys.argv[2:])
         kwargs = mock_serve_ui.call_args.kwargs
@@ -879,11 +879,11 @@ class BindHostGuardCliTests(unittest.TestCase):
     def test_show_report_refuses_non_loopback_bind_without_allow_remote(self):
         stderr = io.StringIO()
         with (
-            patch("pyrunner.ui.show_report.serve_report") as mock_serve,
+            patch("ctrlrunner.ui.show_report.serve_report") as mock_serve,
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as ctx,
         ):
-            from pyrunner.cli import _show_report
+            from ctrlrunner.cli import _show_report
 
             _show_report(["some-report.html", "--bind", "0.0.0.0"])
         self.assertEqual(ctx.exception.code, 1)
@@ -891,8 +891,8 @@ class BindHostGuardCliTests(unittest.TestCase):
         mock_serve.assert_not_called()
 
     def test_show_report_allow_remote_passes_bind_through(self):
-        with patch("pyrunner.ui.show_report.serve_report") as mock_serve:
-            from pyrunner.cli import _show_report
+        with patch("ctrlrunner.ui.show_report.serve_report") as mock_serve:
+            from ctrlrunner.cli import _show_report
 
             _show_report(["some-report.html", "--bind", "0.0.0.0", "--allow-remote"])
         self.assertEqual(mock_serve.call_args.kwargs["bind"], "0.0.0.0")
@@ -900,11 +900,11 @@ class BindHostGuardCliTests(unittest.TestCase):
     def test_ui_refuses_non_loopback_bind_without_allow_remote(self):
         stderr = io.StringIO()
         with (
-            patch("pyrunner.ui.ui_server.serve_ui") as mock_serve,
+            patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve,
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as ctx,
         ):
-            from pyrunner.cli import _ui
+            from ctrlrunner.cli import _ui
 
             _ui(["--bind", "192.168.1.10"])
         self.assertEqual(ctx.exception.code, 1)
@@ -912,7 +912,7 @@ class BindHostGuardCliTests(unittest.TestCase):
         mock_serve.assert_not_called()
 
     def test_loopback_binds_pass_without_allow_remote(self):
-        from pyrunner.cli import _resolve_bind_host
+        from ctrlrunner.cli import _resolve_bind_host
 
         for bind in ("127.0.0.1", "localhost", "::1"):
             self.assertEqual(_resolve_bind_host(bind, allow_remote=False), bind)
@@ -926,7 +926,7 @@ class BindHostGuardCliTests(unittest.TestCase):
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as ctx,
         ):
-            from pyrunner.cli import _show_report
+            from ctrlrunner.cli import _show_report
 
             _show_report([tmp, "--no-browser"])
         self.assertEqual(ctx.exception.code, 1)
@@ -938,12 +938,12 @@ class FlakyReportCliTests(unittest.TestCase):
     codes for its refusal paths and the --output happy path."""
 
     def _write_config(self, tmp, body):
-        cfg = Path(tmp) / "pyrunner.toml"
+        cfg = Path(tmp) / "ctrlrunner.toml"
         cfg.write_text(body)
         return str(cfg)
 
     def _run(self, argv):
-        from pyrunner.cli import _flaky_report
+        from ctrlrunner.cli import _flaky_report
 
         stderr, stdout = io.StringIO(), io.StringIO()
         with (
@@ -956,21 +956,21 @@ class FlakyReportCliTests(unittest.TestCase):
 
     def test_history_disabled_exits_1(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cfg = self._write_config(tmp, "[pyrunner.history]\nenabled = false\n")
+            cfg = self._write_config(tmp, "[ctrlrunner.history]\nenabled = false\n")
             code, _, err = self._run(["--config", cfg])
         self.assertEqual(code, 1)
         self.assertIn("history] is disabled", err)
 
     def test_missing_history_db_exits_1(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cfg = self._write_config(tmp, f'[pyrunner]\nreports_dir = "{tmp}/reports"\n')
+            cfg = self._write_config(tmp, f'[ctrlrunner]\nreports_dir = "{tmp}/reports"\n')
             code, _, err = self._run(["--config", cfg])
         self.assertEqual(code, 1)
         self.assertIn("no history database found", err)
 
     def test_output_file_written_on_success(self):
-        from pyrunner.reporting.history import HistoryStore
-        from pyrunner.reporting.reporter import Result
+        from ctrlrunner.reporting.history import HistoryStore
+        from ctrlrunner.reporting.reporter import Result
 
         with tempfile.TemporaryDirectory() as tmp:
             db_path = str(Path(tmp) / "reports" / ".history.db")
@@ -987,7 +987,7 @@ class FlakyReportCliTests(unittest.TestCase):
                         )
                     ]
                 )
-            cfg = self._write_config(tmp, f'[pyrunner]\nreports_dir = "{tmp}/reports"\n')
+            cfg = self._write_config(tmp, f'[ctrlrunner]\nreports_dir = "{tmp}/reports"\n')
             out_path = str(Path(tmp) / "flaky.json")
             code, out, _ = self._run(["--config", cfg, "--format", "json", "--output", out_path])
             self.assertEqual(code, 0)
@@ -1005,7 +1005,7 @@ class ReportTimestampCliOverrideTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_no_report_timestamp_flag_forces_it_off_over_truthy_config(self):
@@ -1016,9 +1016,9 @@ class ReportTimestampCliOverrideTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text("[pyrunner]\nreport_timestamp = true\n")
+            (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner]\nreport_timestamp = true\n")
             os.chdir(tmp)
             self._run_cli(["--no-report-timestamp", "--reporter", "json"])
             self.assertTrue(Path("reports/html-report/results.json").exists())
@@ -1041,7 +1041,7 @@ class MultiProjectDurationTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_combined_duration_is_wall_clock_not_sum_of_test_durations(self):
@@ -1050,7 +1050,7 @@ class MultiProjectDurationTests(unittest.TestCase):
                 root = Path(tmp) / f"tests_{name}"
                 root.mkdir()
                 (root / f"test_{name}.py").write_text(
-                    "import time\nfrom pyrunner import test\n\n"
+                    "import time\nfrom ctrlrunner import test\n\n"
                     "@test()\ndef test_one():\n    time.sleep(0.4)\n\n"
                     "@test()\ndef test_two():\n    time.sleep(0.4)\n"
                 )
@@ -1058,10 +1058,10 @@ class MultiProjectDurationTests(unittest.TestCase):
             # durations, which needs the two same-file tests to actually
             # run concurrently -- the file-grouped default would
             # serialize them onto one worker.
-            (Path(tmp) / "pyrunner.toml").write_text(
-                "[pyrunner]\nfully_parallel = true\n\n"
-                '[pyrunner.projects.a]\ntests_dir = ["tests_a"]\nnum_workers = 2\n\n'
-                '[pyrunner.projects.b]\ntests_dir = ["tests_b"]\nnum_workers = 2\n'
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                "[ctrlrunner]\nfully_parallel = true\n\n"
+                '[ctrlrunner.projects.a]\ntests_dir = ["tests_a"]\nnum_workers = 2\n\n'
+                '[ctrlrunner.projects.b]\ntests_dir = ["tests_b"]\nnum_workers = 2\n'
             )
             os.chdir(tmp)
             self._run_cli(["--project", "a,b", "--reporter", "json"])
@@ -1088,7 +1088,7 @@ class MultiProjectLineReporterResetTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_progress_fraction_never_exceeds_its_own_projects_total(self):
@@ -1100,7 +1100,7 @@ class MultiProjectLineReporterResetTests(unittest.TestCase):
             root_a = Path(tmp) / "tests_a"
             root_a.mkdir()
             (root_a / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_one():\n    pass\n\n"
                 "@test()\ndef test_two():\n    pass\n\n"
                 "@test()\ndef test_three():\n    pass\n"
@@ -1108,11 +1108,11 @@ class MultiProjectLineReporterResetTests(unittest.TestCase):
             root_b = Path(tmp) / "tests_b"
             root_b.mkdir()
             (root_b / "test_b.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_one():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    pass\n"
             )
-            (Path(tmp) / "pyrunner.toml").write_text(
-                '[pyrunner.projects.a]\ntests_dir = ["tests_a"]\n\n'
-                '[pyrunner.projects.b]\ntests_dir = ["tests_b"]\n'
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner.projects.a]\ntests_dir = ["tests_a"]\n\n'
+                '[ctrlrunner.projects.b]\ntests_dir = ["tests_b"]\n'
             )
             os.chdir(tmp)
             buf = io.StringIO()
@@ -1134,7 +1134,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit) as cm:
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as cm:
             main()
         return cm.exception.code
 
@@ -1143,7 +1143,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
         root.mkdir()
         if two_tests:
             (root / "test_demo.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_ok():\n"
                 "    assert 1 == 1\n\n"
@@ -1153,7 +1153,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
             )
         else:
             (root / "test_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_ok():\n    assert 1 == 1\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_ok():\n    assert 1 == 1\n"
             )
 
     def test_coverage_flag_adds_percent_to_json_report(self):
@@ -1169,7 +1169,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
     def test_coverage_fail_under_fails_run_when_below_threshold(self):
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp)
-            (Path(tmp) / "pyrunner.toml").write_text("[pyrunner.coverage]\nfail_under = 100\n")
+            (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner.coverage]\nfail_under = 100\n")
             os.chdir(tmp)
             code = self._run_cli(["--coverage", "--reporter", "json"])
 
@@ -1181,7 +1181,7 @@ class CoverageCliIntegrationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             self._make_suite(tmp, two_tests=True)
-            (Path(tmp) / "pyrunner.toml").write_text("[pyrunner.coverage]\nfail_under = 100\n")
+            (Path(tmp) / "ctrlrunner.toml").write_text("[ctrlrunner.coverage]\nfail_under = 100\n")
             os.chdir(tmp)
             buf = io.StringIO()
             with contextlib.redirect_stderr(buf):
@@ -1225,13 +1225,13 @@ class TagNotCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_tagnot_demo.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(tags={'smoke'})\ndef test_fast():\n    pass\n\n"
                 "@test(tags={'smoke', 'slow'})\ndef test_slow():\n    pass\n"
             )
             os.chdir(tmp)
             with (
-                patch.object(sys, "argv", ["pyrunner", "--tag-not", "slow", "--reporter", "dots"]),
+                patch.object(sys, "argv", ["ctrlrunner", "--tag-not", "slow", "--reporter", "dots"]),
                 self.assertRaises(SystemExit),
             ):
                 main()
@@ -1253,13 +1253,13 @@ class RunManifestCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_manifest_demo.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_ok():\n    pass\n\n"
                 "@test()\ndef test_bad():\n    assert False\n"
             )
             os.chdir(tmp)
             with (
-                patch.object(sys, "argv", ["pyrunner", "--reporter", "dots"]),
+                patch.object(sys, "argv", ["ctrlrunner", "--reporter", "dots"]),
                 self.assertRaises(SystemExit),
             ):
                 main()
@@ -1268,7 +1268,7 @@ class RunManifestCliTests(unittest.TestCase):
         self.assertEqual(manifest["totalTests"], 2)
         self.assertEqual(manifest["failedTestIds"], ["tests.test_manifest_demo::test_bad"])
         self.assertIn("--reporter", manifest["argv"])
-        self.assertIn("pyrunnerVersion", manifest)
+        self.assertIn("ctrlrunnerVersion", manifest)
 
 
 class OrderSeedCliTests(unittest.TestCase):
@@ -1283,7 +1283,7 @@ class OrderSeedCliTests(unittest.TestCase):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / "test_orderseed_demo.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
         )
 
     def test_random_order_seed_lands_in_junit_properties(self):
@@ -1294,7 +1294,7 @@ class OrderSeedCliTests(unittest.TestCase):
                 patch.object(
                     sys,
                     "argv",
-                    ["pyrunner", "--order", "random", "--seed", "99", "--reporter", "dots"],
+                    ["ctrlrunner", "--order", "random", "--seed", "99", "--reporter", "dots"],
                 ),
                 self.assertRaises(SystemExit),
             ):
@@ -1309,7 +1309,7 @@ class OrderSeedCliTests(unittest.TestCase):
             self._make_suite(tmp)
             os.chdir(tmp)
             with (
-                patch.object(sys, "argv", ["pyrunner", "--reporter", "dots"]),
+                patch.object(sys, "argv", ["ctrlrunner", "--reporter", "dots"]),
                 self.assertRaises(SystemExit),
             ):
                 main()
@@ -1327,7 +1327,7 @@ class FailOnFlakyCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli_code(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
             main()
         return ctx.exception.code
 
@@ -1337,7 +1337,7 @@ class FailOnFlakyCliTests(unittest.TestCase):
         # A module-level counter makes the first attempt fail and the
         # retry pass -- a deterministic flaky test, no timing/threading.
         (root / "test_flaky_demo.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "_attempts = {'n': 0}\n\n"
             "@test(retries=1)\n"
             "def test_eventually_passes():\n"
@@ -1369,14 +1369,14 @@ class GrepCliTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def _make_suite(self, tmp):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / "test_grep_cli_demo.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\ndef test_login():\n    pass\n\n"
             "@test()\ndef test_signup():\n    pass\n"
         )
@@ -1396,7 +1396,7 @@ class GrepCliTests(unittest.TestCase):
             os.chdir(tmp)
             with (
                 patch.object(
-                    sys, "argv", ["pyrunner", "--grep", "(unclosed", "--reporter", "dots"]
+                    sys, "argv", ["ctrlrunner", "--grep", "(unclosed", "--reporter", "dots"]
                 ),
                 self.assertRaises(SystemExit) as ctx,
             ):
@@ -1417,11 +1417,11 @@ class UnknownReporterCliTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_unknown_reporter_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             os.chdir(tmp)
             with (
-                patch.object(sys, "argv", ["pyrunner", "--reporter", "list"]),
+                patch.object(sys, "argv", ["ctrlrunner", "--reporter", "list"]),
                 self.assertRaises(SystemExit) as ctx,
             ):
                 main()
@@ -1445,11 +1445,11 @@ class EmptySelectionExitCodeTests(unittest.TestCase):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / f"test_{module_name}.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
         )
 
     def _run_cli_code(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
             main()
         return ctx.exception.code
 
@@ -1492,21 +1492,21 @@ class HtmlReportTimelineFieldsTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_timeline_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             os.chdir(tmp)
             with (
                 patch.object(
                     sys,
                     "argv",
-                    ["pyrunner", "-n", "1", "--reporter", "dots", "--html-report"],
+                    ["ctrlrunner", "-n", "1", "--reporter", "dots", "--html-report"],
                 ),
                 self.assertRaises(SystemExit),
             ):
                 main()
             html = Path("reports/html-report/report.html").read_text(encoding="utf-8")
 
-        m = re.search(r"window\.__PYRUNNER_REPORT__ = (.*?);</script>", html, re.DOTALL)
+        m = re.search(r"window\.__CTRLRUNNER_REPORT__ = (.*?);</script>", html, re.DOTALL)
         data = json.loads(m.group(1))
         self.assertIsNotNone(data["runStartedAt"])
         self.assertIsNotNone(data["runDuration"])

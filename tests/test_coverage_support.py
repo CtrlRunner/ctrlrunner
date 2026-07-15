@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 
-from pyrunner.execution.coverage_support import (
+from ctrlrunner.execution.coverage_support import (
     CoverageConfig,
     prepare_data_dir,
     resolve_coverage_config,
@@ -99,7 +99,7 @@ class ResolveCoverageConfigTests(unittest.TestCase):
                 report_dir="/tmp/x",
                 selection_filtered=False,
             )
-        self.assertIn("[pyrunner.coverage].fail_under", str(ctx.exception))
+        self.assertIn("[ctrlrunner.coverage].fail_under", str(ctx.exception))
 
     def test_fail_under_bool_raises(self):
         # bool is an int subclass, so isinstance(True, (int, float)) is
@@ -113,7 +113,7 @@ class ResolveCoverageConfigTests(unittest.TestCase):
                 report_dir="/tmp/x",
                 selection_filtered=False,
             )
-        self.assertIn("[pyrunner.coverage].fail_under", str(ctx.exception))
+        self.assertIn("[ctrlrunner.coverage].fail_under", str(ctx.exception))
 
     def test_invalid_source_raises(self):
         with self.assertRaises(ValueError) as ctx:
@@ -124,7 +124,7 @@ class ResolveCoverageConfigTests(unittest.TestCase):
                 report_dir="/tmp/x",
                 selection_filtered=False,
             )
-        self.assertIn("[pyrunner.coverage].source", str(ctx.exception))
+        self.assertIn("[ctrlrunner.coverage].source", str(ctx.exception))
 
 
 class PrepareDataDirTests(unittest.TestCase):
@@ -204,7 +204,7 @@ class PrepareDataDirTests(unittest.TestCase):
 
 import coverage as coverage_pkg
 
-from pyrunner.execution.coverage_support import CoverageSummary, finalize_coverage
+from ctrlrunner.execution.coverage_support import CoverageSummary, finalize_coverage
 
 
 class FinalizeCoverageTests(unittest.TestCase):

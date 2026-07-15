@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pyrunner report</title>
+    <title>ctrlrunner report</title>
     <script>
       // Applied before first paint to avoid a light-mode flash.
       (function () {
-        var stored = localStorage.getItem('pyrunner-theme');
+        var stored = localStorage.getItem('ctrlrunner-theme');
         var dark =
           stored === 'dark' ||
           ((stored === null || stored === 'system') &&
@@ -15,7 +15,7 @@
         document.documentElement.classList.add(dark ? 'theme-dark' : 'theme-light');
       })();
     </script>
-    <!--PYRUNNER_DATA-->
+    <!--CTRLRUNNER_DATA-->
   </head>
   <body>
     <div id="root"></div>

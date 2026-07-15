@@ -1,4 +1,4 @@
-# pyrunner
+# CtrlRunner
 
 A from-scratch Python test runner for Playwright, built to replace
 `pytest` + `pytest-timeout` + `pytest-xdist` on Windows CI, where those
@@ -22,7 +22,7 @@ processes, and no-teardown thread-mode kills.
   Chromium/Node processes holding stdout/stderr handles, once causing an
   8.5-hour CI hang.
 
-pyrunner's answer to both: every worker is a real OS process wrapped in
+ctrlrunner's answer to both: every worker is a real OS process wrapped in
 a **Windows Job Object**, so a timeout is a guaranteed hard-kill of the
 whole process tree (worker + browser + any Node helpers) — never a
 best-effort thread interrupt.
@@ -30,19 +30,19 @@ best-effort thread interrupt.
 ## Install
 
 ```
-pip install pyrunner                 # core install, zero third-party deps
-pip install pyrunner[playwright]     # + playwright (for the built-in fixtures/actions)
-pip install pyrunner[migrate]        # + libcst (pytest -> pyrunner migration script)
+pip install ctrlrunner                 # core install, zero third-party deps
+pip install ctrlrunner[playwright]     # + playwright (for the built-in fixtures/actions)
+pip install ctrlrunner[migrate]        # + libcst (pytest -> ctrlrunner migration script)
 playwright install                   # browser binaries, if you don't have them
 ```
 
-Windows also needs `pywin32` for Job Objects: `pip install pyrunner[windows]`.
+Windows also needs `pywin32` for Job Objects: `pip install ctrlrunner[windows]`.
 
-With [uv](https://docs.astral.sh/uv/), the equivalent is `uv add pyrunner --extra playwright`.
+With [uv](https://docs.astral.sh/uv/), the equivalent is `uv add ctrlrunner --extra playwright`.
 
 No `pytest` dependency, anywhere.
 
-Contributing to pyrunner itself (not just using it)? See
+Contributing to ctrlrunner itself (not just using it)? See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup instead.
 
 ## Quick start
@@ -50,7 +50,7 @@ Contributing to pyrunner itself (not just using it)? See
 ```python
 # tests/test_example.py
 from playwright.sync_api import sync_playwright
-from pyrunner import fixture, test
+from ctrlrunner import fixture, test
 
 
 @fixture(scope="session")
@@ -81,7 +81,7 @@ def test_example_dot_com(page):
 ```
 
 ```
-python -m pyrunner tests -n 4 --timeout 30 --junit-xml report.xml
+python -m ctrlrunner tests -n 4 --timeout 30 --junit-xml report.xml
 ```
 
 ## Core concepts
@@ -150,7 +150,7 @@ tuple/list of names (`("a", "b")`).
 
 ### `param()` — per-combination metadata
 
-`param(...)` is pyrunner's equivalent of `pytest.param(..., id=...,
+`param(...)` is ctrlrunner's equivalent of `pytest.param(..., id=...,
 marks=[...])`, expressed as flat keyword arguments instead of marker
 objects. Plain tuples/scalars mix freely with `param(...)` entries:
 
@@ -202,7 +202,7 @@ failures (assertions/exceptions), each attempt getting a fresh deadline.
 The suite-**import** phase has its own separate watchdog budget (default
 60s, never charged against the first test's timeout). Suites with heavy
 imports (cold-AV-scanned CI) can raise it: `--import-timeout 180` or
-`import_timeout = 180.0` in `pyrunner.toml`.
+`import_timeout = 180.0` in `ctrlrunner.toml`.
 
 ## Documentation
 
@@ -211,11 +211,11 @@ Everything past the core API lives in `docs/`:
 - [Parallelism, scheduling & test selection](docs/parallelism-and-scheduling.md) — worker budgets, serial classes, worker isolation, `--test-id`/`--tag`/`--grep` filters, `--list`.
 - [Reporters, history & flake management](docs/reporters-and-history.md) — console/JUnit/JSON reporters, rerun workflows, the historical timing store, fail policies, flaky analytics and quarantine, execution profiling.
 - [Named projects, HTML report, coverage & UI Mode](docs/html-report-and-ui.md) — `--project`, grouping, the self-contained HTML report, code coverage, and the live UI Mode app.
-- [Config file, tags & test metadata reference](docs/config-reference.md) — full `pyrunner.toml` reference, the registered tag registry, `@test_class`, and runtime `skip`/`fail`/`fixme`/`slow` annotations.
+- [Config file, tags & test metadata reference](docs/config-reference.md) — full `ctrlrunner.toml` reference, the registered tag registry, `@test_class`, and runtime `skip`/`fail`/`fixme`/`slow` annotations.
 - [Tracing, artifacts & assertion details](docs/tracing-and-artifacts.md) — artifacts on failure, `step()`, built-in Playwright fixtures, `auto_step`, rich assertion failures, log capture.
 - [Event model](docs/event-model.md) — the stable interface for reporter/hook/plugin authors.
-- [Migrating from pytest](docs/migrating-from-pytest.md) — the `pyrunner.migrate` conversion tool.
-- [Developing pyrunner](docs/development.md) — running the test suite, dev tooling, project layout.
+- [Migrating from pytest](docs/migrating-from-pytest.md) — the `ctrlrunner.migrate` conversion tool.
+- [Developing ctrlrunner](docs/development.md) — running the test suite, dev tooling, project layout.
 - [Security model](docs/SECURITY.md) and [pytest migration checklist](docs/MIGRATION.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and PR expectations,

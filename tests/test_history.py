@@ -6,13 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pyrunner.reporting.history import (
+from ctrlrunner.reporting.history import (
     HistoryReporter,
     HistoryStore,
     compute_near_timeout_test_ids,
     resolve_history_config,
 )
-from pyrunner.reporting.reporter import Result
+from ctrlrunner.reporting.reporter import Result
 
 
 def _result(
@@ -492,7 +492,7 @@ class HistoryWriteProcessBoundaryTests(unittest.TestCase):
     def test_worker_module_has_no_history_references(self):
         import inspect
 
-        from pyrunner.execution import worker as worker_module
+        from ctrlrunner.execution import worker as worker_module
 
         source = inspect.getsource(worker_module)
         self.assertNotIn("HistoryStore", source)

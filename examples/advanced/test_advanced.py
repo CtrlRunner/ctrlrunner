@@ -1,4 +1,4 @@
-from pyrunner import fixture, test
+from ctrlrunner import fixture, test
 from examples.advanced.conftest import module_setup_log, audit_log_calls
 
 

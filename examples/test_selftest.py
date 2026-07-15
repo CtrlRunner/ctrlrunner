@@ -1,5 +1,5 @@
 import time
-from pyrunner import fixture, test, parametrize, step, skip, fail, fixme, slow
+from ctrlrunner import fixture, test, parametrize, step, skip, fail, fixme, slow
 
 calls = {"session_setup": 0, "session_teardown": 0}
 

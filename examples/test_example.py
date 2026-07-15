@@ -1,15 +1,15 @@
 """
 No manual browser/context/page fixtures needed anymore -- trace and
 screenshot capture are controlled entirely by --trace/--screenshot CLI
-flags (or pyrunner.toml), same idea as Playwright TS's CLI:
+flags (or ctrlrunner.toml), same idea as Playwright TS's CLI:
 
-    python -m pyrunner examples --trace on-first-retry --screenshot only-on-failure
+    python -m ctrlrunner examples --trace on-first-retry --screenshot only-on-failure
 """
 import re
 
 from playwright.sync_api import expect
 
-from pyrunner import test
+from ctrlrunner import test
 
 
 @test(timeout=15, case_id="TC-EX-001", tags={"smoke"})

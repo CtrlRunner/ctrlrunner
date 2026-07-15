@@ -1,7 +1,7 @@
 import unittest
 
-from pyrunner.execution.orchestrator import _chunk
-from pyrunner.execution.sharding import lookup_median_durations, lpt_shard
+from ctrlrunner.execution.orchestrator import _chunk
+from ctrlrunner.execution.sharding import lookup_median_durations, lpt_shard
 
 
 class LptShardTests(unittest.TestCase):

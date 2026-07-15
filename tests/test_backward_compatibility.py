@@ -20,18 +20,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from pyrunner.cli import main
-from pyrunner.config.config import load_config
-from pyrunner.config.projects import ProjectConfig, load_projects, run_projects
-from pyrunner.config.tag_registry import load_tag_registry
-from pyrunner.core import registry
-from pyrunner.execution.orchestrator import Orchestrator
-from pyrunner.execution.quarantine import resolve_quarantine_config
-from pyrunner.reporting.grouping import DEFAULT_DIMENSIONS, load_grouping_dimensions
+from ctrlrunner.cli import main
+from ctrlrunner.config.config import load_config
+from ctrlrunner.config.projects import ProjectConfig, load_projects, run_projects
+from ctrlrunner.config.tag_registry import load_tag_registry
+from ctrlrunner.core import registry
+from ctrlrunner.execution.orchestrator import Orchestrator
+from ctrlrunner.execution.quarantine import resolve_quarantine_config
+from ctrlrunner.reporting.grouping import DEFAULT_DIMENSIONS, load_grouping_dimensions
 
 
 class AbsentConfigDefaultsToOffTests(unittest.TestCase):
-    """Every opt-in [pyrunner.*] section, when absent entirely, must
+    """Every opt-in [ctrlrunner.*] section, when absent entirely, must
     resolve to its pre-feature default: None/{}/DEFAULT_DIMENSIONS,
     never a new required key, never a behavior change."""
 
@@ -62,7 +62,7 @@ class SingleProjectRunUnchangedTests(unittest.TestCase):
         web = Path(tmp) / "tests" / "web"
         web.mkdir(parents=True)
         (web / "test_backcompat_web.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_login():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_login():\n    pass\n"
         )
         return web
 
@@ -98,7 +98,7 @@ class NoHistoryStoreRoundRobinUnchangedTests(unittest.TestCase):
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(6))
             (root / "test_backcompat_shard.py").write_text(
-                "from pyrunner import test\n\n" + tests_src + "\n"
+                "from ctrlrunner import test\n\n" + tests_src + "\n"
             )
 
             orch = Orchestrator(str(root), 3, 10.0)  # history_store=None
@@ -109,15 +109,15 @@ class NoHistoryStoreRoundRobinUnchangedTests(unittest.TestCase):
 
 class ConfigNestingGotchaTests(unittest.TestCase):
     """Regression test for a real gotcha hit during manual verification:
-    a bare `[grouping]` header in pyrunner.toml is a sibling TOML table,
-    NOT nested under `[pyrunner]` -- load_config() would silently drop
-    it. `[pyrunner.grouping]` is the correct nesting."""
+    a bare `[grouping]` header in ctrlrunner.toml is a sibling TOML table,
+    NOT nested under `[ctrlrunner]` -- load_config() would silently drop
+    it. `[ctrlrunner.grouping]` is the correct nesting."""
 
     def test_correct_nesting_is_picked_up(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "pyrunner.toml"
+            path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
-                "[pyrunner.grouping]\n"
+                "[ctrlrunner.grouping]\n"
                 "dimensions = [\n"
                 '  { name = "team", strategy = "tag_prefix", prefix = "team_" },\n'
                 "]\n"
@@ -131,9 +131,9 @@ class ConfigNestingGotchaTests(unittest.TestCase):
 
     def test_bare_grouping_header_is_silently_a_sibling_table_not_nested(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "pyrunner.toml"
+            path = Path(tmp) / "ctrlrunner.toml"
             path.write_text(
-                "[pyrunner]\n"
+                "[ctrlrunner]\n"
                 "[grouping]\n"
                 "dimensions = [\n"
                 '  { name = "team", strategy = "tag_prefix", prefix = "team_" },\n'
@@ -157,7 +157,7 @@ class CliEndToEndBackwardCompatibilityTests(unittest.TestCase):
         os.chdir(self._cwd)
 
     def _run_cli(self, argv):
-        with patch.object(sys, "argv", ["pyrunner"] + argv), self.assertRaises(SystemExit):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
             main()
 
     def test_no_project_flag_produces_todays_exact_single_testsuite_shape(self):
@@ -168,7 +168,7 @@ class CliEndToEndBackwardCompatibilityTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_backcompat_cli_shape.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             os.chdir(tmp)
             self._run_cli(["--reporter", "json"])

@@ -49,7 +49,7 @@ JUnit XML hardening & options:
 Runtime metadata from inside a test or fixture:
 
 ```python
-from pyrunner import record_property, record_suite_property
+from ctrlrunner import record_property, record_suite_property
 
 @test()
 def test_checkout(page):
@@ -76,9 +76,9 @@ properties.
 ## Rerun workflows
 
 ```
-pyrunner --last-failed                              # rerun what failed in the most recent report
-pyrunner --failed-from old-results.json               # rerun what failed in a specific JSON report
-pyrunner --changed-since origin/main                   # rerun tests in files changed since a git ref
+ctrlrunner --last-failed                              # rerun what failed in the most recent report
+ctrlrunner --failed-from old-results.json               # rerun what failed in a specific JSON report
+ctrlrunner --changed-since origin/main                   # rerun tests in files changed since a git ref
 ```
 
 All three are pure ways to pre-populate `--test-id` -- no new selection
@@ -118,7 +118,7 @@ file -- the foundation for future smart sharding and flaky-test
 analytics, and already independently useful for your own queries:
 
 ```toml
-[pyrunner.history]
+[ctrlrunner.history]
 enabled = true                    # default; set false to disable entirely
 db_path = "reports/.history.db"   # default: <reports-dir>/.history.db
 window_runs = 20
@@ -138,7 +138,7 @@ multiple times in one invocation), never mid-run, so a killed/crashed
 run simply never gets recorded rather than leaving a partial entry.
 
 ```python
-from pyrunner.reporting.history import HistoryStore
+from ctrlrunner.reporting.history import HistoryStore
 
 with HistoryStore("reports/.history.db") as store:
     durations = store.get_durations("mod::test_x", window=10)
@@ -169,7 +169,7 @@ burning through the whole suite:
 ```
 
 ```toml
-[pyrunner.fail_policy]
+[ctrlrunner.fail_policy]
 max_failures = 0
 max_timeouts = 0
 stop_on_worker_crash = false
@@ -199,13 +199,13 @@ partway through project `a` stops project `b` from ever starting.
 
 ## Flaky analytics and quarantine
 
-`pyrunner flaky-report` computes flake scores from the history store --
+`ctrlrunner flaky-report` computes flake scores from the history store --
 a *separate* command from a normal test run, so acting on this data
 (quarantining something) is always an explicit, human-reviewed step:
 
 ```
-pyrunner flaky-report
-pyrunner flaky-report --window 20 --project smoke --format json --output flaky.json
+ctrlrunner flaky-report
+ctrlrunner flaky-report --window 20 --project smoke --format json --output flaky.json
 ```
 
 A test's flake score is the fraction of its recent runs (where retries
@@ -224,7 +224,7 @@ Quarantine is a config-driven allowlist, populated by a human after
 reviewing `flaky-report` output:
 
 ```toml
-[pyrunner.quarantine]
+[ctrlrunner.quarantine]
 test_ids = ["tests.test_demo::test_flaky_checkout"]
 reason = "JIRA-4821, flaky since 2026-06, investigating"
 ```

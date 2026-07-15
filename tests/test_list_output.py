@@ -1,8 +1,8 @@
 import json
 import unittest
 
-from pyrunner.core.registry import TestItem
-from pyrunner.reporting.list_output import ALL_FIELDS, DEFAULT_FIELDS, format_list
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.reporting.list_output import ALL_FIELDS, DEFAULT_FIELDS, format_list
 
 
 def _item(

@@ -1,5 +1,5 @@
 """
-Standalone benchmark for pyrunner's test discovery/import speed --
+Standalone benchmark for ctrlrunner's test discovery/import speed --
 NOT part of the unittest suite (timing assertions on shared/slow CI
 machines are inherently flaky; this is a measurement tool, not a gate).
 
@@ -16,15 +16,15 @@ import tempfile
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from pyrunner.core import registry
-from pyrunner.execution.orchestrator import discover_and_import
+from ctrlrunner.core import registry
+from ctrlrunner.execution.orchestrator import discover_and_import
 
 
 def _write_suite(root: Path, num_files: int, tests_per_file: int, parametrize_values: int) -> None:
     for i in range(num_files):
-        lines = ["from pyrunner import test, parametrize", ""]
+        lines = ["from ctrlrunner import test, parametrize", ""]
         for j in range(tests_per_file):
             if parametrize_values > 1:
                 values = ", ".join(str(v) for v in range(parametrize_values))
@@ -55,7 +55,7 @@ def _run_one(label: str, num_files: int, tests_per_file: int, parametrize_values
 
 
 def main() -> None:
-    print("pyrunner discovery/import benchmark")
+    print("ctrlrunner discovery/import benchmark")
     print("-" * 90)
     _run_one("small, no parametrize", num_files=10, tests_per_file=5, parametrize_values=1)
     _run_one("medium, no parametrize", num_files=50, tests_per_file=10, parametrize_values=1)

@@ -9,7 +9,7 @@ import { ReportApp } from './reportApp';
 
 applyTheme();
 const report = loadReportData();
-document.title = `${report.suiteName} — pyrunner report`;
+document.title = `${report.suiteName} — ctrlrunner report`;
 
 const root = document.getElementById('root');
 if (!root) throw new Error('missing #root element in report page');

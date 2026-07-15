@@ -1,7 +1,7 @@
 import unittest
 
-from pyrunner.core import steps as steps_module
-from pyrunner.playwright.playwright_actions import AutoStepPage, auto_step
+from ctrlrunner.core import steps as steps_module
+from ctrlrunner.playwright.playwright_actions import AutoStepPage, auto_step
 
 
 class FakeLocator:

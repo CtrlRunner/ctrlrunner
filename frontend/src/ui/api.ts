@@ -3,7 +3,7 @@ import type { Step } from '../shared/types';
 
 declare global {
   interface Window {
-    PYRUNNER_SESSION_TOKEN?: string;
+    CTRLRUNNER_SESSION_TOKEN?: string;
   }
 }
 
@@ -12,8 +12,8 @@ export function sessionToken(): string {
   // string, so the bundle must never contain it verbatim (a minifier
   // constant-folds even split concatenations). Recognizing an unreplaced
   // placeholder by its prefix avoids embedding the full literal.
-  const embedded = window.PYRUNNER_SESSION_TOKEN || '';
-  if (embedded && !embedded.startsWith('__PYRUNNER')) return embedded;
+  const embedded = window.CTRLRUNNER_SESSION_TOKEN || '';
+  if (embedded && !embedded.startsWith('__CTRLRUNNER')) return embedded;
   // Dev-only escape: the Vite dev server can't receive the embedded
   // token, so allow passing it as ?token=.
   if (import.meta.env.DEV) return new URLSearchParams(location.search).get('token') || '';
@@ -25,7 +25,7 @@ export function apiPost(path: string, body?: unknown): Promise<Response> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Pyrunner-Token': sessionToken(),
+      'X-Ctrlrunner-Token': sessionToken(),
     },
     body: JSON.stringify(body || {}),
   });
@@ -38,7 +38,7 @@ export type TestInfo = {
 };
 
 // UI Mode results are leaner than report results: artifacts are plain
-// path strings served under /pyrunner-artifacts/.
+// path strings served under /ctrlrunner-artifacts/.
 export type LiveResult = {
   id: string;
   outcome: string;

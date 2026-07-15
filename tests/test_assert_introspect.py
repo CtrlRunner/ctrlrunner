@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 
-from pyrunner.core import assert_introspect
+from ctrlrunner.core import assert_introspect
 
 
 class AssertIntrospectTests(unittest.TestCase):

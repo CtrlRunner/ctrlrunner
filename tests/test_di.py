@@ -1,9 +1,9 @@
 import unittest
 from contextlib import ExitStack
 
-from pyrunner.core import registry
-from pyrunner.core import steps as steps_module
-from pyrunner.core.di import FixtureResolver
+from ctrlrunner.core import registry
+from ctrlrunner.core import steps as steps_module
+from ctrlrunner.core.di import FixtureResolver
 
 
 class DiTests(unittest.TestCase):

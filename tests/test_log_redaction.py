@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.reporting.log_redaction import (
+from ctrlrunner.reporting.log_redaction import (
     REDACTED,
     redact_log_entries,
     redact_text,

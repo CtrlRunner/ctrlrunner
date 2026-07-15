@@ -7,15 +7,15 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 // (all JS/CSS inlined) that render_ui_html() serves after replacing the
 // session-token placeholder.
 //
-// Dev flow: start `python -m pyrunner ui <root>` (note its port), then
-// `PYRUNNER_UI_PORT=<port> npm run dev:ui` and open the printed Vite URL
+// Dev flow: start `python -m ctrlrunner ui <root>` (note its port), then
+// `CTRLRUNNER_UI_PORT=<port> npm run dev:ui` and open the printed Vite URL
 // with `?token=<token>` (the server prints its URL; the token is only
 // embedded in the served page, so for HMR development pass it manually).
 export default defineConfig({
   base: '',
   plugins: [react(), viteSingleFile()],
   build: {
-    outDir: path.resolve(__dirname, '../pyrunner/ui/_static/ui'),
+    outDir: path.resolve(__dirname, '../src/ctrlrunner/ui/_static/ui'),
     emptyOutDir: true,
     chunkSizeWarningLimit: 10000,
     rollupOptions: {
@@ -24,8 +24,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': `http://127.0.0.1:${process.env.PYRUNNER_UI_PORT || 8123}`,
-      '/pyrunner-artifacts': `http://127.0.0.1:${process.env.PYRUNNER_UI_PORT || 8123}`,
+      '/api': `http://127.0.0.1:${process.env.CTRLRUNNER_UI_PORT || 8123}`,
+      '/ctrlrunner-artifacts': `http://127.0.0.1:${process.env.CTRLRUNNER_UI_PORT || 8123}`,
     },
   },
 });

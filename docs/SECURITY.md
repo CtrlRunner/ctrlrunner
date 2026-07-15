@@ -1,33 +1,33 @@
 # Security model
 
-pyrunner is a local test runner. This document states what it does and
+ctrlrunner is a local test runner. This document states what it does and
 doesn't defend against, and how the hardening in the codebase maps to a
 concrete threat model, so a reader can reason about the tool rather than
 guess.
 
 ## Threat model
 
-pyrunner **executes arbitrary local test code by design.** Discovering
+ctrlrunner **executes arbitrary local test code by design.** Discovering
 and running the test files in your project is the whole job, so "an
 attacker who can write your test files" is out of scope — at that point
 they already have code execution as you. The adversaries that matter are:
 
 1. **A malicious web page** in a browser you have open, trying to reach
-   pyrunner's local HTTP servers (UI Mode, `show-report`) and either
+   ctrlrunner's local HTTP servers (UI Mode, `show-report`) and either
    drive them (start runs, cancel, load traces) or read what they serve.
 2. **Another local user or process** on a shared machine or CI runner,
-   trying to reach those same servers or read pyrunner's on-disk state.
+   trying to reach those same servers or read ctrlrunner's on-disk state.
 3. **Untrusted data flowing into reports** — test output, error text,
    artifact filenames — reaching a browser or a shared CI dashboard.
 
 ## The local HTTP servers
 
-Both the UI Mode server (`pyrunner ui`) and the report server
-(`pyrunner show-report`) bind `127.0.0.1` only. Binding loopback is *not*
+Both the UI Mode server (`ctrlrunner ui`) and the report server
+(`ctrlrunner show-report`) bind `127.0.0.1` only. Binding loopback is *not*
 by itself a browser-security boundary: any page can `fetch()` a localhost
 port, and DNS rebinding can make an attacker hostname resolve to
 `127.0.0.1` so the browser treats the request as same-site. The shared
-defenses (in [`pyrunner/ui/localsec.py`](../pyrunner/ui/localsec.py)) are:
+defenses (in [`src/ctrlrunner/ui/localsec.py`](../src/ctrlrunner/ui/localsec.py)) are:
 
 - **Host allowlisting** — every request's `Host` header must be one of
   this server's own loopback names (`127.0.0.1:<port>`, `localhost:<port>`,
@@ -39,7 +39,7 @@ defenses (in [`pyrunner/ui/localsec.py`](../pyrunner/ui/localsec.py)) are:
   both to the same attacker value and they trivially matched).
 - **Per-session token** — the UI server mints an unguessable token at
   launch, embeds it in the served page, and requires it (in the
-  `X-Pyrunner-Token` header) on every state-changing POST. A page that
+  `X-Ctrlrunner-Token` header) on every state-changing POST. A page that
   never received the token — a cross-site attacker, or a different local
   process/user — can't forge it. (The SSE stream and other GETs don't
   require it: `EventSource` can't set headers, and GETs are read-only and
@@ -62,7 +62,7 @@ interface hands that surface to anyone who can reach the port. Only use
 
 - **History database** (`reports/.history.db`) is created `0o600`
   (owner-only) on POSIX. On a shared workspace, prefer a per-job
-  `[pyrunner.history].db_path` so jobs don't share timing history.
+  `[ctrlrunner.history].db_path` so jobs don't share timing history.
 - **Report/coverage directories** are pruned/purged with containment
   guards that refuse to delete anything outside their expected root.
 
@@ -70,11 +70,11 @@ interface hands that surface to anyone who can reach the port. Only use
 
 With `--logs on` (or `only-on-failure`), everything a test prints is
 captured and embedded into `results.json`, the HTML report, and JUnit
-XML — artifacts often uploaded to CI dashboards. pyrunner applies
+XML — artifacts often uploaded to CI dashboards. ctrlrunner applies
 **best-effort redaction** of obvious secret shapes (passwords, bearer
 tokens, API keys; see
-[`pyrunner/reporting/log_redaction.py`](../pyrunner/reporting/log_redaction.py))
-before logs reach any report, configurable under `[pyrunner.log_redaction]`.
+[`src/ctrlrunner/reporting/log_redaction.py`](../src/ctrlrunner/reporting/log_redaction.py))
+before logs reach any report, configurable under `[ctrlrunner.log_redaction]`.
 
 **This is a safety net, not a guarantee.** A pattern set only catches
 shapes it knows about. Treat any report containing captured logs as

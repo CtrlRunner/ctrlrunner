@@ -1,13 +1,13 @@
 import unittest
 
-from pyrunner.config.tag_registry import (
+from ctrlrunner.config.tag_registry import (
     TagRegistry,
     format_unregistered_tags_warning,
     load_tag_registry,
     validate_tags,
     warn_unregistered_cli_tags,
 )
-from pyrunner.core.registry import TestItem
+from ctrlrunner.core.registry import TestItem
 
 
 def _item(tags):

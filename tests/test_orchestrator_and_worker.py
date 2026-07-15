@@ -12,24 +12,24 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pyrunner.config.projects import ProjectConfig, run_projects
-from pyrunner.core import registry
-from pyrunner.core.registry import Fixture
-from pyrunner.execution.coverage_support import CoverageConfig, finalize_coverage
-from pyrunner.execution.orchestrator import (
+from ctrlrunner.config.projects import ProjectConfig, run_projects
+from ctrlrunner.core import registry
+from ctrlrunner.core.registry import Fixture
+from ctrlrunner.execution.coverage_support import CoverageConfig, finalize_coverage
+from ctrlrunner.execution.orchestrator import (
     Orchestrator,
     _chunk,
     discover_conftests,
     discover_modules,
 )
-from pyrunner.execution.worker import (
+from ctrlrunner.execution.worker import (
     _call_on_failure,
     _extract_aria_snapshot,
     _safe_test_dir,
     _trim_aria_snapshot_from_steps,
     capture_artifacts,
 )
-from pyrunner.reporting.reporter import Result
+from ctrlrunner.reporting.reporter import Result
 
 
 class NearTimeoutBadgeTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class NearTimeoutBadgeTests(unittest.TestCase):
             # slow runner can't hard-kill it, yet test_fast (a no-op)
             # stays far below.
             (root / "test_a.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=2)\ndef test_close():\n    time.sleep(1.8)\n\n"
                 "@test(timeout=2)\ndef test_fast():\n    pass\n"
             )
@@ -69,7 +69,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
             root = Path(tmp) / "param_meta_suite"
             root.mkdir()
             (root / "test_params.py").write_text(
-                "from pyrunner import test, parametrize, param\n\n"
+                "from ctrlrunner import test, parametrize, param\n\n"
                 "@test(timeout=10)\n"
                 "@parametrize('x', [\n"
                 "    param(1, id='plain'),\n"
@@ -107,7 +107,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
             root.mkdir()
             (root / "test_xr.py").write_text(
                 "_state = {'n': 0}\n"
-                "from pyrunner import test, parametrize, param\n\n"
+                "from ctrlrunner import test, parametrize, param\n\n"
                 "@test(retries=2)\n"
                 # xfail=True (no description) so the reported error is the
                 # traceback itself, which carries the body's run counter
@@ -130,7 +130,7 @@ class ParamMetadataExecutionTests(unittest.TestCase):
             root = Path(tmp) / "param_skip_suite"
             root.mkdir()
             (root / "test_skip.py").write_text(
-                "from pyrunner import fixture, test, parametrize, param\n\n"
+                "from ctrlrunner import fixture, test, parametrize, param\n\n"
                 "@fixture()\n"
                 "def exploding():\n"
                 "    raise RuntimeError('fixture must not be resolved for skipped combo')\n\n"
@@ -175,7 +175,7 @@ class DiscoverModulesTests(unittest.TestCase):
             self.assertFalse(any("not_a_test" in str(m) for m in modules))
 
     def test_file_path_root_returns_just_that_file(self):
-        # Regression: `pyrunner suite/test_one.py` (pytest-style single-file
+        # Regression: `ctrlrunner suite/test_one.py` (pytest-style single-file
         # selection) used to silently collect 0 tests -- rglob() on a file
         # path (not a directory) always returns empty, no error raised.
         with tempfile.TemporaryDirectory() as tmp:
@@ -224,7 +224,7 @@ class DiscoverConftestsTests(unittest.TestCase):
 
 
 class FilePathRootOrchestratorTests(unittest.TestCase):
-    """End-to-end regression for the CLI bug: `pyrunner suite/test_one.py`
+    """End-to-end regression for the CLI bug: `ctrlrunner suite/test_one.py`
     (a single file, pytest-style) must actually run that file's tests
     instead of silently selecting zero."""
 
@@ -236,10 +236,10 @@ class FilePathRootOrchestratorTests(unittest.TestCase):
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_one.py").write_text(
-                "from pyrunner import test\n\n@test(timeout=10)\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test(timeout=10)\ndef test_a():\n    pass\n"
             )
             (root / "test_two.py").write_text(
-                "from pyrunner import test\n\n@test(timeout=10)\ndef test_b():\n    pass\n"
+                "from ctrlrunner import test\n\n@test(timeout=10)\ndef test_b():\n    pass\n"
             )
             orch = Orchestrator(str(root / "test_one.py"), 1, 30.0)
             reporter = orch.run()
@@ -264,7 +264,7 @@ class AlwaysCaptureOrderingRegressionTests(unittest.TestCase):
             root = Path(tmp) / "suite"
             root.mkdir()
             (root / "test_ordering.py").write_text(
-                "from pyrunner import fixture, test\n\n"
+                "from ctrlrunner import fixture, test\n\n"
                 "class Resource:\n"
                 "    def __init__(self):\n"
                 "        self.closed = False\n\n"
@@ -314,7 +314,7 @@ class WallClockParallelismTests(unittest.TestCase):
             # class, making re-import a no-op after registry.reset()
             # (zero tests collected).
             (root / f"test_{suite_name}_{i}.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 f"@test(timeout=30)\ndef test_sleep_{i}():\n    time.sleep({seconds})\n"
             )
         return root
@@ -372,7 +372,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
             (root / "test_grouped.py").write_text(
-                "from pyrunner import test\n\n" + tests_src + "\n"
+                "from ctrlrunner import test\n\n" + tests_src + "\n"
             )
 
             orch = Orchestrator(str(root), 4, 10.0)
@@ -393,7 +393,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
             (root / "test_scattered.py").write_text(
-                "from pyrunner import test\n\n" + tests_src + "\n"
+                "from ctrlrunner import test\n\n" + tests_src + "\n"
             )
 
             orch = Orchestrator(str(root), 4, 10.0, fully_parallel=True)
@@ -410,7 +410,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             root = Path(tmp) / "classpar_suite"
             root.mkdir()
             (root / "test_classpar.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(fully_parallel=True)\n"
                 "class Par:\n"
                 "    @test()\n"
@@ -431,7 +431,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             root = Path(tmp) / "capone_suite"
             root.mkdir()
             (root / "test_capped.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(workers=1, fully_parallel=True)\n"
                 "class Capped:\n"
                 "    @test()\n"
@@ -458,7 +458,7 @@ class SchedulingUnitsTests(unittest.TestCase):
             root = Path(tmp) / "dedicated_suite"
             root.mkdir()
             (root / "test_dedicated.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(workers=1, workers_mode='dedicated')\n"
                 "class Reserved:\n"
                 "    @test()\n"
@@ -467,7 +467,7 @@ class SchedulingUnitsTests(unittest.TestCase):
                 "    def test_b(self):\n        pass\n"
             )
             (root / "test_pool.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_c():\n    pass\n\n"
                 "@test()\ndef test_d():\n    pass\n"
             )
@@ -481,14 +481,14 @@ class SchedulingUnitsTests(unittest.TestCase):
             self.assertEqual(len({r.worker_id for r in reserved}), 1)
 
     def test_config_worker_constraint_caps_a_file(self):
-        from pyrunner.execution.worker_budget import WorkerConstraintSpec
+        from ctrlrunner.execution.worker_budget import WorkerConstraintSpec
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "configcap_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(4))
             (root / "test_configcapped.py").write_text(
-                "from pyrunner import test\n\n" + tests_src + "\n"
+                "from ctrlrunner import test\n\n" + tests_src + "\n"
             )
 
             spec = WorkerConstraintSpec(
@@ -518,7 +518,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
         root = Path(tmp) / suite_name
         root.mkdir()
         (root / f"test_{suite_name}.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test(tags={'smoke'})\n"
             "def test_a():\n    pass\n\n"
             "@test(tags={'typo_tag'})\n"
@@ -527,7 +527,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
         return root
 
     def test_strict_mode_runs_zero_tests_and_raises(self):
-        from pyrunner.config.tag_registry import TagRegistry, TagValidationError
+        from ctrlrunner.config.tag_registry import TagRegistry, TagValidationError
 
         with tempfile.TemporaryDirectory() as tmp:
             root = self._make_suite(tmp, "strict_tags_suite")
@@ -540,7 +540,7 @@ class TagRegistryOrchestratorIntegrationTests(unittest.TestCase):
             self.assertEqual(orch.reporter.results, [])
 
     def test_warning_mode_still_runs_all_tests(self):
-        from pyrunner.config.tag_registry import TagRegistry
+        from ctrlrunner.config.tag_registry import TagRegistry
 
         with tempfile.TemporaryDirectory() as tmp:
             root = self._make_suite(tmp, "warn_tags_suite")
@@ -570,7 +570,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         root = Path(tmp) / suite_name
         root.mkdir()
         (root / f"test_{suite_name}.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\n"
             "def test_a():\n    pass\n\n"
             "@test()\n"
@@ -579,7 +579,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         return root
 
     def test_subscriber_receives_full_lifecycle_in_order(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -599,14 +599,14 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(types.count("test_start"), 2)
         self.assertEqual(types.count("test_end"), 2)
         # every envelope is schema-versioned and JSON-serializable
-        from pyrunner.reporting.events import SCHEMA_VERSION
+        from ctrlrunner.reporting.events import SCHEMA_VERSION
 
         for e in received:
             self.assertEqual(e.schema_version, SCHEMA_VERSION)
             json.dumps(e.to_dict())
 
     def test_test_end_payload_matches_the_actual_result(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -628,7 +628,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             self.assertEqual(payload["attempts"], result.attempts)
 
     def test_restart_overhead_is_included_in_the_test_end_event_payload(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -641,7 +641,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "restart_overhead_event_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\ndef test_hangs():\n    time.sleep(30)\n\n"
                 "@test()\ndef test_after_hang():\n    pass\n"
             )
@@ -661,8 +661,8 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
     def test_console_reporter_is_completely_unaffected_by_event_subscribers(self):
         # the core promise of the two-tier design: adding subscribers
         # must not change what a plain ConsoleReporter sees or how.
-        from pyrunner.reporting.events import EventSubscriber
-        from pyrunner.reporting.reporters import ConsoleReporter
+        from ctrlrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.reporters import ConsoleReporter
 
         cr_calls = []
 
@@ -716,7 +716,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         # a subscriber that only handles known types today must not
         # break when it silently ignores ones it doesn't recognize --
         # this is what makes future event types additive, not breaking.
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         class PickySubscriber(EventSubscriber):
             def __init__(self):
@@ -735,7 +735,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(sub.seen_test_end, 2)
 
     def test_worker_terminated_emitted_on_timeout_kill(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -748,7 +748,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "hang_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -759,7 +759,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(received[0]["reason"], "timeout")
 
     def test_worker_terminated_emitted_on_cancellation(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -772,7 +772,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "cancel_event_suite"
             root.mkdir()
             (root / "test_cancel.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=30)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -796,7 +796,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(received[0]["reason"], "cancelled")
 
     def test_test_end_is_emitted_for_a_timeout_killed_test(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -809,7 +809,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "test_end_timeout_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -820,7 +820,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(received[0]["outcome"], "failed")
 
     def test_test_end_is_emitted_for_a_cancelled_test(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -833,7 +833,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "test_end_cancel_suite"
             root.mkdir()
             (root / "test_cancel.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=30)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -857,7 +857,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
         self.assertEqual(received[0]["outcome"], "cancelled")
 
     def test_test_end_is_emitted_for_a_worker_crash(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -870,7 +870,7 @@ class EventEnvelopeIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "test_end_crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
-                "import os, sys\nfrom pyrunner import test\n\n"
+                "import os, sys\nfrom ctrlrunner import test\n\n"
                 "@test()\ndef test_a():\n    os._exit(1)\n"
             )
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[RecordingSubscriber()])
@@ -889,13 +889,13 @@ class GroupingIntegrationTests(unittest.TestCase):
         registry.reset()
 
     def test_default_no_config_groups_by_module_only(self):
-        from pyrunner.reporting.grouping import DEFAULT_DIMENSIONS
+        from ctrlrunner.reporting.grouping import DEFAULT_DIMENSIONS
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "default_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)  # grouping_dimensions=None -> default
             self.assertEqual(orch.grouping_dimensions, DEFAULT_DIMENSIONS)
@@ -905,13 +905,13 @@ class GroupingIntegrationTests(unittest.TestCase):
             self.assertTrue(result.groups["module"].endswith("test_a"))
 
     def test_custom_dimensions_computed_and_attached_to_results(self):
-        from pyrunner.reporting.grouping import GroupingDimension
+        from ctrlrunner.reporting.grouping import GroupingDimension
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "custom_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(tags={'team_backend'}, properties={'owner': 'alice'})\n"
                 "def test_x():\n    pass\n"
             )
@@ -930,7 +930,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "cancel_grouping_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=30)\ndef test_hangs():\n    time.sleep(30)\n"
             )
             cancel_event = threading.Event()
@@ -947,7 +947,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             self.assertIn("module", reporter.results[0].groups)
 
     def test_groups_included_in_event_envelope_payload(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -960,7 +960,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "event_grouping_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[RecordingSubscriber()])
             orch.run()
@@ -984,12 +984,12 @@ class RunProjectsIntegrationTests(unittest.TestCase):
         web.mkdir(parents=True)
         e2e.mkdir(parents=True)
         (web / "test_web.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test(tags={'smoke'})\ndef test_login():\n    pass\n\n"
             "@test(tags={'regression'})\ndef test_checkout():\n    assert False\n"
         )
         (e2e / "test_e2e.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_full_flow():\n    pass\n"
         )
         return web, e2e
 
@@ -1071,7 +1071,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             # project's own timeout=1 should be what's actually used
             root = Path(tmp) / "tests" / "web"
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test()\ndef test_hangs():\n    time.sleep(30)\n"
             )
             combined, multi = run_projects(
@@ -1102,7 +1102,7 @@ class RunProjectsIntegrationTests(unittest.TestCase):
             self.assertEqual(len(combined.results), 2)  # both web tests ran regardless
 
     def test_event_envelopes_carry_the_project_name(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -1143,12 +1143,12 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             f"@test()\ndef test_fail_{i}():\n    assert False" for i in range(count)
         )
         (root / f"test_{suite_name}.py").write_text(
-            "from pyrunner import test\n\n" + tests_src + "\n"
+            "from ctrlrunner import test\n\n" + tests_src + "\n"
         )
         return root
 
     def test_max_failures_stops_after_threshold_marks_rest_not_run(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = self._make_failing_suite(tmp, 5, suite_name="maxfail5")
@@ -1163,7 +1163,7 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertEqual(fp.cancel_reason, "max_failures")
 
     def test_max_failures_zero_means_unlimited(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = self._make_failing_suite(tmp, 4, suite_name="maxfailunlimited")
@@ -1183,13 +1183,13 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertTrue(all(r.outcome == "failed" for r in reporter.results))
 
     def test_max_timeouts_stops_after_first_timeout_kill(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "hang_suite"
             root.mkdir()
             (root / "test_hangs.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\ndef test_hang_a():\n    time.sleep(30)\n\n"
                 "@test(timeout=1)\ndef test_hang_b():\n    time.sleep(30)\n\n"
                 "@test()\ndef test_c():\n    pass\n"
@@ -1206,13 +1206,13 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertEqual(len(reporter.results), 3)
 
     def test_stop_on_worker_crash_detects_real_crash_and_cancels(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
-                "import os, time\nfrom pyrunner import test\n\n"
+                "import os, time\nfrom ctrlrunner import test\n\n"
                 "@test()\ndef test_a():\n    pass\n\n"
                 # sleep first so test_a's own "finished" message has time
                 # to actually flush through the queue before the abrupt
@@ -1233,17 +1233,17 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertEqual(fp.cancel_reason, "stop_on_worker_crash")
 
     def test_worker_crash_without_stop_on_worker_crash_does_not_cancel(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "crash_suite2"
             root.mkdir()
             (root / "test_crash.py").write_text(
-                "import os\nfrom pyrunner import test\n\n"
+                "import os\nfrom ctrlrunner import test\n\n"
                 "@test()\ndef test_crashes():\n    os._exit(1)\n"
             )
             (root / "test_unrelated.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_fine():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_fine():\n    pass\n"
             )
             fp = FailPolicyState(stop_on_worker_crash=False)
             orch = Orchestrator(str(root), 2, 10.0, fail_policy=fp)
@@ -1255,14 +1255,14 @@ class FailPolicyIntegrationTests(unittest.TestCase):
             self.assertIsNone(fp.cancel_reason)
 
     def test_retry_then_pass_does_not_count_toward_max_failures(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "flaky_suite"
             root.mkdir()
             (root / "test_flaky.py").write_text(
                 "_state = {'n': 0}\n"
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(retries=1)\n"
                 "def test_flaky():\n"
                 "    _state['n'] += 1\n"
@@ -1295,7 +1295,7 @@ class ShardingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "sharding_unaffected_suite"
             root.mkdir()
             tests_src = "\n\n".join(f"@test()\ndef test_{i}():\n    pass" for i in range(6))
-            (root / "test_x.py").write_text("from pyrunner import test\n\n" + tests_src + "\n")
+            (root / "test_x.py").write_text("from ctrlrunner import test\n\n" + tests_src + "\n")
 
             orch = Orchestrator(str(root), 3, 10.0)  # history_store=None
             reporter = orch.run()
@@ -1306,7 +1306,7 @@ class ShardingIntegrationTests(unittest.TestCase):
         # per-test LPT is specifically what fully_parallel=True buys, so
         # this test opts in -- under the file-grouped default all 8
         # tests share one file and would serialize onto one worker.
-        from pyrunner.reporting.history import HistoryStore
+        from ctrlrunner.reporting.history import HistoryStore
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "sharding_seeded_suite"
@@ -1317,7 +1317,7 @@ class ShardingIntegrationTests(unittest.TestCase):
                 + "\n\n".join(f"@test()\ndef test_fast_{i}():\n    pass" for i in range(6))
             )
             (root / "test_mixed.py").write_text(
-                "import time\nfrom pyrunner import test\n\n" + tests_src + "\n"
+                "import time\nfrom ctrlrunner import test\n\n" + tests_src + "\n"
             )
 
             db_path = str(Path(tmp) / "history.db")
@@ -1363,14 +1363,14 @@ class ShardingIntegrationTests(unittest.TestCase):
         # the file-grouped analogue: two slow FILES with seeded history
         # must land on different workers (unit weight = sum of member
         # durations), keeping wall time near one file's sleep total.
-        from pyrunner.reporting.history import HistoryStore
+        from ctrlrunner.reporting.history import HistoryStore
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "sharding_filegroup_suite"
             root.mkdir()
             for name in ("alpha", "beta"):
                 (root / f"test_{name}.py").write_text(
-                    "import time\nfrom pyrunner import test\n\n"
+                    "import time\nfrom ctrlrunner import test\n\n"
                     f"@test()\ndef test_slow_{name}():\n    time.sleep(0.5)\n"
                 )
 
@@ -1411,7 +1411,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "profiling_flat_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -1423,7 +1423,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "profiling_retry_suite"
             root.mkdir()
             (root / "test_flaky.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "_state = {'n': 0}\n\n"
                 "@test(retries=2)\n"
                 "def test_flaky():\n"
@@ -1447,7 +1447,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "profiling_capture_suite"
             root.mkdir()
             (root / "test_capture.py").write_text(
-                "from pyrunner import test, fixture\n\n"
+                "from ctrlrunner import test, fixture\n\n"
                 "def _capture(value, prefix):\n"
                 "    path = prefix + '.txt'\n"
                 "    open(path, 'w').write('x')\n"
@@ -1477,7 +1477,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "profiling_restart_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\ndef test_hangs():\n    time.sleep(30)\n\n"
                 "@test()\ndef test_after_hang():\n    pass\n"
             )
@@ -1521,7 +1521,7 @@ class ProfilingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "profiling_no_restart_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -1539,13 +1539,13 @@ class QuarantineIntegrationTests(unittest.TestCase):
         registry.reset()
 
     def test_quarantined_failure_gets_distinct_outcome_and_reason(self):
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_basic_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_flaky():\n    assert False\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_flaky():\n    assert False\n"
             )
             qc = QuarantineConfig(
                 test_ids={"quarantine_basic_suite.test_x::test_flaky"}, reason="JIRA-999"
@@ -1558,13 +1558,13 @@ class QuarantineIntegrationTests(unittest.TestCase):
             self.assertEqual(r.quarantine_reason, "JIRA-999")
 
     def test_quarantined_pass_stays_passed_but_flagged(self):
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_pass_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_ok():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_ok():\n    pass\n"
             )
             qc = QuarantineConfig(test_ids={"quarantine_pass_suite.test_x::test_ok"})
             orch = Orchestrator(str(root), 1, 10.0, quarantine=qc)
@@ -1574,13 +1574,13 @@ class QuarantineIntegrationTests(unittest.TestCase):
             self.assertTrue(r.quarantined)
 
     def test_unquarantined_test_unaffected(self):
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_unaffected_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
             )
             qc = QuarantineConfig(test_ids={"some.other.test::not_this_one"})
             orch = Orchestrator(str(root), 1, 10.0, quarantine=qc)
@@ -1590,14 +1590,14 @@ class QuarantineIntegrationTests(unittest.TestCase):
             self.assertFalse(r.quarantined)
 
     def test_quarantined_failure_does_not_count_toward_max_failures(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_failpolicy_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_quarantined():\n    assert False\n\n"
                 "@test()\ndef test_real_failure():\n    assert False\n\n"
                 "@test()\ndef test_ok():\n    pass\n"
@@ -1621,7 +1621,7 @@ class QuarantineIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "quarantine_none_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)  # quarantine=None
             reporter = orch.run()
@@ -1635,14 +1635,14 @@ class QuarantineIntegrationTests(unittest.TestCase):
         # reported failure -- the quarantine transform must reach it too,
         # or a quarantined hanging test aborts the whole run through
         # --max-timeouts despite being quarantined.
-        from pyrunner.execution.fail_policy import FailPolicyState
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_timeout_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\ndef test_hangs():\n    time.sleep(30)\n\n"
                 "@test()\ndef test_ok():\n    pass\n"
             )
@@ -1667,14 +1667,14 @@ class QuarantineIntegrationTests(unittest.TestCase):
         # that fails once and passes on retry ends up 'passed' (quarantine
         # only ever rewrites 'failed'), still flagged, with both attempts
         # counted.
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_flaky_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
                 "_state = {'n': 0}\n"
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(retries=1)\n"
                 "def test_flaky():\n"
                 "    _state['n'] += 1\n"
@@ -1694,13 +1694,13 @@ class QuarantineIntegrationTests(unittest.TestCase):
         # skip-on-fail still protects the rest of the group. Pins that
         # interaction: quarantining a member doesn't un-skip its
         # dependents.
-        from pyrunner.execution.quarantine import QuarantineConfig
+        from ctrlrunner.execution.quarantine import QuarantineConfig
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "quarantine_serial_suite"
             root.mkdir()
             (root / "test_serial_q.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -1731,7 +1731,7 @@ class CancellationTests(unittest.TestCase):
             root.mkdir()
             (root / "test_slow.py").write_text(
                 "import time\n"
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(timeout=30)\n"
                 "def test_a():\n    pass\n\n"
                 "@test(timeout=30)\n"
@@ -1772,7 +1772,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             root = Path(tmp) / "worker_id_finished_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_x():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -1785,7 +1785,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             root = Path(tmp) / "worker_id_timeout_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -1801,7 +1801,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             root = Path(tmp) / "worker_id_crash_suite"
             root.mkdir()
             (root / "test_crash.py").write_text(
-                "import os\nfrom pyrunner import test\n\n@test()\ndef test_a():\n    os._exit(1)\n"
+                "import os\nfrom ctrlrunner import test\n\n@test()\ndef test_a():\n    os._exit(1)\n"
             )
             orch = Orchestrator(str(root), 1, 10.0)
             reporter = orch.run()
@@ -1821,7 +1821,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             root.mkdir()
             (root / "test_slow.py").write_text(
                 "import time\n"
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test(timeout=30)\n"
                 "def test_a():\n    time.sleep(10)\n\n"
                 "@test(timeout=30)\n"
@@ -1830,9 +1830,9 @@ class WorkerIdOnResultTests(unittest.TestCase):
             cancel_event = threading.Event()
             orch = Orchestrator(str(root), 1, 30.0, cancel_event=cancel_event)
 
-            from pyrunner.core.registry import get_tests
-            from pyrunner.execution.orchestrator import discover_and_import
-            from pyrunner.reporting.grouping import compute_groups
+            from ctrlrunner.core.registry import get_tests
+            from ctrlrunner.execution.orchestrator import discover_and_import
+            from ctrlrunner.reporting.grouping import compute_groups
 
             modules = discover_and_import(str(root))
             all_tests = get_tests()
@@ -1845,7 +1845,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             # Two separate single-test batches -- the second is still
             # sitting in `pending` (no slot ever assigned to it) when
             # cancellation fires.
-            from pyrunner.execution.worker_budget import Batch, ExecUnit
+            from ctrlrunner.execution.worker_budget import Batch, ExecUnit
 
             pending = [
                 Batch(units=[ExecUnit(key=tid, kind="single", test_ids=(tid,))]) for tid in test_ids
@@ -1874,7 +1874,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "worker_id_bounded_suite"
             root.mkdir()
-            body = "from pyrunner import test\n\n" + "\n".join(
+            body = "from ctrlrunner import test\n\n" + "\n".join(
                 f"@test()\ndef test_{i}():\n    pass\n" for i in range(5)
             )
             (root / "test_many.py").write_text(body)
@@ -1894,7 +1894,7 @@ class WorkerIdOnResultTests(unittest.TestCase):
             root = Path(tmp) / "worker_id_timeout_started_at_suite"
             root.mkdir()
             (root / "test_hang.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\n"
                 "def test_hangs():\n    time.sleep(30)\n"
             )
@@ -1919,7 +1919,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_order_suite"
             root.mkdir()
             (root / "test_serial_order.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -1944,7 +1944,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_skip_suite"
             root.mkdir()
             (root / "test_serial_skip.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -1971,7 +1971,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_retry_suite"
             root.mkdir()
             (root / "test_serial_retry.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "COUNT = {'a': 0, 'b': 0}\n\n"
                 "@test_class(serial=True, retries=1)\n"
                 "class Flow:\n"
@@ -2004,7 +2004,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_exhaust_suite"
             root.mkdir()
             (root / "test_serial_exhaust.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True, retries=1)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -2030,7 +2030,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_kill_suite"
             root.mkdir()
             (root / "test_serial_kill.py").write_text(
-                "import time\nfrom pyrunner import test, test_class\n\n"
+                "import time\nfrom ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True, timeout=2)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -2058,7 +2058,7 @@ class SerialClassTests(unittest.TestCase):
             root.mkdir()
             flag = (Path(tmp) / "first_attempt_done.flag").as_posix()
             (root / "test_serial_killretry.py").write_text(
-                "import os\nimport time\nfrom pyrunner import test, test_class\n\n"
+                "import os\nimport time\nfrom ctrlrunner import test, test_class\n\n"
                 f"FLAG = {flag!r}\n\n"
                 "@test_class(serial=True, retries=1, timeout=2)\n"
                 "class Flow:\n"
@@ -2094,7 +2094,7 @@ class SerialClassTests(unittest.TestCase):
             root = Path(tmp) / "serial_skipmember_suite"
             root.mkdir()
             (root / "test_serial_skipmember.py").write_text(
-                "from pyrunner import skip, test, test_class\n\n"
+                "from ctrlrunner import skip, test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class Flow:\n"
                 "    @test()\n"
@@ -2123,7 +2123,7 @@ class NextSpawnableIndexTests(unittest.TestCase):
         return orch
 
     def _slot(self, group=None, dedicated=False):
-        from pyrunner.execution.orchestrator import _WorkerSlot
+        from ctrlrunner.execution.orchestrator import _WorkerSlot
 
         return _WorkerSlot(
             worker_id=0,
@@ -2137,7 +2137,7 @@ class NextSpawnableIndexTests(unittest.TestCase):
         )
 
     def _batch(self, group=None, dedicated=False):
-        from pyrunner.execution.worker_budget import Batch, ExecUnit
+        from ctrlrunner.execution.worker_budget import Batch, ExecUnit
 
         return Batch(
             units=[ExecUnit(key="k", kind="single", test_ids=("t",))],
@@ -2397,7 +2397,7 @@ class TimeoutSentinelResolutionTests(unittest.TestCase):
             root = Path(tmp) / "zero_timeout_suite"
             root.mkdir()
             (root / "test_x.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=0)\ndef test_a():\n    time.sleep(20)\n"
             )
             start = time.time()
@@ -2428,12 +2428,12 @@ class ImportPhaseTimeoutTests(unittest.TestCase):
             # restart buffer, patched below), which is exactly the old
             # bug's trigger condition.
             (root / "test_a.py").write_text(
-                "import time\ntime.sleep(0.6)\nfrom pyrunner import test\n\n"
+                "import time\ntime.sleep(0.6)\nfrom ctrlrunner import test\n\n"
                 "@test()\ndef test_fast():\n    pass\n"
             )
             with (
-                mock.patch("pyrunner.execution.orchestrator.WORKER_RESTART_BUFFER", 0.1),
-                mock.patch("pyrunner.execution.orchestrator.IMPORT_PHASE_TIMEOUT", 5.0),
+                mock.patch("ctrlrunner.execution.orchestrator.WORKER_RESTART_BUFFER", 0.1),
+                mock.patch("ctrlrunner.execution.orchestrator.IMPORT_PHASE_TIMEOUT", 5.0),
             ):
                 orch = Orchestrator(str(root), 1, 0.2)
                 reporter = orch.run()
@@ -2450,7 +2450,7 @@ class ProcessGroupKillTests(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == "win32", "POSIX process-group behavior only")
     def test_terminate_kills_the_whole_process_group_not_just_the_leader(self):
-        from pyrunner.execution.jobobject import JobObject
+        from ctrlrunner.execution.jobobject import JobObject
 
         with tempfile.TemporaryDirectory() as tmp:
             pid_file = Path(tmp) / "child.pid"
@@ -2504,7 +2504,7 @@ class PolicyCancelDoesNotOverwriteExternalCancelTests(unittest.TestCase):
     instead of 'cancelled'."""
 
     def test_external_cancel_reason_is_not_overwritten_by_a_later_policy_trip(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         fp = FailPolicyState(max_failures=1)
         orch = Orchestrator("unused", 1, 10.0, fail_policy=fp)
@@ -2514,7 +2514,7 @@ class PolicyCancelDoesNotOverwriteExternalCancelTests(unittest.TestCase):
         self.assertTrue(orch.cancel_event.is_set())
 
     def test_policy_trip_still_sets_reason_when_nothing_cancelled_it_first(self):
-        from pyrunner.execution.fail_policy import FailPolicyState
+        from ctrlrunner.execution.fail_policy import FailPolicyState
 
         fp = FailPolicyState(max_failures=1)
         orch = Orchestrator("unused", 1, 10.0, fail_policy=fp)
@@ -2540,7 +2540,7 @@ class NearTimeoutPerAttemptTests(unittest.TestCase):
             # near_timeout, despite neither attempt individually
             # coming close.
             (root / "test_a.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "_state = {'n': 0}\n\n"
                 "@test(timeout=1.0, retries=1)\n"
                 "def test_flaky_then_pass():\n"
@@ -2571,12 +2571,12 @@ class SchedulerCrashSafetyTests(unittest.TestCase):
         root = Path(tmp) / name
         root.mkdir()
         (root / "test_a.py").write_text(
-            "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
         )
         return root
 
     def test_broken_event_subscriber_does_not_crash_the_run(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         class BrokenSubscriber(EventSubscriber):
             def on_event(self, event):
@@ -2605,7 +2605,7 @@ class SchedulerCrashSafetyTests(unittest.TestCase):
         self.assertIn("run_end", received)
 
     def test_broken_console_reporter_does_not_prevent_other_reporters(self):
-        from pyrunner.reporting.reporters import ConsoleReporter
+        from ctrlrunner.reporting.reporters import ConsoleReporter
 
         class BrokenReporter(ConsoleReporter):
             def on_test_end(self, result):
@@ -2645,7 +2645,7 @@ class GuardedOnRunEndTests(unittest.TestCase):
         registry.reset()
 
     def test_reporter_raising_in_on_run_end_does_not_block_the_next_reporter(self):
-        from pyrunner.reporting.reporters import ConsoleReporter
+        from ctrlrunner.reporting.reporters import ConsoleReporter
 
         class LockedHistoryReporter(ConsoleReporter):
             def on_run_end(self, results, duration):
@@ -2661,7 +2661,7 @@ class GuardedOnRunEndTests(unittest.TestCase):
             root = Path(tmp) / "guarded_on_run_end_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             orch = Orchestrator(
                 str(root),
@@ -2684,15 +2684,15 @@ class QueueDrainTests(unittest.TestCase):
         registry.reset()
 
     def _fake_item(self, test_id):
-        from pyrunner.core.registry import TestItem
+        from ctrlrunner.core.registry import TestItem
 
         return TestItem(id=test_id, func=lambda: None, params=[])
 
     def test_finalize_slot_drains_a_trailing_finished_message_before_reporting_not_run(self):
         import multiprocessing as mp
 
-        from pyrunner.execution.jobobject import JobObject
-        from pyrunner.execution.orchestrator import Orchestrator, _WorkerSlot
+        from ctrlrunner.execution.jobobject import JobObject
+        from ctrlrunner.execution.orchestrator import Orchestrator, _WorkerSlot
 
         orch = Orchestrator("unused", 1, 10.0)
         orch.items_by_id = {"mod::test_a": self._fake_item("mod::test_a")}
@@ -2754,8 +2754,8 @@ class QueueDrainTests(unittest.TestCase):
         q.close()
 
     def test_corrupt_message_is_logged_not_silently_swallowed(self):
-        from pyrunner.execution.jobobject import JobObject
-        from pyrunner.execution.orchestrator import Orchestrator, _WorkerSlot
+        from ctrlrunner.execution.jobobject import JobObject
+        from ctrlrunner.execution.orchestrator import Orchestrator, _WorkerSlot
 
         orch = Orchestrator("unused", 1, 10.0)
 
@@ -2782,7 +2782,7 @@ class QueueDrainTests(unittest.TestCase):
             deadline=time.time() + 10,
         )
 
-        with self.assertLogs("pyrunner.execution.orchestrator", level="ERROR") as ctx:
+        with self.assertLogs("ctrlrunner.execution.orchestrator", level="ERROR") as ctx:
             orch._drain_queue_once(slot, {"mod::test_a": 10.0})
 
         self.assertTrue(any("corrupt" in msg.lower() for msg in ctx.output))
@@ -2797,7 +2797,7 @@ class EventPayloadFieldsTests(unittest.TestCase):
         registry.reset()
 
     def test_test_end_payload_includes_worker_id_retries_configured_and_near_timeout(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -2809,7 +2809,7 @@ class EventPayloadFieldsTests(unittest.TestCase):
             root = Path(tmp) / "event_payload_fields_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n@test(retries=2)\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test(retries=2)\ndef test_a():\n    pass\n"
             )
             orch = Orchestrator(str(root), 1, 10.0, event_subscribers=[RecordingSubscriber()])
             orch.run()
@@ -2834,7 +2834,7 @@ class EventOrderingTests(unittest.TestCase):
         registry.reset()
 
     def test_test_end_precedes_worker_terminated_on_timeout_kill(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -2846,7 +2846,7 @@ class EventOrderingTests(unittest.TestCase):
             root = Path(tmp) / "event_ordering_timeout_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "import time\nfrom pyrunner import test\n\n"
+                "import time\nfrom ctrlrunner import test\n\n"
                 "@test(timeout=1)\ndef test_hangs():\n    time.sleep(30)\n"
             )
             orch = Orchestrator(str(root), 1, 1.0, event_subscribers=[RecordingSubscriber()])
@@ -2862,7 +2862,7 @@ class EventOrderingTests(unittest.TestCase):
         self.assertLess(test_end_idx, terminated_idx)
 
     def test_cancelled_test_end_has_a_preceding_test_start(self):
-        from pyrunner.reporting.events import EventSubscriber
+        from ctrlrunner.reporting.events import EventSubscriber
 
         received = []
 
@@ -2874,7 +2874,7 @@ class EventOrderingTests(unittest.TestCase):
             root = Path(tmp) / "event_ordering_cancel_suite"
             root.mkdir()
             (root / "test_a.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\ndef test_a():\n    pass\n\n"
                 "@test()\ndef test_b():\n    pass\n"
             )
@@ -2905,7 +2905,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
         root = Path(tmp) / "assert_details_suite"
         root.mkdir()
         (root / "test_assert_details.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\n"
             "def test_equality_failure():\n"
             "    left = 1\n"
@@ -2953,7 +2953,7 @@ class AssertDetailsIntegrationTests(unittest.TestCase):
         self.assertIsNone(by_id["test_passing"].assert_details)
 
     def test_assert_details_survives_full_chain_into_html_report(self):
-        from pyrunner.reporting.html_report import render_html
+        from ctrlrunner.reporting.html_report import render_html
 
         with tempfile.TemporaryDirectory() as tmp:
             root = self._make_suite(tmp)
@@ -2973,7 +2973,7 @@ class LogCaptureIntegrationTests(unittest.TestCase):
         root.mkdir()
         (root / "test_log_capture_suite.py").write_text(
             "import logging\n"
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\n"
             "def test_passing_with_output():\n"
             "    print('hello from passing test')\n"
@@ -3046,7 +3046,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         os.makedirs(test_dir)
         with open(os.path.join(test_dir, "test_cov_demo.py"), "w") as f:
             f.write(
-                "from pyrunner import test\n\n@test()\ndef test_one():\n    assert 1 + 1 == 2\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    assert 1 + 1 == 2\n"
             )
 
         data_dir = os.path.join(self.tmp_dir, ".coverage-data")
@@ -3085,7 +3085,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         with open(os.path.join(test_dir, "test_cov_hang.py"), "w") as f:
             f.write(
                 "import time\n"
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_hangs():\n"
                 "    time.sleep(30)\n"
@@ -3118,7 +3118,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         os.makedirs(test_dir)
         with open(os.path.join(test_dir, "test_cov_ctx.py"), "w") as f:
             f.write(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_a():\n"
                 "    assert 1 == 1\n\n"
@@ -3169,7 +3169,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         os.makedirs(test_dir)
         with open(os.path.join(test_dir, "test_cov_module_level.py"), "w") as f:
             f.write(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "def multiply(x, y):\n"
                 "    return x * y\n\n"
                 "class Calculator:\n"
@@ -3187,9 +3187,9 @@ class CoverageIntegrationTests(unittest.TestCase):
         os.makedirs(data_dir)
         coverage_config = CoverageConfig(
             # source is scoped to just the fixture module's own directory
-            # (as a real user's [pyrunner.coverage].source config would
+            # (as a real user's [ctrlrunner.coverage].source config would
             # be) so the reported percentage measures only the code under
-            # test, not incidental pyrunner-internal code that also runs
+            # test, not incidental ctrlrunner-internal code that also runs
             # in the worker process after cov.start().
             enabled=True,
             data_dir=data_dir,
@@ -3237,7 +3237,7 @@ class RecordPropertyE2ETests(unittest.TestCase):
             root = Path(tmp) / "recprop_suite"
             root.mkdir()
             (root / "test_props.py").write_text(
-                "from pyrunner import record_property, record_suite_property, test\n\n"
+                "from ctrlrunner import record_property, record_suite_property, test\n\n"
                 "@test()\n"
                 "def test_records():\n"
                 '    record_property("testrail", "C123")\n'
@@ -3259,7 +3259,7 @@ class TeardownErrorSurfacingTests(unittest.TestCase):
     it via a teardown_failed property."""
 
     SUITE = (
-        "from pyrunner import fixture, test\n\n"
+        "from ctrlrunner import fixture, test\n\n"
         "@fixture(scope='function')\n"
         "def broken():\n"
         "    yield 'value'\n"
@@ -3307,7 +3307,7 @@ class TeardownErrorSurfacingTests(unittest.TestCase):
 
     def test_session_scope_teardown_error_lands_in_suite_properties(self):
         suite = (
-            "from pyrunner import fixture, test\n\n"
+            "from ctrlrunner import fixture, test\n\n"
             "@fixture(scope='session')\n"
             "def sess_broken():\n"
             "    yield 'value'\n"
@@ -3327,7 +3327,7 @@ class TeardownErrorSurfacingTests(unittest.TestCase):
 
 class FilteredTracebackE2ETests(unittest.TestCase):
     """A real failed run's error text starts at user code --
-    no pyrunner/execution/worker.py dispatch frames."""
+    no ctrlrunner/execution/worker.py dispatch frames."""
 
     def setUp(self):
         registry.reset()
@@ -3337,7 +3337,7 @@ class FilteredTracebackE2ETests(unittest.TestCase):
             root = Path(tmp) / "tb_suite"
             root.mkdir()
             (root / "test_tb.py").write_text(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_fails():\n"
                 "    raise AssertionError('user boom')\n"
@@ -3349,7 +3349,7 @@ class FilteredTracebackE2ETests(unittest.TestCase):
         self.assertEqual(result.outcome, "failed")
         self.assertIn("user boom", result.error)
         self.assertIn("test_tb.py", result.error)
-        self.assertNotIn("pyrunner/execution/worker.py", result.error)
+        self.assertNotIn("ctrlrunner/execution/worker.py", result.error)
 
 
 class ReconciliationInvariantTests(unittest.TestCase):
@@ -3364,7 +3364,7 @@ class ReconciliationInvariantTests(unittest.TestCase):
         root = Path(tmp) / "recon_suite"
         root.mkdir()
         (root / "test_recon.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\ndef test_one():\n    pass\n\n"
             "@test()\ndef test_two():\n    pass\n"
         )
@@ -3414,7 +3414,7 @@ class WarningsCaptureTests(unittest.TestCase):
             root = Path(tmp) / "warn_suite"
             root.mkdir()
             (root / "test_warns.py").write_text(
-                "import warnings\nfrom pyrunner import test\n\n"
+                "import warnings\nfrom ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_warns():\n"
                 "    warnings.warn('legacy api', DeprecationWarning)\n\n"
@@ -3451,7 +3451,7 @@ class DottedNameAliasTests(unittest.TestCase):
     def test_dotted_import_returns_the_runner_module_object(self):
         import importlib
 
-        from pyrunner.execution.worker import import_module_by_path, module_name_for_path
+        from ctrlrunner.execution.worker import import_module_by_path, module_name_for_path
 
         with tempfile.TemporaryDirectory() as tmp:
             pkg = Path(tmp) / "alias_demo_pkg"
@@ -3478,7 +3478,7 @@ class DottedNameAliasTests(unittest.TestCase):
         # Regression guard: two files producing the SAME dotted name
         # (two roots with identical relative layout) each keep their own
         # hash key; the alias stays pointing at whoever came first.
-        from pyrunner.execution.worker import import_module_by_path, module_name_for_path
+        from ctrlrunner.execution.worker import import_module_by_path, module_name_for_path
 
         with tempfile.TemporaryDirectory() as tmp:
             a = Path(tmp) / "a"
@@ -3514,7 +3514,7 @@ class StartedAtThreadingTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_started_at_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             before = time.time()
             orch = Orchestrator(str(root), num_workers=1, default_timeout=30.0)
@@ -3534,7 +3534,7 @@ class StartedAtThreadingTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_serial_skip_demo.py").write_text(
-                "from pyrunner import test, test_class\n\n"
+                "from ctrlrunner import test, test_class\n\n"
                 "@test_class(serial=True)\n"
                 "class SerialDemo:\n"
                 "    @test()\n"
@@ -3561,7 +3561,7 @@ class StartedAtThreadingTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_run_start_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             before = time.time()
             orch = Orchestrator(str(root), num_workers=1, default_timeout=30.0)
@@ -3587,7 +3587,7 @@ class CollectionSummaryPrintTests(unittest.TestCase):
             root = Path(tmp) / "tests"
             root.mkdir()
             (root / "test_collection_summary_demo.py").write_text(
-                "from pyrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
             )
             buf = io.StringIO()
             with redirect_stdout(buf):
@@ -3606,7 +3606,7 @@ class GrepFilterOrchestratorTests(unittest.TestCase):
         root = Path(tmp) / "tests"
         root.mkdir()
         (root / "test_grep_demo.py").write_text(
-            "from pyrunner import test\n\n"
+            "from ctrlrunner import test\n\n"
             "@test()\ndef test_login():\n    pass\n\n"
             "@test()\ndef test_logout():\n    pass\n\n"
             "@test()\ndef test_signup():\n    pass\n"
@@ -3645,7 +3645,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
         root.mkdir()
         for name in ("a", "b", "c"):
             (root / f"test_order_{name}.py").write_text(
-                f"from pyrunner import test\n\n@test()\ndef test_{name}():\n    pass\n"
+                f"from ctrlrunner import test\n\n@test()\ndef test_{name}():\n    pass\n"
             )
         return str(root)
 
@@ -3686,7 +3686,7 @@ class OrderSeedOrchestratorTests(unittest.TestCase):
 
 class ImportTimeoutConfigTests(unittest.TestCase):
     def test_orchestrator_defaults_to_module_constant(self):
-        from pyrunner.execution.orchestrator import IMPORT_PHASE_TIMEOUT
+        from ctrlrunner.execution.orchestrator import IMPORT_PHASE_TIMEOUT
 
         orch = Orchestrator("tests", num_workers=1, default_timeout=30.0)
         self.assertEqual(orch.import_timeout, IMPORT_PHASE_TIMEOUT)

@@ -15,18 +15,18 @@ def page(context):
     ...
 ```
 
-On failure, artifacts land in `pyrunner-artifacts/<test>/attempt-N/` and
+On failure, artifacts land in `ctrlrunner-artifacts/<test>/attempt-N/` and
 their paths are written into the JUnit `<properties>` and JSON reporter
 output.
 
 ### Steps (`test.step()` equivalent)
 
-Playwright TS's `test.step()` is an `await`-wrapped block; pyrunner's
+Playwright TS's `test.step()` is an `await`-wrapped block; ctrlrunner's
 equivalent is a context manager, since steps are inline blocks inside a
 test body, not separate functions:
 
 ```python
-from pyrunner import step
+from ctrlrunner import step
 
 def test_login(page):
     with step("Navigate to login page"):
@@ -55,12 +55,12 @@ explicitly in TS.
 ### Built-in Playwright fixtures with native trace/screenshot capture
 
 The fastest way to get Playwright tests running — no fixture code at
-all, capture controlled entirely by CLI flags or `pyrunner.toml`, same
+all, capture controlled entirely by CLI flags or `ctrlrunner.toml`, same
 idea as Playwright TS's CLI (https://playwright.dev/docs/test-cli):
 
 ```python
-from pyrunner import test
-from pyrunner.playwright.playwright_fixtures import page
+from ctrlrunner import test
+from ctrlrunner.playwright.playwright_fixtures import page
 
 @test(timeout=15, case_id="TC-1")
 def test_login(page):
@@ -91,7 +91,7 @@ works," no per-project fixture code needed.
 
 Config file equivalent:
 ```toml
-[pyrunner]
+[ctrlrunner]
 trace = "retain-on-failure"
 screenshot = "only-on-failure"
 browser = "chromium"
@@ -110,11 +110,11 @@ callbacks keep working unchanged.
 
 ### Auto-recorded actions (`auto_step`)
 
-Already applied automatically by `pyrunner.playwright.playwright_fixtures.page`
+Already applied automatically by `ctrlrunner.playwright.playwright_fixtures.page`
 above. Writing your own `page` fixture instead? Wrap it the same way:
 
 ```python
-from pyrunner import auto_step
+from ctrlrunner import auto_step
 
 @fixture(scope="function")
 def page(context):
@@ -150,7 +150,7 @@ of outcome, not only for failures. **Must fire before the resource is
 torn down** — if `on_failure` needs the object still "open" (e.g.
 `context.tracing.stop()`), do the capture inside `on_failure` itself,
 not in code that runs after `yield` unconditionally in a separate
-teardown step, since pyrunner calls `on_failure` before generator
+teardown step, since ctrlrunner calls `on_failure` before generator
 teardown for exactly this reason.
 
 ### Rich assertion failures
@@ -182,9 +182,9 @@ at import time, no nested sub-expression trees — a deliberate scope
 limit in exchange for staying import-hook-free.
 
 Failure tracebacks are **display-filtered**: frames from inside the
-pyrunner package (worker dispatch, fixture resolution) are hidden so
+ctrlrunner package (worker dispatch, fixture resolution) are hidden so
 the traceback starts at your code — the `__tracebackhide__`
-equivalent. An exception raised entirely inside pyrunner keeps its
+equivalent. An exception raised entirely inside ctrlrunner keeps its
 full stack, and `--full-trace` (or `full_trace = true` in config)
 disables filtering altogether.
 
@@ -199,7 +199,7 @@ its worker process:
 
 Config file equivalent:
 ```toml
-[pyrunner]
+[ctrlrunner]
 logs = "only-on-failure"
 ```
 

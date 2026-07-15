@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.reporting.events import EVENT_TYPES, SCHEMA_VERSION, EventEnvelope, EventSubscriber
+from ctrlrunner.reporting.events import EVENT_TYPES, SCHEMA_VERSION, EventEnvelope, EventSubscriber
 
 
 class EventEnvelopeTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class UnifiedResultShapeTests(unittest.TestCase):
     must be the identical dict, built by result_to_public_dict()."""
 
     def _make_result(self):
-        from pyrunner.reporting.reporter import Result
+        from ctrlrunner.reporting.reporter import Result
 
         return Result(
             test_id="mod::test_x[a]",
@@ -93,9 +93,9 @@ class UnifiedResultShapeTests(unittest.TestCase):
         import os
         import tempfile
 
-        from pyrunner.execution.orchestrator import Orchestrator
-        from pyrunner.reporting.events import result_to_public_dict
-        from pyrunner.reporting.reporters import JsonReporter
+        from ctrlrunner.execution.orchestrator import Orchestrator
+        from ctrlrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.reporters import JsonReporter
 
         result = self._make_result()
         expected = result_to_public_dict(result)
@@ -110,7 +110,7 @@ class UnifiedResultShapeTests(unittest.TestCase):
         self.assertEqual(payload["tests"][0], expected)
 
     def test_public_dict_uses_camel_case_id_key(self):
-        from pyrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.events import result_to_public_dict
 
         d = result_to_public_dict(self._make_result())
         self.assertEqual(d["id"], "mod::test_x[a]")
@@ -121,27 +121,27 @@ class UnifiedResultShapeTests(unittest.TestCase):
         self.assertEqual(d["duration"], 1.235)
 
     def test_public_dict_includes_assert_details(self):
-        from pyrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.events import result_to_public_dict
 
         d = result_to_public_dict(self._make_result())
         self.assertEqual(d["assertDetails"], {"expr": "a == b"})
 
     def test_public_dict_includes_logs(self):
-        from pyrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.events import result_to_public_dict
 
         d = result_to_public_dict(self._make_result())
         self.assertEqual(d["logs"][0]["stdout"], "hi")
 
     def test_public_dict_includes_flaky(self):
-        from pyrunner.reporting.events import result_to_public_dict
-        from pyrunner.reporting.reporter import Result
+        from ctrlrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.reporter import Result
 
         r = Result(test_id="m::t", outcome="passed", error=None, duration=0.1, flaky=True)
         self.assertTrue(result_to_public_dict(r)["flaky"])
 
     def test_public_dict_includes_started_at(self):
-        from pyrunner.reporting.events import result_to_public_dict
-        from pyrunner.reporting.reporter import Result
+        from ctrlrunner.reporting.events import result_to_public_dict
+        from ctrlrunner.reporting.reporter import Result
 
         r = Result(test_id="m::t", outcome="passed", error=None, duration=0.1, started_at=1000.5)
         self.assertEqual(result_to_public_dict(r)["startedAt"], 1000.5)

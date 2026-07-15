@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.core import registry
+from ctrlrunner.core import registry
 
 
 class RegistryTests(unittest.TestCase):
@@ -107,7 +107,7 @@ class RegistryTests(unittest.TestCase):
     def test_double_test_decorator_application_raises(self):
         # Applying @test twice to the same function should be
         # caught the same way @parametrize already catches a bad
-        # decorator order, via the shared _pyrunner_registered guard.
+        # decorator order, via the shared _ctrlrunner_registered guard.
         def sample():
             pass
 
@@ -339,7 +339,7 @@ class TestClassTests(unittest.TestCase):
     def test_staticmethod_test_inside_test_class_raises(self):
         # A @test-decorated @staticmethod silently escaped the
         # class merge with no error before this fix (getattr on the
-        # staticmethod object doesn't see _pyrunner_items, which lives
+        # staticmethod object doesn't see _ctrlrunner_items, which lives
         # on the wrapped function) -- must now raise loudly instead.
         with self.assertRaises(TypeError):
 
@@ -792,7 +792,7 @@ class ParamHelperTests(unittest.TestCase):
                 pass
 
     def test_param_case_id_is_selectable(self):
-        from pyrunner.core.selection import select_tests
+        from ctrlrunner.core.selection import select_tests
 
         @registry.test()
         @registry.parametrize("x", [registry.param(1, case_id="7184475"), 2])
@@ -828,9 +828,9 @@ class ParamHelperTests(unittest.TestCase):
         self.assertTrue(items[1].id.endswith("[pair]"))
 
     def test_param_is_exported_from_package_root(self):
-        import pyrunner
+        import ctrlrunner
 
-        self.assertIs(pyrunner.param, registry.param)
+        self.assertIs(ctrlrunner.param, registry.param)
 
 
 if __name__ == "__main__":

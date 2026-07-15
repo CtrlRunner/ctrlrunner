@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.execution.fail_policy import FailPolicyState, resolve_fail_policy
+from ctrlrunner.execution.fail_policy import FailPolicyState, resolve_fail_policy
 
 
 class FailPolicyStateTests(unittest.TestCase):

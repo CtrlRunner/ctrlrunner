@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.ui.localsec import (
+from ctrlrunner.ui.localsec import (
     host_allowed,
     new_session_token,
     origin_allowed,

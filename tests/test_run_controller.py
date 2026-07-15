@@ -6,9 +6,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from pyrunner.execution.coverage_support import CoverageConfig
-from pyrunner.execution.orchestrator import discover_and_import
-from pyrunner.execution.run_controller import (
+from ctrlrunner.execution.coverage_support import CoverageConfig
+from ctrlrunner.execution.orchestrator import discover_and_import
+from ctrlrunner.execution.run_controller import (
     STATUS_IDLE,
     STATUS_RUNNING,
     LiveEventReporter,
@@ -66,7 +66,7 @@ class RunControllerTests(unittest.TestCase):
         os.makedirs(test_dir)
         with open(os.path.join(test_dir, "test_demo.py"), "w") as f:
             f.write(
-                "from pyrunner import test\n\n"
+                "from ctrlrunner import test\n\n"
                 "@test()\n"
                 "def test_ok():\n"
                 "    assert 1 == 1\n"
@@ -168,7 +168,7 @@ class RunControllerTests(unittest.TestCase):
         self.assertEqual(rc.dimension_names(), ["module"])
 
     def test_custom_grouping_dimensions_used_for_list_and_names(self):
-        from pyrunner.reporting.grouping import GroupingDimension
+        from ctrlrunner.reporting.grouping import GroupingDimension
 
         dims = [GroupingDimension(name="team", strategy="tag_prefix", options={"prefix": "team_"})]
         rc = RunController(
@@ -204,14 +204,14 @@ class RunControllerTests(unittest.TestCase):
         self.assertEqual(rc.num_workers_setting, 5)
 
     def test_default_num_workers_is_auto(self):
-        with patch("pyrunner.execution.worker_budget._cpu_count", return_value=9):
+        with patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=9):
             rc = RunController("examples")
         self.assertEqual(rc.num_workers_setting, "auto")
         self.assertEqual(rc.num_workers, 8)
 
     def test_set_num_workers_accepts_auto_and_percent(self):
         rc = self._make()
-        with patch("pyrunner.execution.worker_budget._cpu_count", return_value=8):
+        with patch("ctrlrunner.execution.worker_budget._cpu_count", return_value=8):
             rc.set_num_workers("auto")
             self.assertEqual(rc.num_workers, 7)
             self.assertEqual(rc.num_workers_setting, "auto")
@@ -225,7 +225,7 @@ class RunControllerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 rc.set_num_workers(bad)
 
-    @patch("pyrunner.execution.run_controller.PersistentTraceViewer.start", return_value=True)
+    @patch("ctrlrunner.execution.run_controller.PersistentTraceViewer.start", return_value=True)
     def test_start_run_starts_the_trace_viewer(self, mock_start):
         rc = self._make()
         rc.start_run(case_ids=["TC-001"])
@@ -310,7 +310,7 @@ class RunControllerTests(unittest.TestCase):
         self.assertEqual(result["type"], "test_end")
         self.assertIn("outcome", result)
 
-    @patch("pyrunner.execution.run_controller.Orchestrator")
+    @patch("ctrlrunner.execution.run_controller.Orchestrator")
     def test_start_run_passes_force_reload_true_to_orchestrator(self, mock_orch_cls):
         # UI Mode discovers tests once at startup; without force_reload
         # on every run, test files edited after the server started are
@@ -327,7 +327,7 @@ class RunControllerTests(unittest.TestCase):
         _, kwargs = mock_orch_cls.call_args
         self.assertTrue(kwargs.get("force_reload"))
 
-    @patch("pyrunner.execution.run_controller.Orchestrator")
+    @patch("ctrlrunner.execution.run_controller.Orchestrator")
     def test_run_thread_exception_still_emits_terminal_event(self, mock_orch_cls):
         # If the run thread raises before reaching on_run_end, the
         # frontend's controls (only re-enabled on a terminal event)

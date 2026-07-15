@@ -8,8 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from pyrunner.reporting.reporter import Result
-from pyrunner.reporting.reporters import DotsReporter, JsonReporter, LineReporter, build_reporters
+from ctrlrunner.reporting.reporter import Result
+from ctrlrunner.reporting.reporters import DotsReporter, JsonReporter, LineReporter, build_reporters
 
 
 def _results():
@@ -269,7 +269,7 @@ class JsonReporterTests(unittest.TestCase):
 
             with (
                 patch(
-                    "pyrunner.reporting.reporters.json.dump",
+                    "ctrlrunner.reporting.reporters.json.dump",
                     side_effect=RuntimeError("simulated crash mid-write"),
                 ),
                 self.assertRaises(RuntimeError),
@@ -344,7 +344,7 @@ class BuildReportersTests(unittest.TestCase):
 
 class SummaryLinesFlakyTests(unittest.TestCase):
     def test_flaky_count_appears_in_summary(self):
-        from pyrunner.reporting.reporters import _summary_lines
+        from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [
             Result(test_id="m::a", outcome="passed", error=None, duration=0.1, flaky=True),
@@ -354,7 +354,7 @@ class SummaryLinesFlakyTests(unittest.TestCase):
         self.assertIn("1 flaky", lines[0])
 
     def test_no_flaky_segment_when_zero(self):
-        from pyrunner.reporting.reporters import _summary_lines
+        from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [Result(test_id="m::a", outcome="passed", error=None, duration=0.1)]
         lines = _summary_lines(results, 1.0)
@@ -363,7 +363,7 @@ class SummaryLinesFlakyTests(unittest.TestCase):
 
 class SummaryLinesModuleBreakdownTests(unittest.TestCase):
     def test_breakdown_table_appears_with_two_or_more_modules(self):
-        from pyrunner.reporting.reporters import _summary_lines
+        from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [
             Result(
@@ -385,7 +385,7 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
         self.assertIn("mod_b", joined)
 
     def test_no_breakdown_table_with_a_single_module(self):
-        from pyrunner.reporting.reporters import _summary_lines
+        from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [
             Result(
@@ -398,7 +398,7 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
         self.assertNotIn("mod_a", joined)
 
     def test_no_breakdown_table_when_groups_missing(self):
-        from pyrunner.reporting.reporters import _summary_lines
+        from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [Result(test_id="m::t", outcome="passed", error=None, duration=0.1)]
         lines = _summary_lines(results, 1.0)

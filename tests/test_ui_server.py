@@ -8,7 +8,7 @@ import unittest.mock
 import urllib.request
 from pathlib import Path
 
-from pyrunner.ui.ui_server import _QuietHTTPServer, serve_ui
+from ctrlrunner.ui.ui_server import _QuietHTTPServer, serve_ui
 
 
 class QuietHTTPServerTests(unittest.TestCase):
@@ -52,7 +52,7 @@ class ServeUICtrlCTests(unittest.TestCase):
         mock_controller = unittest.mock.MagicMock()
         with (
             unittest.mock.patch(
-                "pyrunner.ui.ui_server.RunController", return_value=mock_controller
+                "ctrlrunner.ui.ui_server.RunController", return_value=mock_controller
             ),
             unittest.mock.patch.object(
                 _QuietHTTPServer, "serve_forever", side_effect=KeyboardInterrupt
@@ -122,7 +122,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-001"]}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -145,7 +145,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-001"]}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -160,7 +160,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-003"]}).encode(),  # test_hangs
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -171,7 +171,7 @@ class UIServerTests(unittest.TestCase):
             data=b"{}",
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -190,7 +190,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-003"]}).encode(),  # test_hangs: sleep(30)
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -202,7 +202,7 @@ class UIServerTests(unittest.TestCase):
             data=b"{}",
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -229,7 +229,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-001"]}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -258,7 +258,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-001"]}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -284,7 +284,7 @@ class UIServerTests(unittest.TestCase):
                 data=json.dumps({"path": "some/trace.zip"}).encode(),
                 headers={
                     "Content-Type": "application/json",
-                    "X-Pyrunner-Token": self.httpd.session_token,
+                    "X-Ctrlrunner-Token": self.httpd.session_token,
                 },
                 method="POST",
             )
@@ -298,7 +298,7 @@ class UIServerTests(unittest.TestCase):
             data=b"{}",
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -314,7 +314,7 @@ class UIServerTests(unittest.TestCase):
                 data=json.dumps({"path": "some/trace.zip", "testId": "mod::test"}).encode(),
                 headers={
                     "Content-Type": "application/json",
-                    "X-Pyrunner-Token": self.httpd.session_token,
+                    "X-Ctrlrunner-Token": self.httpd.session_token,
                 },
                 method="POST",
             )
@@ -330,7 +330,7 @@ class UIServerTests(unittest.TestCase):
                 data=json.dumps({"path": "some/trace.zip", "testId": "mod::test"}).encode(),
                 headers={
                     "Content-Type": "application/json",
-                    "X-Pyrunner-Token": self.httpd.session_token,
+                    "X-Ctrlrunner-Token": self.httpd.session_token,
                 },
                 method="POST",
             )
@@ -356,7 +356,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-400"]}).encode(),  # has nested steps
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -374,7 +374,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"numWorkers": 7}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -388,7 +388,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"numWorkers": "auto"}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -405,7 +405,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"numWorkers": "banana"}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -421,7 +421,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"numWorkers": 0}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -437,7 +437,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"caseIds": ["TC-003"]}).encode(),  # test_hangs
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -449,7 +449,7 @@ class UIServerTests(unittest.TestCase):
             data=json.dumps({"numWorkers": 3}).encode(),
             headers={
                 "Content-Type": "application/json",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -486,7 +486,7 @@ class UIServerTests(unittest.TestCase):
             headers={
                 "Content-Type": "application/json",
                 "Origin": self.url.rstrip("/"),
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -512,7 +512,7 @@ class UIServerTests(unittest.TestCase):
         req = urllib.request.Request(
             self.url + "api/cancel",
             data=b"{}",
-            headers={"Content-Type": "application/json", "X-Pyrunner-Token": "not-the-token"},
+            headers={"Content-Type": "application/json", "X-Ctrlrunner-Token": "not-the-token"},
             method="POST",
         )
         try:
@@ -531,7 +531,7 @@ class UIServerTests(unittest.TestCase):
             headers={
                 "Content-Type": "application/json",
                 "Host": "attacker.tld",
-                "X-Pyrunner-Token": self.httpd.session_token,
+                "X-Ctrlrunner-Token": self.httpd.session_token,
             },
             method="POST",
         )
@@ -580,7 +580,7 @@ class UIServerTests(unittest.TestCase):
                 data=json.dumps({"path": "some/trace.zip\nrm -rf /"}).encode(),
                 headers={
                     "Content-Type": "application/json",
-                    "X-Pyrunner-Token": self.httpd.session_token,
+                    "X-Ctrlrunner-Token": self.httpd.session_token,
                 },
                 method="POST",
             )
@@ -591,7 +591,7 @@ class UIServerTests(unittest.TestCase):
     def test_get_serves_artifact_file_under_artifacts_root(self):
         resp = urllib.request.urlopen(
             self.url
-            + "pyrunner-artifacts/examples.test_selftest__test_fails/attempt-1/fake_page.txt",
+            + "ctrlrunner-artifacts/examples.test_selftest__test_fails/attempt-1/fake_page.txt",
             timeout=3,
         )
         self.assertEqual(resp.status, 200)
@@ -599,7 +599,7 @@ class UIServerTests(unittest.TestCase):
     def test_get_artifact_rejects_path_traversal(self):
         try:
             urllib.request.urlopen(
-                self.url + "pyrunner-artifacts/../cli.py",
+                self.url + "ctrlrunner-artifacts/../cli.py",
                 timeout=3,
             )
             self.fail("expected HTTPError")
@@ -613,7 +613,7 @@ class UIServerTests(unittest.TestCase):
         # resolve()-based wall as the literal one.
         try:
             urllib.request.urlopen(
-                self.url + "pyrunner-artifacts/%2e%2e/cli.py",
+                self.url + "ctrlrunner-artifacts/%2e%2e/cli.py",
                 timeout=3,
             )
             self.fail("expected HTTPError")
@@ -625,7 +625,7 @@ class UIServerTests(unittest.TestCase):
         # `..` is stripped by resolve(), but a symlink INSIDE the
         # artifacts root pointing outside it resolves to an external
         # path -- the same threat show_report.py already tests for.
-        from pyrunner.ui.ui_server import ARTIFACTS_ROOT
+        from ctrlrunner.ui.ui_server import ARTIFACTS_ROOT
 
         link = ARTIFACTS_ROOT / "escape-link.py"
         target = Path(__file__).resolve()  # any real file outside the root
@@ -633,7 +633,7 @@ class UIServerTests(unittest.TestCase):
         self.addCleanup(link.unlink)
         try:
             urllib.request.urlopen(
-                self.url + "pyrunner-artifacts/escape-link.py",
+                self.url + "ctrlrunner-artifacts/escape-link.py",
                 timeout=3,
             )
             self.fail("expected HTTPError")
@@ -643,7 +643,7 @@ class UIServerTests(unittest.TestCase):
     def test_get_artifact_returns_404_for_missing_file(self):
         try:
             urllib.request.urlopen(
-                self.url + "pyrunner-artifacts/does/not/exist.png",
+                self.url + "ctrlrunner-artifacts/does/not/exist.png",
                 timeout=3,
             )
             self.fail("expected HTTPError 404")

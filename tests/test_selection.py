@@ -1,7 +1,7 @@
 import unittest
 
-from pyrunner.core.registry import TestItem
-from pyrunner.core.selection import select_tests
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.core.selection import select_tests
 
 
 def _item(id_, case_id=None, tags=None):

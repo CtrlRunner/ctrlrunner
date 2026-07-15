@@ -4,7 +4,7 @@ import time
 import unittest
 from pathlib import Path
 
-from pyrunner.reporting.report_paths import (
+from ctrlrunner.reporting.report_paths import (
     _PRUNE_GRACE_SECONDS,
     _prune_old_reports,
     find_latest_report_dir,

@@ -1,12 +1,12 @@
 import unittest
 
-from pyrunner.execution.flaky import (
+from ctrlrunner.execution.flaky import (
     FlakyStats,
     compute_flake_score,
     compute_flaky_report,
     format_flaky_report,
 )
-from pyrunner.execution.quarantine import QuarantineConfig
+from ctrlrunner.execution.quarantine import QuarantineConfig
 
 
 def _row(outcome, attempts, retries_configured):

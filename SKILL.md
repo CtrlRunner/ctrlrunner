@@ -1,4 +1,4 @@
-# Skill: Writing tests with pyrunner
+# Skill: Writing tests with ctrlrunner
 
 Use this whenever asked to write, edit, or review a Playwright test in
 this repository. **This project does not use pytest.** Do not import
@@ -10,14 +10,14 @@ this repository. **This project does not use pytest.** Do not import
 ## Imports
 
 ```python
-from pyrunner import test, fixture, parametrize
+from ctrlrunner import test, fixture, parametrize
 ```
 
 ## Golden rule: decorator order
 
 `@test` is always the outermost decorator; `@parametrize` sits directly
 above the function. This is backwards from what pytest muscle memory
-suggests — write it wrong and pyrunner raises a clear error at import
+suggests — write it wrong and ctrlrunner raises a clear error at import
 time, but don't rely on that; get it right the first time:
 
 ```python
@@ -79,11 +79,11 @@ def test_x(browser_type, page):
 For Playwright tests, prefer the built-in fixtures over writing your
 own -- no fixture code needed, and trace/screenshot capture is
 controlled entirely by `--trace`/`--screenshot` CLI flags or
-`pyrunner.toml`:
+`ctrlrunner.toml`:
 
 ```python
-from pyrunner import test
-from pyrunner.playwright_fixtures import page
+from ctrlrunner import test
+from ctrlrunner.playwright_fixtures import page
 
 @test(timeout=15, case_id="TC-1")
 def test_login(page):
@@ -118,7 +118,7 @@ state (a `page`, a `context`) — it will leak between tests.
 
 ## Screenshots/traces on failure
 
-With the built-in `pyrunner.playwright_fixtures.page`, this is just
+With the built-in `ctrlrunner.playwright_fixtures.page`, this is just
 `--trace`/`--screenshot` CLI flags (see Fixtures section above) — don't
 write capture code at all unless using a custom fixture.
 
@@ -143,12 +143,12 @@ reporter) and duplicates logic that already exists per-fixture.
 
 ## Steps
 
-Use `with step("...")` (from `pyrunner`) to break a test into named,
+Use `with step("...")` (from `ctrlrunner`) to break a test into named,
 reportable phases -- this is the equivalent of Playwright TS's `await
 test.step(...)`, but as a context manager since there's no `await` here:
 
 ```python
-from pyrunner import step
+from ctrlrunner import step
 
 def test_checkout(page):
     with step("Add item to cart"):
@@ -172,7 +172,7 @@ decide their condition, the same way Playwright TS's `test.skip()` is
 called inline, not at declaration time:
 
 ```python
-from pyrunner import skip, fail, fixme, slow
+from ctrlrunner import skip, fail, fixme, slow
 
 def test_x(browser_type, page):
     skip(browser_type == "firefox", "not implemented for Firefox")
@@ -213,10 +213,10 @@ the suite (`grep -rn "tags=" tests/`).
   `pytest_collection_modifyitems`, `pytest_runtest_makereport`, etc.).
   A `conftest.py` in this repo is just a plain module with `@fixture`
   definitions, auto-imported by the orchestrator — nothing else.
-- No `pytest.mark.parametrize` — use `@parametrize` from `pyrunner`.
-- No `pytest.fixture` — use `@fixture` from `pyrunner`.
+- No `pytest.mark.parametrize` — use `@parametrize` from `ctrlrunner`.
+- No `pytest.fixture` — use `@fixture` from `ctrlrunner`.
 - No `pytest.raises` — use plain `try/except` + `assert`, or
-  `unittest.TestCase.assertRaises`-style patterns if writing pyrunner's
+  `unittest.TestCase.assertRaises`-style patterns if writing ctrlrunner's
   *own* internals (not test suites) in `tests/`.
 - No `-k` / `-m` pytest CLI flags in docs, CI YAML, or comments — the
   equivalents here are `--test-id` / `--case-id` / `--case-id-prefix` /

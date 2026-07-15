@@ -2,10 +2,10 @@
 
 [← Back to README](../README.md)
 
-## Config file (`pyrunner.toml`)
+## Config file (`ctrlrunner.toml`)
 
 ```toml
-[pyrunner]
+[ctrlrunner]
 root = "tests"
 num_workers = "auto"   # default: CPUs - 1. Or an int, or "50%" of CPUs
 timeout = 30.0
@@ -24,18 +24,18 @@ artifact_mode = "files"
 # junit_logs = "off"            # "system-out"/"split": captured stdout/stderr into JUnit XML
 # junit_infra_errors = false    # true: timeout-kill/crash render as <error>, not <failure>
 # strict_teardown = true        # false: a broken teardown no longer fails a passing test
-# full_trace = false            # true: keep pyrunner-internal frames in failure tracebacks
+# full_trace = false            # true: keep ctrlrunner-internal frames in failure tracebacks
 
-# [pyrunner.workers]            # scoped worker budgets -- see "Parallelism & scheduling"
+# [ctrlrunner.workers]            # scoped worker budgets -- see "Parallelism & scheduling"
 # "tests/test_checkout.py" = 1
 ```
 
-Precedence: **CLI flag > `pyrunner.toml` > built-in default**. Running
-`python -m pyrunner` with no arguments at all uses the config file's
+Precedence: **CLI flag > `ctrlrunner.toml` > built-in default**. Running
+`python -m ctrlrunner` with no arguments at all uses the config file's
 `root`, or falls back to `"tests"`.
 
-Unknown `[pyrunner]` keys and mis-nested tables (a bare `[workers]`
-instead of `[pyrunner.workers]`) print a **warning** to stderr instead
+Unknown `[ctrlrunner]` keys and mis-nested tables (a bare `[workers]`
+instead of `[ctrlrunner.workers]`) print a **warning** to stderr instead
 of being silently ignored — typos no longer quietly run the suite with
 defaults.
 
@@ -80,7 +80,7 @@ Group related tests and give them shared defaults, without any shared
 instance state between them:
 
 ```python
-from pyrunner import test, test_class
+from ctrlrunner import test, test_class
 
 @test_class(tags={"smoke"}, properties={"owner": "team_checkout"}, timeout=30, retries=1)
 class LoginTests:
@@ -123,7 +123,7 @@ also when a runtime condition like `browser_type == "firefox"` becomes
 available:
 
 ```python
-from pyrunner import skip, fail, fixme, slow
+from ctrlrunner import skip, fail, fixme, slow
 
 def test_x(browser_type, page):
     skip(browser_type == "firefox", "not implemented for Firefox")

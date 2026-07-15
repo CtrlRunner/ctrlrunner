@@ -10,7 +10,7 @@ except ImportError:
     HAS_LIBCST = False
 
 if HAS_LIBCST:
-    from pyrunner.migrate import migrate_paths
+    from ctrlrunner.migrate import migrate_paths
 
 
 def _write_tree(root: Path, files: dict):
@@ -47,7 +47,7 @@ class FixtureConversionTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertIn('@fixture(scope="session", autouse=True)', code)
-        self.assertIn("from pyrunner import fixture", code)
+        self.assertIn("from ctrlrunner import fixture", code)
         self.assertNotIn("import pytest", code)
 
     def test_function_scope_is_default_and_dropped(self):
@@ -89,7 +89,7 @@ class TestFunctionConversionTests(MigrateTestCase):
     def test_plain_test_gets_test_decorator(self):
         report, out = self.migrate({"test_a.py": ("def test_one():\n    assert True\n")})
         self.assertIn("@test()\ndef test_one():", out["test_a.py"])
-        self.assertIn("from pyrunner import test", out["test_a.py"])
+        self.assertIn("from ctrlrunner import test", out["test_a.py"])
         self.assertEqual(report.totals()["tests"], 1)
 
     def test_timeout_flaky_and_custom_marker(self):
@@ -125,7 +125,7 @@ class TestFunctionConversionTests(MigrateTestCase):
 
     def test_flaky_max_runs_kwarg_kept_with_todo_not_silently_dropped(self):
         # @pytest.mark.flaky(max_runs=3) is the actual `flaky` package's
-        # API, not pyrunner's `reruns=` shape -- must be flagged, not
+        # API, not ctrlrunner's `reruns=` shape -- must be flagged, not
         # dropped.
         report, out = self.migrate(
             {
@@ -170,10 +170,10 @@ class TestFunctionConversionTests(MigrateTestCase):
         code = out["test_a.py"]
         # @test outermost, @parametrize directly above def -- required order.
         self.assertLess(code.index("@test("), code.index("@parametrize("))
-        # pytest.param with kwargs is converted to pyrunner's param()
+        # pytest.param with kwargs is converted to ctrlrunner's param()
         # (id preserved), not stripped down to the bare value anymore.
         self.assertIn('parametrize("x", [1, param(2, id="two")])', code)
-        self.assertIn("from pyrunner import param, parametrize, test", code)
+        self.assertIn("from ctrlrunner import param, parametrize, test", code)
 
     def test_skipif_and_xfail_inserted_after_docstring(self):
         _, out = self.migrate(
@@ -197,7 +197,7 @@ class TestFunctionConversionTests(MigrateTestCase):
         self.assertTrue(doc < skip_call < fail_call < body)
 
     def test_xfail_strict_defaults_to_false(self):
-        # pytest xfail default is strict=False; pyrunner fail() defaults to
+        # pytest xfail default is strict=False; ctrlrunner fail() defaults to
         # strict=True -- the migration must pin it explicitly.
         _, out = self.migrate(
             {
@@ -311,13 +311,13 @@ class RuntimeCallTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        self.assertIn("TODO(pyrunner-migrate): pytest.raises", code)
+        self.assertIn("TODO(ctrlrunner-migrate): pytest.raises", code)
         self.assertIn("import pytest", code)
         self.assertIn("with pytest.raises(ValueError):", code)  # untouched
         self.assertTrue(any("pytest.raises" in msg for f in report.files for _, msg in f.todos))
 
     def test_module_level_skip_allow_module_level_left_as_is_with_inline_todo(self):
-        # pyrunner's skip() raises at IMPORT TIME, unlike pytest's
+        # ctrlrunner's skip() raises at IMPORT TIME, unlike pytest's
         # module-level skip semantics -- auto-converting this breaks
         # collection of the whole module. Must be left untouched with
         # an inline TODO comment at the exact call site.
@@ -333,8 +333,8 @@ class RuntimeCallTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertIn('pytest.skip("unsupported on this platform", allow_module_level=True)', code)
-        self.assertIn("TODO(pyrunner-migrate)", code)
-        self.assertIn("allow_module_level", code.split("TODO(pyrunner-migrate):", 1)[1][:200])
+        self.assertIn("TODO(ctrlrunner-migrate)", code)
+        self.assertIn("allow_module_level", code.split("TODO(ctrlrunner-migrate):", 1)[1][:200])
         self.assertTrue(
             any("allow_module_level" in msg for f in report.files for _, msg in f.todos)
         )
@@ -400,7 +400,7 @@ class IndirectParametrizeTests(MigrateTestCase):
 class PlaywrightAndImportTests(MigrateTestCase):
     def test_playwright_fixture_import_added(self):
         _, out = self.migrate({"test_a.py": ('def test_one(page):\n    page.goto("https://x")\n')})
-        self.assertIn("from pyrunner.playwright.playwright_fixtures import page", out["test_a.py"])
+        self.assertIn("from ctrlrunner.playwright.playwright_fixtures import page", out["test_a.py"])
 
     def test_own_page_fixture_wins_over_playwright_import(self):
         _, out = self.migrate(
@@ -452,7 +452,7 @@ class PlaywrightAndImportTests(MigrateTestCase):
             }
         )
         # the other file still migrated
-        self.assertIn("from pyrunner import fixture", out["test_ok.py"])
+        self.assertIn("from ctrlrunner import fixture", out["test_ok.py"])
         # the star-import file is flagged, not crashed on: its pytest
         # import survives and a human-facing note exists
         star_reports = [f for f in report.files if str(f.path).endswith("test_star.py")]
@@ -480,7 +480,7 @@ class PlaywrightAndImportTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertNotIn("from pytest import", code)
-        self.assertIn("from pyrunner import fixture, test", code)
+        self.assertIn("from ctrlrunner import fixture, test", code)
         self.assertIn("@test(tags={'smoke'})", code)
 
 
@@ -527,7 +527,7 @@ class HookAndAsyncTests(MigrateTestCase):
 
     def test_async_test_bailout_does_not_inflate_report_or_add_unused_import(self):
         # The async bail-out used to run AFTER parametrize's plan side
-        # effects (report count + `from pyrunner import parametrize`)
+        # effects (report count + `from ctrlrunner import parametrize`)
         # already happened -- inflating report counts for a decorator
         # that never actually got applied, and leaving a dangling
         # unused import in a file where nothing was converted.
@@ -542,13 +542,13 @@ class HookAndAsyncTests(MigrateTestCase):
             }
         )
         code = out.get("test_a.py", "")
-        self.assertNotIn("from pyrunner import parametrize", code)
+        self.assertNotIn("from ctrlrunner import parametrize", code)
         self.assertEqual(report.totals()["parametrize"], 0)
 
 
 class RecordPropertyMigrationTests(MigrateTestCase):
     """pytest's record_property/record_testsuite_property fixtures now
-    have direct pyrunner equivalents (runtime imports, not fixtures):
+    have direct ctrlrunner equivalents (runtime imports, not fixtures):
     the parameter disappears from the signature and the call becomes a
     plain imported function -- no TODO needed."""
 
@@ -562,9 +562,9 @@ class RecordPropertyMigrationTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertIn("def test_one():", code)
-        self.assertIn("from pyrunner import record_property, test", code)
+        self.assertIn("from ctrlrunner import record_property, test", code)
         self.assertIn('record_property("testrail", "C123")', code)
-        self.assertNotIn("TODO(pyrunner-migrate): builtin fixture 'record_property'", code)
+        self.assertNotIn("TODO(ctrlrunner-migrate): builtin fixture 'record_property'", code)
 
     def test_record_testsuite_property_param_and_call_renamed(self):
         report, out = self.migrate(
@@ -580,7 +580,7 @@ class RecordPropertyMigrationTests(MigrateTestCase):
         self.assertIn('record_suite_property("environment", "staging")', code)
         self.assertNotIn("record_testsuite_property", code)
         self.assertIn("record_suite_property", code)
-        self.assertIn("from pyrunner import record_suite_property, test", code)
+        self.assertIn("from ctrlrunner import record_suite_property, test", code)
 
     def test_other_params_survive_removal_without_trailing_comma(self):
         _, out = self.migrate(
@@ -600,9 +600,9 @@ class RecordPropertyMigrationTests(MigrateTestCase):
                 "test_a.py": ('def test_one(record_property):\n    record_property("k", "v")\n'),
             }
         )
-        # the user's own fixture wins: param stays, no pyrunner import
+        # the user's own fixture wins: param stays, no ctrlrunner import
         self.assertIn("def test_one(record_property):", out["test_a.py"])
-        self.assertNotIn("from pyrunner import record_property", out["test_a.py"])
+        self.assertNotIn("from ctrlrunner import record_property", out["test_a.py"])
 
 
 class CaseIdMarkerTests(MigrateTestCase):
@@ -748,7 +748,7 @@ class AddMarkerTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertIn("record_property('test_case_id', \"7392947\")", code)
-        self.assertIn("from pyrunner import", code)
+        self.assertIn("from ctrlrunner import", code)
         self.assertIn("record_property", code.split("\n")[0] + code)
         # request no longer used -> parameter dropped
         self.assertIn("def test_one():", code)
@@ -807,7 +807,7 @@ class AddMarkerTests(MigrateTestCase):
         self.assertIn("def test_one(request):", code)  # request stays
         self.assertTrue(
             any(
-                "add_marker has no pyrunner equivalent" in msg
+                "add_marker has no ctrlrunner equivalent" in msg
                 for f in report.files
                 for _, msg in f.todos
             )
@@ -877,7 +877,7 @@ class PytestParamConversionTests(MigrateTestCase):
         )
         code = out["test_a.py"]
         self.assertIn('param(1, "Entity", id="GEPM-Entity", case_id="7279719")', code)
-        self.assertIn("from pyrunner import param", code)
+        self.assertIn("from ctrlrunner import param", code)
         self.assertEqual(report.totals()["params"], 1)
 
     def test_param_with_marks_list_case_id_and_xfail(self):
@@ -1015,11 +1015,11 @@ class ConfigMigrationTests(MigrateTestCase):
         return root, report, changes
 
     def _config_text(self, changes, root) -> str:
-        target = (root / "pyrunner.toml").resolve()
+        target = (root / "ctrlrunner.toml").resolve()
         for path, _, new in changes:
             if path.resolve() == target:
                 return new
-        raise AssertionError("no pyrunner.toml in changes")
+        raise AssertionError("no ctrlrunner.toml in changes")
 
     def test_full_mapping_from_pyproject(self):
         root, report, changes = self._migrate_tree()
@@ -1034,7 +1034,7 @@ class ConfigMigrationTests(MigrateTestCase):
         self.assertNotIn("test_case_id", text)
         self.assertNotIn('"timeout"', text)
         # unmappable options become commented TODO lines
-        self.assertIn("# TODO(pyrunner-migrate): addopts '--dist=loadscope'", text)
+        self.assertIn("# TODO(ctrlrunner-migrate): addopts '--dist=loadscope'", text)
         self.assertIn("filterwarnings", text)
         self.assertIn("pythonpath", text)
         # >=3 team_* tags -> prefix-pattern tip
@@ -1044,13 +1044,13 @@ class ConfigMigrationTests(MigrateTestCase):
     def test_generated_toml_parses_and_loads_without_warnings(self):
         import tomllib
 
-        from pyrunner.config.config import load_config
+        from ctrlrunner.config.config import load_config
 
         root, _, changes = self._migrate_tree()
         text = self._config_text(changes, root)
         parsed = tomllib.loads(text)
-        self.assertIn("pyrunner", parsed)
-        config_path = root / "generated_pyrunner.toml"
+        self.assertIn("ctrlrunner", parsed)
+        config_path = root / "generated_ctrlrunner.toml"
         config_path.write_text(text, encoding="utf-8")
         warnings: list[str] = []
         section = load_config(str(config_path), warn=warnings.append)
@@ -1061,41 +1061,41 @@ class ConfigMigrationTests(MigrateTestCase):
 
     def test_dry_run_writes_nothing_and_write_creates_the_file(self):
         root, _, _ = self._migrate_tree(write=False)
-        self.assertFalse((root / "pyrunner.toml").exists())
+        self.assertFalse((root / "ctrlrunner.toml").exists())
 
         root2, _, _ = self._migrate_tree(write=True)
-        target = root2 / "pyrunner.toml"
+        target = root2 / "ctrlrunner.toml"
         self.assertTrue(target.exists())
         self.assertIn('root = "spec"', target.read_text(encoding="utf-8"))
-        # second run: existing pyrunner.toml is never overwritten
+        # second run: existing ctrlrunner.toml is never overwritten
         report, changes = migrate_paths([str(root2 / "spec")], write=True)
         self.assertNotIn(target.resolve(), [p.resolve() for p, _, _ in changes])
         self.assertTrue(any("already exists" in msg for f in report.files for _, msg in f.todos))
 
-    def test_existing_pyrunner_toml_is_untouched(self):
+    def test_existing_ctrlrunner_toml_is_untouched(self):
         marker = "# hand-written -- do not touch\n"
         root, report, changes = self._migrate_tree(
-            extra_files={"pyrunner.toml": marker}, write=True
+            extra_files={"ctrlrunner.toml": marker}, write=True
         )
-        self.assertEqual((root / "pyrunner.toml").read_text(encoding="utf-8"), marker)
-        self.assertNotIn((root / "pyrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
+        self.assertEqual((root / "ctrlrunner.toml").read_text(encoding="utf-8"), marker)
+        self.assertNotIn((root / "ctrlrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
         self.assertTrue(any("already exists" in msg for f in report.files for _, msg in f.todos))
 
     def test_no_config_flag_disables_the_pass(self):
         root, report, changes = self._migrate_tree(migrate_config_files=False)
-        self.assertNotIn((root / "pyrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
+        self.assertNotIn((root / "ctrlrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
         self.assertEqual(report.totals()["config"], 0)
 
     def test_pyproject_found_in_parent_of_migrated_path(self):
         # _migrate_tree already migrates root/spec while pyproject.toml
         # sits at root -- assert the upward walk found it.
         root, _, changes = self._migrate_tree()
-        self.assertIn((root / "pyrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
+        self.assertIn((root / "ctrlrunner.toml").resolve(), [p.resolve() for p, _, _ in changes])
 
     def test_addopts_num_workers_auto_and_list_form(self):
-        from pyrunner.migrate.config_migrator import build_pyrunner_toml
+        from ctrlrunner.migrate.config_migrator import build_ctrlrunner_toml
 
-        text, _, _ = build_pyrunner_toml(
+        text, _, _ = build_ctrlrunner_toml(
             {"addopts": ["-n", "auto", "--strict-markers"]}, "test_case_id"
         )
         self.assertIn('num_workers = "auto"', text)

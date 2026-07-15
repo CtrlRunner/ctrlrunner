@@ -1,4 +1,4 @@
-/* pyrunner design tokens. The palette grows out of the one that already
+/* ctrlrunner design tokens. The palette grows out of the one that already
    shipped in html_report.py's _CSS block (ours), extended with six label
    hues. Theme is a .theme-light / .theme-dark class on <html>. */
 

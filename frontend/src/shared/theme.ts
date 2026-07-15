@@ -1,6 +1,6 @@
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
-const STORAGE_KEY = 'pyrunner-theme';
+const STORAGE_KEY = 'ctrlrunner-theme';
 
 export function themeSetting(): ThemeSetting {
   const stored = localStorage.getItem(STORAGE_KEY);

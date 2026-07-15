@@ -1,4 +1,4 @@
-// Mirrors pyrunner/reporting/html_report.py::_result_to_dict exactly.
+// Mirrors ctrlrunner/reporting/html_report.py::_result_to_dict exactly.
 // The Python side is the source of truth for this contract.
 
 export type Outcome =

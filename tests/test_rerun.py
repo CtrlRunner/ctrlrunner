@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pyrunner.core.registry import TestItem
-from pyrunner.execution.rerun import (
+from ctrlrunner.core.registry import TestItem
+from ctrlrunner.execution.rerun import (
     RerunError,
     expand_serial_groups,
     load_failed_test_ids,
@@ -192,7 +192,7 @@ class ResolveRepoRootTests(unittest.TestCase):
 
     def test_resolves_the_real_repo_root_from_a_subdirectory(self):
         # --changed-since must resolve paths against the actual
-        # git repo root, not the process's cwd -- running pyrunner from
+        # git repo root, not the process's cwd -- running ctrlrunner from
         # a subdirectory previously made every comparison miss.
         with tempfile.TemporaryDirectory() as tmp:
             self._init_repo(tmp)

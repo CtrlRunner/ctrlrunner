@@ -10,7 +10,7 @@ export default defineConfig({
   base: '',
   plugins: [react(), viteSingleFile()],
   build: {
-    outDir: path.resolve(__dirname, '../pyrunner/reporting/_static/report'),
+    outDir: path.resolve(__dirname, '../src/ctrlrunner/reporting/_static/report'),
     emptyOutDir: true,
     chunkSizeWarningLimit: 10000,
   },

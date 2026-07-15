@@ -1,6 +1,6 @@
 import unittest
 
-from pyrunner.core import annotations
+from ctrlrunner.core import annotations
 
 
 class SkipFixmeTests(unittest.TestCase):

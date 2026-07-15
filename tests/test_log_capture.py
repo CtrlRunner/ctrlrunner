@@ -3,7 +3,7 @@ import logging
 import sys
 import unittest
 
-from pyrunner.core import log_capture
+from ctrlrunner.core import log_capture
 
 
 class CaptureLogsTests(unittest.TestCase):

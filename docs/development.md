@@ -1,12 +1,12 @@
-# Developing pyrunner
+# Developing ctrlrunner
 
 [← Back to README](../README.md)
 
 See also [CONTRIBUTING.md](../CONTRIBUTING.md) for PR expectations.
 
-## Running pyrunner's own test suite
+## Running ctrlrunner's own test suite
 
-pyrunner is tested with the standard library `unittest`, not itself or
+ctrlrunner is tested with the standard library `unittest`, not itself or
 pytest — avoids both the irony and a dependency on either:
 
 ```
@@ -19,7 +19,7 @@ uv run python -m unittest discover -s tests
 uv sync --group dev       # installs ruff + ty alongside the project
 uv run ruff check .       # lint
 uv run ruff format .      # format
-uv run ty check           # type check (pyrunner/ only; see [tool.ty.src])
+uv run ty check           # type check (src/ctrlrunner/ only; see [tool.ty.src])
 ```
 
 Config for all three lives in `pyproject.toml` (`[tool.ruff]`, `[tool.ty]`).
@@ -27,7 +27,7 @@ Config for all three lives in `pyproject.toml` (`[tool.ruff]`, `[tool.ty]`).
 ## Project layout
 
 ```
-pyrunner/
+src/ctrlrunner/
     core/
         registry.py       @test / @fixture / @parametrize, TestItem/Fixture models
         di.py              Fixture dependency resolution (scopes, request.param)
@@ -42,7 +42,7 @@ pyrunner/
         flaky.py            flaky-report score computation
         quarantine.py       quarantine config resolution
         fail_policy.py      --max-failures / --max-timeouts / --stop-on-worker-crash
-        worker_budget.py    scoped worker budgets ([pyrunner.workers])
+        worker_budget.py    scoped worker budgets ([ctrlrunner.workers])
         coverage_support.py coverage.py integration
         sharding.py         batch scheduling
         run_controller.py   shared run orchestration for CLI/UI Mode
@@ -54,8 +54,8 @@ pyrunner/
         html_report.py         static self-contained HTML report generator
         grouping.py             HTML report / UI Mode grouping dimensions
     config/
-        config.py           pyrunner.toml loader
-        projects.py          named projects ([pyrunner.projects.*])
+        config.py           ctrlrunner.toml loader
+        projects.py          named projects ([ctrlrunner.projects.*])
         tag_registry.py      registered_tags / strict_tags
     ui/
         ui_server.py          UI Mode local server (stdlib http.server + SSE)
@@ -66,8 +66,8 @@ pyrunner/
     playwright/
         playwright_fixtures.py  built-in browser/context/page fixtures
         playwright_actions.py   auto_step (auto-recorded action wrapping)
-    migrate/                pytest -> pyrunner source migration (libcst)
+    migrate/                pytest -> ctrlrunner source migration (libcst)
     cli.py / __main__.py
 examples/               Runnable example test suites
-tests/                  pyrunner's own unittest suite
+tests/                  ctrlrunner's own unittest suite
 ```
