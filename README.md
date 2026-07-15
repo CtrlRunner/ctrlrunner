@@ -29,20 +29,21 @@ best-effort thread interrupt.
 
 ## Install
 
-Managed with [uv](https://docs.astral.sh/uv/):
-
 ```
-uv sync                    # core install, zero third-party deps
-uv sync --extra playwright # + playwright (for the built-in fixtures/actions)
-uv sync --extra migrate    # + libcst (pytest -> pyrunner migration script)
-uv run playwright install  # browser binaries, if you don't have them
+pip install pyrunner                 # core install, zero third-party deps
+pip install pyrunner[playwright]     # + playwright (for the built-in fixtures/actions)
+pip install pyrunner[migrate]        # + libcst (pytest -> pyrunner migration script)
+playwright install                   # browser binaries, if you don't have them
 ```
 
-Windows also needs `pywin32` for Job Objects: `uv sync --extra windows`.
+Windows also needs `pywin32` for Job Objects: `pip install pyrunner[windows]`.
 
-Without uv, plain pip works too: `pip install -e ".[playwright]"`.
+With [uv](https://docs.astral.sh/uv/), the equivalent is `uv add pyrunner --extra playwright`.
 
 No `pytest` dependency, anywhere.
+
+Contributing to pyrunner itself (not just using it)? See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup instead.
 
 ## Quick start
 

@@ -2,10 +2,15 @@
 
 ## Dev setup
 
-Managed with [uv](https://docs.astral.sh/uv/):
+Clone the repo and sync it with [uv](https://docs.astral.sh/uv/) — this installs pyrunner
+itself in editable mode plus its dev tooling:
 
 ```
-uv sync --group dev       # installs ruff + ty alongside the project
+uv sync --group dev                          # ruff + ty + coverage, editable install
+uv sync --group dev --extra playwright --extra migrate  # + playwright/libcst, for the
+                                                          # playwright-fixture tests and
+                                                          # migrate/ tests
+uv run playwright install                    # browser binaries, if you don't have them
 ```
 
 ## Running the test suite
