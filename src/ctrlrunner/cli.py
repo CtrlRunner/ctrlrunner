@@ -44,7 +44,6 @@ from .reporting.manifest import build_manifest, write_manifest
 from .reporting.report_paths import find_latest_report_dir, resolve_report_dir
 from .reporting.reporters import build_reporters
 
-
 # A run that selected zero tests exits with this
 # distinct code instead of 0 -- a typo'd --tag/--test-id (or a wrong
 # root) must never produce a green CI run that tested nothing. Rerun
@@ -638,7 +637,9 @@ def main():
     num_workers, worker_constraints, fully_parallel = _resolve_worker_settings(args, config)
     timeout = args.timeout if args.timeout is not None else config.get("timeout", 30.0)
     import_timeout = (
-        args.import_timeout if args.import_timeout is not None else config.get("import_timeout", 60.0)
+        args.import_timeout
+        if args.import_timeout is not None
+        else config.get("import_timeout", 60.0)
     )
     if (
         isinstance(import_timeout, bool)
@@ -665,7 +666,9 @@ def main():
             import random as _random_module
 
             seed = _random_module.SystemRandom().randrange(2**31)
-            print(f"ctrlrunner: --order random with no --seed -- using seed {seed}", file=sys.stderr)
+            print(
+                f"ctrlrunner: --order random with no --seed -- using seed {seed}", file=sys.stderr
+            )
         elif not isinstance(seed, int) or isinstance(seed, bool):
             print(f"Error: invalid seed config: expected an integer, got {seed!r}", file=sys.stderr)
             sys.exit(1)
@@ -1253,8 +1256,7 @@ def main():
     flaky_count = sum(1 for r in reporter.results if r.flaky)
     if flaky_count and args.fail_on_flaky:
         print(
-            f"{flaky_count} test(s) passed only after a retry this run "
-            f"(--fail-on-flaky is set)",
+            f"{flaky_count} test(s) passed only after a retry this run (--fail-on-flaky is set)",
             file=sys.stderr,
         )
 

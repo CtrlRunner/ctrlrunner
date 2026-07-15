@@ -3,8 +3,12 @@ import shutil
 import tempfile
 import unittest
 
+import coverage as coverage_pkg
+
 from ctrlrunner.execution.coverage_support import (
     CoverageConfig,
+    CoverageSummary,
+    finalize_coverage,
     prepare_data_dir,
     resolve_coverage_config,
 )
@@ -200,11 +204,6 @@ class PrepareDataDirTests(unittest.TestCase):
             self.assertFalse(os.path.exists(stale))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-
-
-import coverage as coverage_pkg
-
-from ctrlrunner.execution.coverage_support import CoverageSummary, finalize_coverage
 
 
 class FinalizeCoverageTests(unittest.TestCase):

@@ -56,9 +56,7 @@ class OriginAllowedTests(unittest.TestCase):
 
     def test_origin_takes_precedence_over_referer(self):
         # A present-but-bad Origin is rejected even if Referer would pass.
-        self.assertFalse(
-            origin_allowed("http://evil.example", f"http://127.0.0.1:{PORT}/x", PORT)
-        )
+        self.assertFalse(origin_allowed("http://evil.example", f"http://127.0.0.1:{PORT}/x", PORT))
 
 
 class TokenTests(unittest.TestCase):

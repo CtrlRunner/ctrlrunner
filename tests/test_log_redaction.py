@@ -19,9 +19,7 @@ class ResolveRedactionPatternsTests(unittest.TestCase):
 
     def test_extra_patterns_are_compiled_on_top_of_defaults(self):
         base = len(resolve_redaction_patterns({}))
-        patterns = resolve_redaction_patterns(
-            {"log_redaction": {"patterns": ["MYCORP-[0-9]+"]}}
-        )
+        patterns = resolve_redaction_patterns({"log_redaction": {"patterns": ["MYCORP-[0-9]+"]}})
         self.assertEqual(len(patterns), base + 1)
 
     def test_bad_enabled_type_raises(self):

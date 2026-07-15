@@ -52,9 +52,7 @@ def resolve_redaction_patterns(config: dict) -> list[re.Pattern] | None:
 
     enabled = section.get("enabled", True)
     if not isinstance(enabled, bool):
-        raise ValueError(
-            f"[ctrlrunner.log_redaction].enabled must be a boolean, got {enabled!r}"
-        )
+        raise ValueError(f"[ctrlrunner.log_redaction].enabled must be a boolean, got {enabled!r}")
     if not enabled:
         return None
 

@@ -73,7 +73,9 @@ class TestItem:
     serial_group: str | None = None  # "module::ClassName" when @test_class(serial=True)
     serial_retries: int = 0  # group retry budget (serial classes only)
     fully_parallel: bool | None = None  # tri-state: None = inherit run default
-    expected_failure: dict | None = None  # {"description": str|None, "strict": bool} from param(xfail=...)
+    expected_failure: dict | None = (
+        None  # {"description": str|None, "strict": bool} from param(xfail=...)
+    )
     skip_marker: dict | None = None  # {"description": str|None} from param(skip=...)
 
 
@@ -362,7 +364,7 @@ def _register_item(item: "TestItem"):
             f"module define a method with the same name (wrap each class in "
             f"@test_class so ids get qualified with the class name), or (b) "
             f"two @parametrize value combinations produce the same id suffix "
-            f"once joined with '-' (e.g. (\"a-b\", \"c\") and (\"a\", \"b-c\") "
+            f'once joined with \'-\' (e.g. ("a-b", "c") and ("a", "b-c") '
             f"both join to '[a-b-c]'), or two param(id=...) entries use the "
             f"same explicit id -- use param values/ids that don't collide, "
             f"or make them distinguishable another way."
@@ -493,9 +495,7 @@ def test(
                     ]
                     suffix = "-".join(parts)
                 else:
-                    suffix = "-".join(
-                        _stable_param_str(v, combo_index) for v in combined.values()
-                    )
+                    suffix = "-".join(_stable_param_str(v, combo_index) for v in combined.values())
                 combo_index += 1
                 test_id = f"{func.__module__}::{func.__name__}[{suffix}]"
                 # A per-entry param(case_id=...) overrides the decorator's
@@ -636,8 +636,7 @@ def test_class(
             isinstance(workers, bool) or not isinstance(workers, int) or workers < 1
         ):
             raise ValueError(
-                f"@test_class on '{cls.__name__}': workers must be an integer >= 1, "
-                f"got {workers!r}"
+                f"@test_class on '{cls.__name__}': workers must be an integer >= 1, got {workers!r}"
             )
         if workers_mode is not None:
             if workers is None:

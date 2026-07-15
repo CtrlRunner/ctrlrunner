@@ -53,17 +53,13 @@ def resolve_coverage_config(
     if fail_under is not None and (
         not isinstance(fail_under, (int, float)) or isinstance(fail_under, bool)
     ):
-        raise ValueError(
-            f"[ctrlrunner.coverage].fail_under must be a number, got {fail_under!r}"
-        )
+        raise ValueError(f"[ctrlrunner.coverage].fail_under must be a number, got {fail_under!r}")
 
     source = section.get("source")
     if source is not None and not (
         isinstance(source, list) and all(isinstance(s, str) for s in source)
     ):
-        raise ValueError(
-            f"[ctrlrunner.coverage].source must be a list of strings, got {source!r}"
-        )
+        raise ValueError(f"[ctrlrunner.coverage].source must be a list of strings, got {source!r}")
 
     html_dir = cli_html_dir
     if html_dir is None:

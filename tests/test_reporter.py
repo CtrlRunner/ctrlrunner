@@ -322,9 +322,7 @@ class JUnitGoldenBytesTests(unittest.TestCase):
     def test_junit_xml_byte_for_byte_for_representative_suite(self):
         reporter = JUnitReporter()
         reporter.started_at = datetime(2026, 1, 2, 3, 4, 5).timestamp()
-        reporter.add_result(
-            "mod::test_pass", "passed", None, 0.123, case_id="C-1", tags=("smoke",)
-        )
+        reporter.add_result("mod::test_pass", "passed", None, 0.123, case_id="C-1", tags=("smoke",))
         reporter.add_result("mod::test_fail", "failed", "AssertionError: boom", 0.456)
         reporter.add_result("mod::test_skip", "skipped", "not implemented", 0.0)
 
@@ -426,9 +424,12 @@ class AtomicWriteTests(unittest.TestCase):
             path = Path(tmp) / "report.xml"
             reporter.write(str(path))
             original = path.read_bytes()
-            with unittest.mock.patch.object(
-                ET.ElementTree, "write", autospec=True, side_effect=partial_then_fail
-            ), self.assertRaises(OSError):
+            with (
+                unittest.mock.patch.object(
+                    ET.ElementTree, "write", autospec=True, side_effect=partial_then_fail
+                ),
+                self.assertRaises(OSError),
+            ):
                 reporter.write(str(path))
             self.assertEqual(path.read_bytes(), original)
             # no tmp-file droppings left behind either
@@ -521,7 +522,13 @@ class JunitLogsTests(unittest.TestCase):
     embedded in the JUnit XML. Off by default: today's exact shape."""
 
     LOGS = [
-        {"attempt": 1, "stdout": "hello out", "stderr": "hello err", "records": [], "truncated": False}
+        {
+            "attempt": 1,
+            "stdout": "hello out",
+            "stderr": "hello err",
+            "records": [],
+            "truncated": False,
+        }
     ]
 
     def _case(self, reporter):

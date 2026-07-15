@@ -65,8 +65,7 @@ class EventEnvelope:
         # construction site) that could catch it early.
         if self.type not in EVENT_TYPES:
             raise ValueError(
-                f"Unknown EventEnvelope type {self.type!r}; must be one of "
-                f"{sorted(EVENT_TYPES)}"
+                f"Unknown EventEnvelope type {self.type!r}; must be one of {sorted(EVENT_TYPES)}"
             )
 
     def to_dict(self) -> dict:

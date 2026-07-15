@@ -367,15 +367,24 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
 
         results = [
             Result(
-                test_id="mod_a::test_1", outcome="passed", error=None, duration=0.1,
+                test_id="mod_a::test_1",
+                outcome="passed",
+                error=None,
+                duration=0.1,
                 groups={"module": "mod_a"},
             ),
             Result(
-                test_id="mod_a::test_2", outcome="failed", error="x", duration=0.1,
+                test_id="mod_a::test_2",
+                outcome="failed",
+                error="x",
+                duration=0.1,
                 groups={"module": "mod_a"},
             ),
             Result(
-                test_id="mod_b::test_1", outcome="passed", error=None, duration=0.1,
+                test_id="mod_b::test_1",
+                outcome="passed",
+                error=None,
+                duration=0.1,
                 groups={"module": "mod_b"},
             ),
         ]
@@ -389,7 +398,10 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
 
         results = [
             Result(
-                test_id="mod_a::test_1", outcome="passed", error=None, duration=0.1,
+                test_id="mod_a::test_1",
+                outcome="passed",
+                error=None,
+                duration=0.1,
                 groups={"module": "mod_a"},
             ),
         ]
@@ -447,8 +459,7 @@ class CustomReporterLoaderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._write_module(
                 tmp,
-                "class NeedsArgs:\n"
-                "    def __init__(self, required): pass\n",
+                "class NeedsArgs:\n    def __init__(self, required): pass\n",
             )
             with self.assertRaises(ValueError) as ctx:
                 build_reporters(["custom_rep_mod:NeedsArgs"])

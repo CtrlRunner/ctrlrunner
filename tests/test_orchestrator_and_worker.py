@@ -2290,12 +2290,12 @@ class ArtifactCaptureTests(unittest.TestCase):
                 "error": (
                     "AssertionError: Locator expected to contain text 'x'\n"
                     "Call log:\n  - waiting\n"
-                    "\nAria snapshot:\n- heading \"y\" [level=1]"
+                    '\nAria snapshot:\n- heading "y" [level=1]'
                 ),
                 "children": [
                     {
                         "name": "inner",
-                        "error": "AssertionError: nope\nAria snapshot:\n- text \"z\"",
+                        "error": 'AssertionError: nope\nAria snapshot:\n- text "z"',
                         "children": [],
                     }
                 ],

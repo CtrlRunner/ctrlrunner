@@ -33,8 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-config",
         action="store_true",
-        help="skip generating ctrlrunner.toml from pyproject.toml "
-        "[tool.pytest.ini_options]",
+        help="skip generating ctrlrunner.toml from pyproject.toml [tool.pytest.ini_options]",
     )
     return parser
 

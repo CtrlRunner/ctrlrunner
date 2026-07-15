@@ -20,7 +20,9 @@ def render_ui_html(token: str) -> str:
     attacker, or a different local process) therefore can't read it and
     can't forge the X-Ctrlrunner-Token header the state-changing POST
     endpoints require."""
-    page = resources.files("ctrlrunner.ui").joinpath("_static/ui/ui.html").read_text(encoding="utf-8")
+    page = (
+        resources.files("ctrlrunner.ui").joinpath("_static/ui/ui.html").read_text(encoding="utf-8")
+    )
     if _TOKEN_PLACEHOLDER not in page:
         raise RuntimeError(
             "Prebuilt UI page is missing its session-token placeholder -- "

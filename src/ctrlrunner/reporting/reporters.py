@@ -219,9 +219,7 @@ class JsonReporter(ConsoleReporter):
         # concurrent reader) then only ever sees the old complete file
         # or the new complete file, never a truncated/partial one.
         output_dir = os.path.dirname(os.path.abspath(self.output_path)) or "."
-        fd, tmp_path = tempfile.mkstemp(
-            dir=output_dir, prefix=".results-", suffix=".json.tmp"
-        )
+        fd, tmp_path = tempfile.mkstemp(dir=output_dir, prefix=".results-", suffix=".json.tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
@@ -252,8 +250,7 @@ def _load_custom_reporter(spec: str):
         module = importlib.import_module(module_name)
     except ImportError as e:
         raise ValueError(
-            f"Could not import custom reporter module '{module_name}' "
-            f"(from spec {spec!r}): {e}"
+            f"Could not import custom reporter module '{module_name}' (from spec {spec!r}): {e}"
         ) from e
     cls = getattr(module, class_name, None)
     if cls is None:

@@ -21,9 +21,7 @@ def format_collection_summary(tests: list) -> str:
 
     tag_counts = Counter(tag for t in tests for tag in t.tags)
     if tag_counts:
-        breakdown = ", ".join(
-            f"{count} tagged {tag}" for tag, count in sorted(tag_counts.items())
-        )
+        breakdown = ", ".join(f"{count} tagged {tag}" for tag, count in sorted(tag_counts.items()))
         line += f" ({breakdown})"
 
     return line

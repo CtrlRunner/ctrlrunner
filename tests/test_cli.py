@@ -547,7 +547,9 @@ class ConfigValidationCliTests(unittest.TestCase):
             (root / "test_a.py").write_text(
                 "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "ctrlrunner.toml").write_text('[ctrlrunner.fail_policy]\nmax_failures = "5"\n')
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner.fail_policy]\nmax_failures = "5"\n'
+            )
             os.chdir(tmp)
             buf = io.StringIO()
             with contextlib.redirect_stderr(buf):
@@ -566,7 +568,9 @@ class ConfigValidationCliTests(unittest.TestCase):
                 (root / "test_a.py").write_text(
                     "from ctrlrunner import test\n\n@test()\ndef test_x():\n    pass\n"
                 )
-                (Path(tmp) / "ctrlrunner.toml").write_text(f"[ctrlrunner]\nimport_timeout = {bad}\n")
+                (Path(tmp) / "ctrlrunner.toml").write_text(
+                    f"[ctrlrunner]\nimport_timeout = {bad}\n"
+                )
                 os.chdir(tmp)
                 buf = io.StringIO()
                 with (
@@ -590,7 +594,9 @@ class ConfigValidationCliTests(unittest.TestCase):
                 "from ctrlrunner import test\n\n"
                 "@test(tags={'not_registered_anywhere'})\ndef test_x():\n    pass\n"
             )
-            (Path(tmp) / "ctrlrunner.toml").write_text('[ctrlrunner]\nregistered_tags = ["smoke"]\n')
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner]\nregistered_tags = ["smoke"]\n'
+            )
             os.chdir(tmp)
             buf = io.StringIO()
             with (
@@ -834,7 +840,9 @@ class UICliHeadedFlagOverrideTests(unittest.TestCase):
             cfg_path = self._config(tmp, "true")
             with (
                 patch("ctrlrunner.ui.ui_server.serve_ui") as mock_serve_ui,
-                patch.object(sys, "argv", ["ctrlrunner", "ui", "--config", cfg_path, "--no-headed"]),
+                patch.object(
+                    sys, "argv", ["ctrlrunner", "ui", "--config", cfg_path, "--no-headed"]
+                ),
             ):
                 from ctrlrunner.cli import _ui
 
@@ -1231,7 +1239,9 @@ class TagNotCliTests(unittest.TestCase):
             )
             os.chdir(tmp)
             with (
-                patch.object(sys, "argv", ["ctrlrunner", "--tag-not", "slow", "--reporter", "dots"]),
+                patch.object(
+                    sys, "argv", ["ctrlrunner", "--tag-not", "slow", "--reporter", "dots"]
+                ),
                 self.assertRaises(SystemExit),
             ):
                 main()

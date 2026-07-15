@@ -67,17 +67,17 @@ class _SafeRepr(reprlib.Repr):
 
     def repr_dict(self, x, level):
         if not all(type(k) in _SAFE_KEY_TYPES for k in x):
-            return "{...} (%d item(s), unsafe key type not shown)" % len(x)
+            return f"{{...}} ({len(x)} item(s), unsafe key type not shown)"
         return super().repr_dict(x, level)
 
     def repr_set(self, x, level):
         if not all(type(v) in _SAFE_KEY_TYPES for v in x):
-            return "{...} (%d item(s), unsafe element type not shown)" % len(x)
+            return f"{{...}} ({len(x)} item(s), unsafe element type not shown)"
         return super().repr_set(x, level)
 
     def repr_frozenset(self, x, level):
         if not all(type(v) in _SAFE_KEY_TYPES for v in x):
-            return "frozenset(...) (%d item(s), unsafe element type not shown)" % len(x)
+            return f"frozenset(...) ({len(x)} item(s), unsafe element type not shown)"
         return super().repr_frozenset(x, level)
 
 

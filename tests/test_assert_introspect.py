@@ -118,7 +118,9 @@ class AssertIntrospectTests(unittest.TestCase):
         self.assertIsNone(details)
 
     def test_never_raises_when_internals_error(self):
-        with mock.patch.object(assert_introspect, "_parse_cached", side_effect=RuntimeError("boom")):
+        with mock.patch.object(
+            assert_introspect, "_parse_cached", side_effect=RuntimeError("boom")
+        ):
             try:
                 assert 1 == 2
             except AssertionError as e:

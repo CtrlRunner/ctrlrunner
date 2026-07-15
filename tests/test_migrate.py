@@ -400,7 +400,9 @@ class IndirectParametrizeTests(MigrateTestCase):
 class PlaywrightAndImportTests(MigrateTestCase):
     def test_playwright_fixture_import_added(self):
         _, out = self.migrate({"test_a.py": ('def test_one(page):\n    page.goto("https://x")\n')})
-        self.assertIn("from ctrlrunner.playwright.playwright_fixtures import page", out["test_a.py"])
+        self.assertIn(
+            "from ctrlrunner.playwright.playwright_fixtures import page", out["test_a.py"]
+        )
 
     def test_own_page_fixture_wins_over_playwright_import(self):
         _, out = self.migrate(

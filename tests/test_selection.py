@@ -46,7 +46,6 @@ class SelectionTests(unittest.TestCase):
         result = select_tests(self.tests, case_ids=["does-not-exist"])
         self.assertEqual(result, [])
 
-
     def test_exclude_tags_drops_tests_with_any_excluded_tag(self):
         result = select_tests(self.tests, exclude_tags=["i18n"])
         self.assertEqual([t.id for t in result], ["mod::a", "mod::b"])

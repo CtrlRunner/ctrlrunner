@@ -13,7 +13,6 @@ worker process runs exactly one test at a time.
 """
 
 
-
 class SkipTest(Exception):
     def __init__(self, description: str | None = None):
         super().__init__(description or "skipped")

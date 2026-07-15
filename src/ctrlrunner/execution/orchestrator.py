@@ -300,9 +300,7 @@ class Orchestrator:
         # attempt bookkeeping down with it; passed into each fresh
         # worker so a requeued group never exceeds its total budget.
         self._unit_attempts_used: dict[str, int] = {}
-        self.reporter = JUnitReporter(
-            junit_logs=junit_logs, junit_infra_errors=junit_infra_errors
-        )
+        self.reporter = JUnitReporter(junit_logs=junit_logs, junit_infra_errors=junit_infra_errors)
         self.console_reporters = console_reporters or []
         self.event_subscribers = event_subscribers or []
         # Always a real threading.Event -- created internally if the
@@ -537,9 +535,7 @@ class Orchestrator:
                 else {}
             )
             constraints_by_id = assign_worker_groups(tests, self.worker_constraints)
-            units, constraints_by_unit = build_units(
-                tests, constraints_by_id, self.fully_parallel
-            )
+            units, constraints_by_unit = build_units(tests, constraints_by_id, self.fully_parallel)
             units = order_units(units, self.order, self.seed)
             plan = group_aware_shard(
                 units,
@@ -885,9 +881,7 @@ class Orchestrator:
         job = JobObject()
         test_ids = batch.test_ids
         serial_attempts_used = {
-            u.key: self._unit_attempts_used.get(u.key, 0)
-            for u in batch.units
-            if u.kind == "serial"
+            u.key: self._unit_attempts_used.get(u.key, 0) for u in batch.units if u.kind == "serial"
         }
         proc = ctx.Process(
             target=run_worker,
@@ -976,9 +970,7 @@ class Orchestrator:
             # on one result -- warn loudly and record it as run-level
             # metadata so reports carry the evidence.
             _, _wid, name, tb = msg
-            _log.warning(
-                "Worker %s: fixture '%s' teardown failed:\n%s", slot.worker_id, name, tb
-            )
+            _log.warning("Worker %s: fixture '%s' teardown failed:\n%s", slot.worker_id, name, tb)
             last_line = tb.strip().splitlines()[-1] if tb.strip() else "teardown failed"
             self.reporter.suite_properties[f"teardown_error:{name}"] = last_line
         elif kind == "finished":
@@ -1162,9 +1154,7 @@ class Orchestrator:
             self._report_timeout_kill(stuck, timeouts, slot.worker_id, importing=True)
             return _trim_units(slot.units, slot.remaining[1:])
 
-        stuck = (
-            slot.current_test if slot.current_test in slot.remaining else slot.remaining[0]
-        )
+        stuck = slot.current_test if slot.current_test in slot.remaining else slot.remaining[0]
         stuck_unit = next((u for u in slot.units if stuck in u.test_ids), None)
 
         if stuck_unit is None or stuck_unit.kind != "serial":
@@ -1173,9 +1163,7 @@ class Orchestrator:
             return _trim_units(slot.units, leftover)
 
         other_ids = [tid for tid in slot.remaining if tid not in stuck_unit.test_ids]
-        other_units = _trim_units(
-            [u for u in slot.units if u.key != stuck_unit.key], other_ids
-        )
+        other_units = _trim_units([u for u in slot.units if u.key != stuck_unit.key], other_ids)
 
         used = self._unit_attempts_used.get(stuck_unit.key, 0)
         if used < stuck_unit.serial_retries + 1:
@@ -1184,9 +1172,7 @@ class Orchestrator:
             return [stuck_unit] + other_units
 
         self._report_timeout_kill(stuck, timeouts, slot.worker_id)
-        skipped = [
-            tid for tid in stuck_unit.test_ids if tid in slot.remaining and tid != stuck
-        ]
+        skipped = [tid for tid in stuck_unit.test_ids if tid in slot.remaining and tid != stuck]
         self._report_serial_skips(skipped, stuck, stuck_unit, slot.worker_id)
         return other_units
 

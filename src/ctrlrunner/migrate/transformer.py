@@ -1045,9 +1045,7 @@ class MigrationTransformer(cst.CSTTransformer):
             updated_node.body[0], m.Expr(value=m.Call())
         ):
             return None
-        call = cst.ensure_type(
-            cst.ensure_type(updated_node.body[0], cst.Expr).value, cst.Call
-        )
+        call = cst.ensure_type(cst.ensure_type(updated_node.body[0], cst.Expr).value, cst.Call)
         if _dotted(call.func) != "request.node.add_marker":
             return None
 

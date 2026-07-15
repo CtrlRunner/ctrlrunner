@@ -28,7 +28,9 @@ def _write_suite(root: Path, num_files: int, tests_per_file: int, parametrize_va
         for j in range(tests_per_file):
             if parametrize_values > 1:
                 values = ", ".join(str(v) for v in range(parametrize_values))
-                lines.append(f"@test()\n@parametrize('n', [{values}])\ndef test_{j}(n):\n    pass\n")
+                lines.append(
+                    f"@test()\n@parametrize('n', [{values}])\ndef test_{j}(n):\n    pass\n"
+                )
             else:
                 lines.append(f"@test()\ndef test_{j}():\n    pass\n")
         (root / f"test_file_{i}.py").write_text("\n".join(lines))

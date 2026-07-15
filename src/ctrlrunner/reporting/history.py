@@ -274,7 +274,9 @@ def resolve_history_config(config: dict) -> HistoryConfig:
         raise ValueError(f"[ctrlrunner.history].db_path must be a string, got {db_path!r}")
     window_runs = section.get("window_runs", 20)
     if not isinstance(window_runs, int) or isinstance(window_runs, bool):
-        raise ValueError(f"[ctrlrunner.history].window_runs must be an integer, got {window_runs!r}")
+        raise ValueError(
+            f"[ctrlrunner.history].window_runs must be an integer, got {window_runs!r}"
+        )
     if window_runs < 1:
         # window_runs feeds a SQLite LIMIT, where a negative value means
         # "no limit" -- a misconfiguration would silently defeat the

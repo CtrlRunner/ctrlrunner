@@ -785,9 +785,7 @@ class ParamHelperTests(unittest.TestCase):
         with self.assertRaises(ValueError):
 
             @registry.test()
-            @registry.parametrize(
-                "x", [registry.param(1, id="same"), registry.param(2, id="same")]
-            )
+            @registry.parametrize("x", [registry.param(1, id="same"), registry.param(2, id="same")])
             def sample(x):
                 pass
 

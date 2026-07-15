@@ -44,9 +44,7 @@ class TagRegistry:
         return {t for t in tags if not self.is_registered(t)}
 
 
-def load_tag_registry(
-    config: dict, strict_override: bool | None = None
-) -> TagRegistry | None:
+def load_tag_registry(config: dict, strict_override: bool | None = None) -> TagRegistry | None:
     """Returns None (no validation at all) if `registered_tags` isn't in
     config -- the "absent = no behavior change" default. `strict_override`
     lets a CLI flag (--strict-tags) win over the config file's

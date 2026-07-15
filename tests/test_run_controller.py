@@ -65,12 +65,7 @@ class RunControllerTests(unittest.TestCase):
         test_dir = os.path.join(tmp_dir, name)
         os.makedirs(test_dir)
         with open(os.path.join(test_dir, "test_demo.py"), "w") as f:
-            f.write(
-                "from ctrlrunner import test\n\n"
-                "@test()\n"
-                "def test_ok():\n"
-                "    assert 1 == 1\n"
-            )
+            f.write("from ctrlrunner import test\n\n@test()\ndef test_ok():\n    assert 1 == 1\n")
         return tmp_dir, test_dir
 
     def test_coverage_ready_event_broadcast_when_enabled(self):
@@ -78,8 +73,13 @@ class RunControllerTests(unittest.TestCase):
         data_dir = os.path.join(tmp_dir, ".coverage-data")
         os.makedirs(data_dir)
         coverage_config = CoverageConfig(
-            enabled=True, data_dir=data_dir, html_dir=None, source=None,
-            fail_under=None, fail_under_enforced=True, contexts=False,
+            enabled=True,
+            data_dir=data_dir,
+            html_dir=None,
+            source=None,
+            fail_under=None,
+            fail_under_enforced=True,
+            contexts=False,
         )
         controller = RunController(test_dir, num_workers=1, coverage_config=coverage_config)
         q = controller.subscribe()
@@ -281,7 +281,9 @@ class RunControllerTests(unittest.TestCase):
         events = []
         reporter = LiveEventReporter(broadcast=events.append)
         result = self._fake_result([])
-        result.logs = [{"attempt": 1, "stdout": "x", "stderr": "", "records": [], "truncated": False}]
+        result.logs = [
+            {"attempt": 1, "stdout": "x", "stderr": "", "records": [], "truncated": False}
+        ]
         reporter.on_test_end(result)
         self.assertEqual(events[-1]["logs"][0]["stdout"], "x")
 
