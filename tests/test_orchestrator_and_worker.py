@@ -1312,7 +1312,7 @@ class ShardingIntegrationTests(unittest.TestCase):
             root = Path(tmp) / "sharding_seeded_suite"
             root.mkdir()
             tests_src = (
-                "\n\n".join(f"@test()\ndef test_slow_{i}():\n    time.sleep(0.5)" for i in range(2))
+                "\n\n".join(f"@test()\ndef test_slow_{i}():\n    time.sleep(1.0)" for i in range(2))
                 + "\n\n"
                 + "\n\n".join(f"@test()\ndef test_fast_{i}():\n    pass" for i in range(6))
             )
@@ -1354,10 +1354,10 @@ class ShardingIntegrationTests(unittest.TestCase):
 
             self.assertEqual(len(reporter.results), 8)
             self.assertTrue(all(r.outcome == "passed" for r in reporter.results))
-            # if both 0.5s-sleep tests had landed on the same worker,
-            # this would take >= ~1.0s of sleep alone; isolated onto
+            # if both 1.0s-sleep tests had landed on the same worker,
+            # this would take >= ~2.0s of sleep alone; isolated onto
             # separate workers, wall time should stay well under that.
-            self.assertLess(elapsed, 1.0, "seeded history did not isolate the slow tests")
+            self.assertLess(elapsed, 2.0, "seeded history did not isolate the slow tests")
 
     def test_seeded_history_weighs_whole_files_under_grouped_default(self):
         # the file-grouped analogue: two slow FILES with seeded history

@@ -1066,8 +1066,8 @@ class MultiProjectDurationTests(unittest.TestCase):
                 root.mkdir()
                 (root / f"test_{name}.py").write_text(
                     "import time\nfrom ctrlrunner import test\n\n"
-                    "@test()\ndef test_one():\n    time.sleep(0.4)\n\n"
-                    "@test()\ndef test_two():\n    time.sleep(0.4)\n"
+                    "@test()\ndef test_one():\n    time.sleep(1.0)\n\n"
+                    "@test()\ndef test_two():\n    time.sleep(1.0)\n"
                 )
             # fully_parallel: this test measures wall-clock vs summed
             # durations, which needs the two same-file tests to actually
