@@ -24,7 +24,7 @@ from ..reporting.reporter import JUnitReporter
 from .fail_policy import FailPolicyState
 from .jobobject import JobObject
 from .quarantine import QuarantineConfig
-from .sharding import lookup_median_durations, lpt_shard  # noqa: F401 -- lpt_shard re-exported
+from .sharding import lookup_median_durations
 from .worker import import_module_by_path, run_worker
 from .worker_budget import (
     Batch,
@@ -339,8 +339,10 @@ class Orchestrator:
         self.fail_policy = fail_policy
         # Optional: a HistoryStore (ctrlrunner/history.py) enables LPT
         # duration-weighted scheduling instead of plain round-robin --
-        # see run()'s use of lpt_shard(). None (the default) means
-        # today's exact _chunk() round-robin, unchanged.
+        # see run()'s use of group_aware_shard(), which applies LPT via
+        # worker_budget._lpt_shard_weighted() when durations are non-empty.
+        # None (the default) means today's exact _chunk() round-robin,
+        # unchanged.
         self.history_store = history_store
         self.history_window = history_window
         # test_id -> timestamp when it was

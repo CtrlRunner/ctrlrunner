@@ -137,14 +137,14 @@ class RegistryTests(unittest.TestCase):
         # second silently clobbering the first (which would run the
         # second test's body twice under one id, and drop the first
         # test entirely from selection/history).
-        class SuiteA:
+        class _:
             @registry.test()
             def test_a(self):
                 pass
 
         with self.assertRaises(ValueError):
 
-            class SuiteB:
+            class _:
                 @registry.test()
                 def test_a(self):
                     pass

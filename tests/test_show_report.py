@@ -1,3 +1,4 @@
+import importlib
 import os
 import tempfile
 import unittest
@@ -18,7 +19,7 @@ class NoPortProbeTests(unittest.TestCase):
         # back the OS-assigned port atomically from the one socket that
         # actually stays bound, so the standalone probe helper should
         # no longer exist.
-        import ctrlrunner.ui.show_report as show_report_module
+        show_report_module = importlib.import_module("ctrlrunner.ui.show_report")
 
         self.assertFalse(hasattr(show_report_module, "_find_free_port"))
 

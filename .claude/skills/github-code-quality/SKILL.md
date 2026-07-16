@@ -86,6 +86,18 @@ CodeQL's rule `full_description`/`help` text describes the *general* vulnerabili
 - **`py/import-and-import-from`: package + submodule imported for different purposes** — `import unittest` (for `unittest.TestCase`) alongside `from unittest import mock` (for the `mock.` alias) is idiomatic, not a duplicate; same for a function-local `import pkg.mod as alias` used for introspection (`hasattr(alias, ...)`) coexisting with a top-level `from pkg.mod import name`. Two genuinely different bindings, not the same name imported twice.
 - **`py/not-named-self` on a test that deliberately verifies the framework doesn't require `self`** — if the test's whole point is proving a method named e.g. `page` still works, renaming the parameter to satisfy the linter defeats the test. Check what the test asserts before renaming.
 
+**A `# noqa` comment's stated justification is a claim, not a fact — verify it too.** Don't just check that the noqa exists; check whether the reason it gives is still true. Example: `from .sharding import lookup_median_durations, lpt_shard  # noqa: F401 -- lpt_shard re-exported` looked like the documented "intentional re-export" false positive above — until `grep -rn "lpt_shard"` across the repo showed every other caller (tests, `worker_budget.py`) imports `lpt_shard` straight from `.sharding`, never through this module, and `lpt_shard(` is never even called here (the code actually calls a *different*, private `_lpt_shard_weighted` via `group_aware_shard`). The "re-exported" claim was stale from an earlier refactor; the import was genuinely dead and the finding was correct. Grep for real external usage before accepting a suppression comment's reasoning.
+
+## Eliminating a false positive instead of just documenting it
+
+Some false positives can be made to disappear with a small, behavior-preserving rewrite that changes the code's *shape* enough that the query no longer pattern-matches it — better than leaving noise on the books when the API can't dismiss it:
+
+- **Collapse dual call sites into one variadic call.** `_call_on_failure`'s two branches (`on_failure(value, prefix, outcome)` / `on_failure(value, prefix)`) each looked like a fixed-arity call CodeQL could cross-check against every possible callee — build the args as a tuple once and call `on_failure(*args)` from a single site instead; a `*args` unpack isn't something the arity checker can flag.
+- **Swap `from pkg import submodule` for a plain `import pkg.submodule as name`** when `py/import-and-import-from` fires on a package+submodule pair used for different purposes (e.g. `import unittest` + `from unittest import mock`) — same runtime binding, but no `ImportFrom` node left for the query to match against the sibling `Import`.
+- **Rename an intentionally-unused binding to `_`** (e.g. a class defined only to trigger a decorator's registration side effect) — the underscore-means-throwaway convention is honored by `py/unused-local-variable` the same way it is by ruff/pylint.
+
+**Know when to stop, though.** A rewrite is only worth it if it's a genuine no-op on behavior *and* doesn't trip some other enforced check. Converting `sys.exit(1)` to `raise SystemExit(1)` inside `except` blocks was tried for `py/mixed-returns` (the hypothesis: CodeQL models `raise` as terminating control flow but not always `sys.exit()`) — it produced 15 new ruff `B904` violations (`raise ... from err` required inside `except`) that would have failed CI's `ruff check .`, for a CodeQL fix that was never confirmed to work in the first place. Reverted. Trading a *guaranteed* regression in an enforced check for an *unverified* fix elsewhere is a bad trade — leave it as a documented false positive instead.
+
 ## Dismissing alerts (code-scanning only)
 
 ```bash

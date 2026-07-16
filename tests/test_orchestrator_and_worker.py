@@ -9,8 +9,8 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock as mock
 from pathlib import Path
-from unittest import mock
 
 from ctrlrunner.config.projects import ProjectConfig, run_projects
 from ctrlrunner.core import registry

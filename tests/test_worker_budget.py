@@ -1,6 +1,6 @@
 import unittest
+import unittest.mock as mock
 from pathlib import Path
-from unittest import mock
 
 from ctrlrunner.core.registry import TestItem
 from ctrlrunner.execution.worker_budget import (

@@ -114,9 +114,8 @@ def _call_on_failure(on_failure, value, prefix, outcome):
         accepts_outcome = len(inspect.signature(on_failure).parameters) >= 3
     except (TypeError, ValueError):
         accepts_outcome = False
-    if accepts_outcome:
-        return on_failure(value, prefix, outcome)
-    return on_failure(value, prefix)
+    args = (value, prefix, outcome) if accepts_outcome else (value, prefix)
+    return on_failure(*args)
 
 
 def capture_artifacts(
