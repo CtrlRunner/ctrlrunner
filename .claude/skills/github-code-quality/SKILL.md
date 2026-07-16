@@ -83,6 +83,8 @@ CodeQL's rule `full_description`/`help` text describes the *general* vulnerabili
 - **Deliberately large regex character ranges** (e.g. the entire UTF-16 surrogate block `\ud800-\udfff` for XML validity filtering) trip `overly-large-range` — check whether the range is a real, meaningful Unicode block before assuming it's a typo.
 - **Intentional unused imports with `# noqa: F401`** (re-exports, feature-detection `try: import X` patterns) — ruff already suppresses these; CodeQL doesn't read ruff's noqa comments and flags them anyway. Don't "fix" these by deleting the import — check for a noqa comment first.
 - **Names bound but never read by design** (e.g. a class defined inside a test purely to trigger a decorator's side effect / raise during registration) — flagged `unused-local-variable`, but the point of the code is the side effect, not the binding.
+- **`py/import-and-import-from`: package + submodule imported for different purposes** — `import unittest` (for `unittest.TestCase`) alongside `from unittest import mock` (for the `mock.` alias) is idiomatic, not a duplicate; same for a function-local `import pkg.mod as alias` used for introspection (`hasattr(alias, ...)`) coexisting with a top-level `from pkg.mod import name`. Two genuinely different bindings, not the same name imported twice.
+- **`py/not-named-self` on a test that deliberately verifies the framework doesn't require `self`** — if the test's whole point is proving a method named e.g. `page` still works, renaming the parameter to satisfy the linter defeats the test. Check what the test asserts before renaming.
 
 ## Dismissing alerts (code-scanning only)
 
