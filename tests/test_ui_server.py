@@ -589,9 +589,22 @@ class UIServerTests(unittest.TestCase):
             mock_load.assert_not_called()
 
     def test_get_serves_artifact_file_under_artifacts_root(self):
+        # Self-contained: write the artifact this test serves rather than
+        # relying on a real @test run having populated it already (no
+        # test in this suite runs examples/test_selftest.py::test_fails
+        # unfiltered, so ctrlrunner-artifacts/ isn't guaranteed to exist
+        # on a fresh checkout).
+        from ctrlrunner.ui.ui_server import ARTIFACTS_ROOT
+
+        artifact_dir = ARTIFACTS_ROOT / "examples.test_selftest__test_fails" / "attempt-1"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = artifact_dir / "fake_page.png"
+        artifact_path.write_bytes(b"fake-png-bytes")
+        self.addCleanup(artifact_path.unlink)
+
         resp = urllib.request.urlopen(
             self.url
-            + "ctrlrunner-artifacts/examples.test_selftest__test_fails/attempt-1/fake_page.txt",
+            + "ctrlrunner-artifacts/examples.test_selftest__test_fails/attempt-1/fake_page.png",
             timeout=3,
         )
         self.assertEqual(resp.status, 200)
@@ -627,6 +640,7 @@ class UIServerTests(unittest.TestCase):
         # path -- the same threat show_report.py already tests for.
         from ctrlrunner.ui.ui_server import ARTIFACTS_ROOT
 
+        ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
         link = ARTIFACTS_ROOT / "escape-link.py"
         target = Path(__file__).resolve()  # any real file outside the root
         link.symlink_to(target)
