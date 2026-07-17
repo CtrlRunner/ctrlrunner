@@ -171,6 +171,7 @@ def _result_to_dict(r: Result, artifact_mode: str, report_dir: Path | None) -> d
         "workerRestartOverhead": r.worker_restart_overhead,
         "assertDetails": r.assert_details,
         "logs": r.logs,
+        "warnings": r.warnings,
         "workerId": r.worker_id,
         "flaky": r.flaky,
         "startedAt": r.started_at,

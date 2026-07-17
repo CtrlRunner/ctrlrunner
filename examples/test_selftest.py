@@ -1,4 +1,6 @@
 import time
+
+from playwright.sync_api import Page, sync_playwright
 from ctrlrunner import fixture, test, parametrize, step, skip, fail, fixme, slow
 
 calls = {"session_setup": 0, "session_teardown": 0}
@@ -11,10 +13,9 @@ def fake_browser():
     calls["session_teardown"] += 1
 
 
-def _fake_capture(page, prefix):
-    path = f"{prefix}.txt"
-    with open(path, "w") as f:
-        f.write(f"fake screenshot of {page['url']}")
+def _fake_capture(page: Page, prefix):
+    path = f"{prefix}.png"
+    page.screenshot(path=path)
     return path
 
 
@@ -30,49 +31,49 @@ def test_captures_artifact_on_failure(fake_page):
     assert False, "forced failure to trigger on_failure capture"
 
 
-@test(timeout=2, case_id="TC-001", tags={"smoke"})
+@test(timeout=2, case_id="TC-001", tags={"smoke", "team_3"})
 def test_passes(fake_page):
     fake_page["url"] = "https://example.com"
     assert fake_page["url"] == "https://example.com"
 
 
-@test(timeout=2, case_id="TC-002", tags={"regression"})
+@test(timeout=2, case_id="TC-002", tags={"regression", "team_3"})
 def test_fails(fake_page):
     assert 1 == 2
 
 
-@test(timeout=2, case_id="TC-003", tags={"smoke"})
+@test(timeout=2, case_id="TC-003", tags={"smoke", "team_3"})
 def test_hangs(fake_page):
     # Should get hard-killed by the Job Object after ~2s + 5s buffer,
     # and the rest of its batch should be requeued onto a new worker.
     time.sleep(30)
 
 
-@test(timeout=2, case_id="TC-004")
+@test(timeout=2, case_id="TC-004", tags={"smoke", "team_3"})
 def test_after_hang(fake_page):
     fake_page["url"] = "https://after.example"
     assert fake_page["url"] == "https://after.example"
 
 
-@test(timeout=5, case_id="TC-500")
+@test(timeout=5, case_id="TC-500", tags={"smoke", "team_3"})
 def test_skipped_via_runtime_condition(fake_page):
     skip(True, "not applicable in this environment")
     assert False, "should never run"
 
 
-@test(timeout=5, case_id="TC-501")
+@test(timeout=5, case_id="TC-501", tags={"smoke", "team_3"})
 def test_fixme_marks_known_broken(fake_page):
     fixme(True, "JIRA-999: fix once backend ships the new endpoint")
     assert False, "should never run"
 
 
-@test(timeout=5, case_id="TC-502")
+@test(timeout=5, case_id="TC-502", tags={"smoke", "team_3"})
 def test_fail_strict_reports_expected_failure(fake_page):
     fail(True, "JIRA-1000: known broken until fix ships", strict=True)
     assert False, "expected to fail -- should NOT break the build"
 
 
-@test(timeout=5, case_id="TC-503")
+@test(timeout=5, case_id="TC-503", tags={"smoke", "team_3"})
 def test_fail_strict_flags_unexpected_pass(fake_page):
     fail(True, "JIRA-1001: should still be broken", strict=True)
     assert True  # unexpectedly passes -> reported as "failed" (strict)
@@ -133,3 +134,30 @@ def test_flaky_passes_on_third_try(fake_page):
 @test(timeout=2, case_id="TC-201", retries=1)
 def test_flaky_always_fails(fake_page):
     assert False
+
+
+@fixture(scope="session")
+def custom_browser():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
+
+
+def _capture_custom_screenshot(page: Page, prefix):
+    path = f"{prefix}.png"
+    page.screenshot(path=path)
+    return path
+
+
+@fixture(scope="function", on_failure=_capture_custom_screenshot)
+def custom_page(custom_browser):
+    page = custom_browser.new_page()
+    yield page
+    page.close()
+
+
+@test(timeout=15, case_id="TC-600")
+def test_custom_browser_captures_screenshot_on_failure(custom_page):
+    custom_page.goto("https://example.com")
+    assert False, "forced failure to confirm custom on_failure capture with a real browser"

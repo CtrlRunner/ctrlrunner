@@ -2519,6 +2519,27 @@ class ArtifactCaptureTests(unittest.TestCase):
             self.assertTrue(artifacts[0].endswith("page.png"))
             self.assertTrue(Path(artifacts[0]).parent.exists())
 
+    def test_capture_artifacts_warns_when_on_failure_raises(self):
+        def broken_on_failure(value, prefix):
+            raise AttributeError("'dict' object has no attribute 'screenshot'")
+
+        fixtures = {
+            "custom_page": Fixture(
+                name="custom_page", func=lambda: None, on_failure=broken_on_failure
+            )
+        }
+        resolved_all = {"custom_page": {"url": "https://example.com"}}
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with self.assertWarns(RuntimeWarning) as cm:
+                artifacts = capture_artifacts(
+                    "mod::test_x", 1, resolved_all, fixtures, artifacts_root=Path(tmp)
+                )
+            self.assertEqual(artifacts, [])
+            message = str(cm.warning)
+            self.assertIn("custom_page", message)
+            self.assertIn("AttributeError", message)
+
     def test_extract_aria_snapshot_writes_artifact_and_trims_traceback(self):
         tb = (
             "Traceback (most recent call last):\n"

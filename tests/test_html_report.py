@@ -310,6 +310,32 @@ class HtmlReportTests(unittest.TestCase):
         out = render_html([])
         self.assertIn("test-logs", out)
 
+    def test_embeds_warnings_when_present(self):
+        results = [
+            Result(
+                test_id="mod::e",
+                outcome="failed",
+                error="boom",
+                duration=0.1,
+                warnings=[
+                    {
+                        "attempt": 1,
+                        "category": "RuntimeWarning",
+                        "message": "on_failure for fixture 'custom_page' raised "
+                        "AttributeError: 'dict' object has no attribute 'screenshot'",
+                        "filename": "worker.py",
+                        "lineno": 170,
+                    }
+                ],
+            ),
+        ]
+        out = render_html(results)
+        data = _extract_embedded_data(out)
+        self.assertEqual(data["tests"][0]["warnings"][0]["category"], "RuntimeWarning")
+        self.assertIn(
+            "on_failure for fixture 'custom_page'", data["tests"][0]["warnings"][0]["message"]
+        )
+
     def test_labels_rendering_is_present_in_page(self):
         # New-report feature guard: the label pill class and the filter
         # query hint must ship in the page.

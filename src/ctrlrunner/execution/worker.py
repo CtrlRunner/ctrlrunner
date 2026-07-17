@@ -150,8 +150,10 @@ def capture_artifacts(
     When only_always=True (test passed), only fixtures with
     always_capture=True are called -- e.g. a trace saved for every test,
     not just failures. Never raises: a broken capture callback must not
-    affect the test result, it should just silently produce no artifact
-    for that fixture."""
+    affect the test result, it should just produce no artifact for that
+    fixture -- but it does emit a RuntimeWarning (surfaced in the run
+    summary and Result.warnings) so a misconfigured on_failure isn't
+    silently invisible."""
     captured = []
     test_dir = artifacts_root / _safe_test_dir(test_id) / f"attempt-{attempt}"
     for name, value in resolved_all.items():
@@ -167,8 +169,18 @@ def capture_artifacts(
                 path = _call_on_failure(fx.on_failure, value, prefix, outcome)
             if path:
                 captured.append(str(path))
-        except Exception:
-            pass  # a broken capture callback must never affect the test result
+        except Exception as exc:
+            # A broken capture callback must never affect the test result,
+            # but failing silently makes a misconfigured on_failure (e.g. the
+            # wrong fixture value type) nearly impossible to notice -- the
+            # step tree records it too, but that's easy to miss. A warning
+            # surfaces it in the run summary and Result.warnings without
+            # touching the outcome.
+            warnings_module.warn(
+                f"on_failure for fixture '{name}' raised {type(exc).__name__}: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
     return captured
 
 
