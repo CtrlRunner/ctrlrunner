@@ -123,6 +123,13 @@ def context(browser):
     ctx.close()
 
 
+# Screenshot capture lives on `page`, not `browser`/`context`, because
+# on_failure is called with THAT fixture's own yielded value -- only a
+# real Page has .screenshot(). Trace capture is the mirror case, on
+# `context` above, since tracing is a BrowserContext API. Writing a
+# custom fixture with its own on_failure? Match the object to the API
+# the same way, or the callback raises (never fails the test, but
+# produces no artifact -- watch for the RuntimeWarning it emits).
 def _capture_screenshot(page_value, prefix, outcome):
     mode = _config["screenshot_mode"]
     if mode == "off":

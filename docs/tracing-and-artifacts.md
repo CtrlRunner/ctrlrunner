@@ -108,6 +108,19 @@ accept a third `outcome` argument (`"passed"`/`"failed"`/...) if they
 need outcome-aware behavior like the built-ins do; existing two-argument
 callbacks keep working unchanged.
 
+**Attach `on_failure` to the fixture whose value your callback actually
+needs** — it receives that specific fixture's own yielded object, not
+some other fixture's. `browser` (a Playwright `Browser`) and `context`
+(a `BrowserContext`) have no `.screenshot()`; only `page` does. Traces
+are the other way around — `context.tracing`, not `page`. Mirror the
+built-ins: screenshot capture on `page`, trace capture on `context`
+(see `_capture_screenshot`/`_capture_trace` in
+[`playwright_fixtures.py`](../src/ctrlrunner/playwright/playwright_fixtures.py)).
+A capture callback that raises never fails the test — it just produces
+no artifact — but it does surface a `RuntimeWarning` naming the fixture
+and the exception, so a wrong-object mismatch shows up in the run's
+warnings instead of an artifact silently never appearing.
+
 ### Auto-recorded actions (`auto_step`)
 
 Already applied automatically by `ctrlrunner.playwright.playwright_fixtures.page`

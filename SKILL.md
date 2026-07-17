@@ -137,6 +137,14 @@ def page(context):
     yield p
 ```
 
+Which fixture matters: `on_failure` gets called with *that fixture's own*
+yielded value, not a fresh `page`. `page` has `.screenshot()`; `browser`
+and `context` don't — put screenshot capture on `page`, trace capture on
+`context` (it has `.tracing`), same as the built-ins. A callback that
+raises (e.g. wrong object type) never fails the test, but does emit a
+`RuntimeWarning` naming the fixture — check the run's warnings if an
+artifact silently doesn't show up.
+
 Do not wrap test bodies in `try/except` to take screenshots manually —
 this bypasses the runner's artifact bookkeeping (JUnit properties, JSON
 reporter) and duplicates logic that already exists per-fixture.
