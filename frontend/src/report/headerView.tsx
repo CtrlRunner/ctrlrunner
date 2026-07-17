@@ -104,7 +104,9 @@ export function HeaderView({ model }: { model: ReportModel }) {
   return (
     <header className="report-header">
       <div className="report-title-row">
-        <h1 className="report-title">{report.suiteName}</h1>
+        <h1 className="report-title" title={report.suiteName}>
+          {report.suiteName}
+        </h1>
         <PassRateBadge rate={passRate(stats)} />
         <span className="report-meta">
           {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
