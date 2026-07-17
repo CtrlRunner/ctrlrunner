@@ -44,7 +44,7 @@ export function GroupLabel({ dimension, value }: { dimension: string; value: str
   const applyToken = useApplyToken();
   return (
     <span
-      className={`label label-${labelColorIndex(`${dimension}=${value}`)}`}
+      className={`label label-wrap label-${labelColorIndex(`${dimension}=${value}`)}`}
       title={`Filter by ${dimension}=${value} (Ctrl/Cmd-click to combine)`}
       onClick={(e) => {
         e.stopPropagation();
