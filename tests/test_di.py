@@ -359,5 +359,82 @@ class TeardownErrorCollectionTests(unittest.TestCase):
         self.assertEqual([n for n, _ in errors], ["mod_broken"])
 
 
+class IndirectOverrideResolutionTests(unittest.TestCase):
+    """Resolver-side behavior for indirect parametrize overrides: a
+    fixture with NO static params=[...] must still honor a per-test
+    override, delivering it as request.param."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_override_reaches_request_param_without_static_params(self):
+        @registry.fixture()
+        def fx(request):
+            return ("got", request.param)
+
+        resolver = FixtureResolver()
+        resolver.begin_module("mod")
+        values, _ = resolver.resolve(["fx"], ExitStack(), {"fx": 42})
+        self.assertEqual(values["fx"], ("got", 42))
+
+    def test_no_override_and_no_params_yields_request_param_none(self):
+        @registry.fixture()
+        def fx(request):
+            return request.param
+
+        resolver = FixtureResolver()
+        resolver.begin_module("mod")
+        values, _ = resolver.resolve(["fx"], ExitStack())
+        self.assertIsNone(values["fx"])
+
+    def test_override_on_fixture_without_request_raises(self):
+        @registry.fixture()
+        def fx():
+            return 1
+
+        resolver = FixtureResolver()
+        resolver.begin_module("mod")
+        with self.assertRaises(ValueError) as ctx:
+            resolver.resolve(["fx"], ExitStack(), {"fx": 42})
+        self.assertIn("request", str(ctx.exception))
+        self.assertIn("fx", str(ctx.exception))
+
+    def test_session_scope_distinct_instances_per_override_value(self):
+        events = []
+
+        @registry.fixture(scope="session")
+        def fx(request):
+            events.append(("setup", request.param))
+            yield request.param
+            events.append(("teardown", request.param))
+
+        resolver = FixtureResolver()
+        resolver.begin_module("mod")
+        v1, _ = resolver.resolve(["fx"], ExitStack(), {"fx": "a"})
+        v2, _ = resolver.resolve(["fx"], ExitStack(), {"fx": "b"})
+        v3, _ = resolver.resolve(["fx"], ExitStack(), {"fx": "a"})  # cached
+        self.assertEqual((v1["fx"], v2["fx"], v3["fx"]), ("a", "b", "a"))
+        self.assertEqual(events, [("setup", "a"), ("setup", "b")])
+        resolver.close_session()
+        self.assertEqual(
+            events[2:], [("teardown", "b"), ("teardown", "a")]
+        )  # LIFO teardown of both instances
+
+    def test_override_threads_through_to_transitive_dependency(self):
+        @registry.fixture()
+        def inner(request):
+            return request.param
+
+        @registry.fixture()
+        def outer(inner):
+            return ("outer", inner)
+
+        resolver = FixtureResolver()
+        resolver.begin_module("mod")
+        values, resolved_all = resolver.resolve(["outer"], ExitStack(), {"inner": 9})
+        self.assertEqual(values["outer"], ("outer", 9))
+        self.assertEqual(resolved_all["inner"], 9)
+
+
 if __name__ == "__main__":
     unittest.main()

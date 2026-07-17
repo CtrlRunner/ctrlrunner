@@ -86,7 +86,26 @@ def import_module_by_path(path, dotted_name: str, force_reload: bool = False) ->
     # double-import. setdefault keeps the split intact: if the dotted name is
     # already taken (another root's file, or the user imported first),
     # it is never clobbered.
-    if sys.modules.setdefault(dotted_name, module) is module:
+    #
+    # conftest.py is the one exception: skip the alias entirely when
+    # dotted_name is bare (no dot -- always true for a conftest.py that
+    # sits directly in root_path.parent, see _dotted_module_name).
+    # discover_conftests can legitimately surface several conftest.py
+    # files at different directory levels in one run, only one of which
+    # should ever answer a test file's plain `from conftest import x`
+    # -- and that choice belongs to sys.path order (which
+    # discover_conftests sets up root-highest-priority), not to
+    # whichever conftest.py we happen to import_module_by_path first.
+    # A bare setdefault("conftest", ...) here would permanently and
+    # arbitrarily claim that sys.modules slot for THIS file, and since
+    # Python's import machinery checks sys.modules before ever
+    # consulting sys.path, that pre-seeding silently overrides the
+    # sys.path ordering no matter how carefully it's built. There is
+    # also no `import a.b; a.b.x` package-attribute case to preserve
+    # here -- a bare (dot-less) dotted_name has no parent package for
+    # that mechanism to apply to in the first place.
+    is_bare_conftest = "." not in dotted_name and Path(path).name == "conftest.py"
+    if not is_bare_conftest and sys.modules.setdefault(dotted_name, module) is module:
         parent_name, _, child = dotted_name.rpartition(".")
         if parent_name:
             # `import a.b; a.b.x` resolves a.b as an ATTRIBUTE of the

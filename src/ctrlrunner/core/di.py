@@ -89,35 +89,49 @@ class FixtureResolver:
             raise ValueError(f"Unknown fixture: '{name}'")
         fx = fixtures[name]
 
-        chosen_value = None
-        if fx.param_values is not None:
-            if name not in overrides:
-                # The overwhelmingly likely cause is import order --
-                # @test's decorator runs `_collect_parametrized_fixtures`
-                # against whatever is in the fixture registry AT THAT
-                # MOMENT. If '{name}' is @fixture(params=[...]) but
-                # defined further down the module (or in a conftest
-                # imported later) than the test that uses it, the
-                # fixture didn't exist yet when @test looked it up, so
-                # the test was registered as if it were unparametrized
-                # -- no override was ever recorded for it. By the time
-                # this resolve() call runs, '{name}' exists and IS
-                # parametrized, so this "no value selected" branch
-                # trips. Name the fixture and the fix explicitly rather
-                # than blaming DI internals.
-                raise ValueError(
-                    f"Fixture '{name}' is parametrized (params=[...]) but no value was "
-                    f"selected for this test run. This almost always means '{name}' is "
-                    f"defined AFTER the test that uses it (directly or transitively) in "
-                    f"module import order -- @test discovers fixture parametrization by "
-                    f"looking at the fixture registry at decoration time, so a fixture "
-                    f"defined later is invisible to it. Move the @fixture(params=[...]) "
-                    f"definition for '{name}' above (earlier in the module than) any test "
-                    f"that depends on it, then re-run."
-                )
-            chosen_value = overrides[name]
+        has_override = name in overrides
+        if fx.param_values is not None and not has_override:
+            # The overwhelmingly likely cause is import order --
+            # @test's decorator runs `_collect_parametrized_fixtures`
+            # against whatever is in the fixture registry AT THAT
+            # MOMENT. If '{name}' is @fixture(params=[...]) but
+            # defined further down the module (or in a conftest
+            # imported later) than the test that uses it, the
+            # fixture didn't exist yet when @test looked it up, so
+            # the test was registered as if it were unparametrized
+            # -- no override was ever recorded for it. By the time
+            # this resolve() call runs, '{name}' exists and IS
+            # parametrized, so this "no value selected" branch
+            # trips. Name the fixture and the fix explicitly rather
+            # than blaming DI internals.
+            raise ValueError(
+                f"Fixture '{name}' is parametrized (params=[...]) but no value was "
+                f"selected for this test run. This almost always means '{name}' is "
+                f"defined AFTER the test that uses it (directly or transitively) in "
+                f"module import order -- @test discovers fixture parametrization by "
+                f"looking at the fixture registry at decoration time, so a fixture "
+                f"defined later is invisible to it. Move the @fixture(params=[...]) "
+                f"definition for '{name}' above (earlier in the module than) any test "
+                f"that depends on it, then re-run."
+            )
+        chosen_value = overrides[name] if has_override else None
+        if has_override and not fx.wants_request:
+            # Registration-time validation in @test already rejects this
+            # for @parametrize(..., indirect=...); this backstop protects
+            # hand-built TestItems (tests/tools constructing items
+            # directly) from a silently-ignored override.
+            raise ValueError(
+                f"Fixture '{name}' received an indirect parametrize value but its "
+                f"function signature has no 'request' parameter -- add `request` "
+                f"and read request.param."
+            )
 
-        cache_key = f"{name}::{chosen_value!r}" if fx.param_values is not None else name
+        # An override without static params= (indirect parametrize) is
+        # parametrized too: the cache key must carry the value so two
+        # tests giving a module/session fixture different values get
+        # distinct instances.
+        is_parametrized = fx.param_values is not None or has_override
+        cache_key = f"{name}::{chosen_value!r}" if is_parametrized else name
 
         if fx.scope == "session" and cache_key in self._session_cache:
             value = self._session_cache[cache_key]

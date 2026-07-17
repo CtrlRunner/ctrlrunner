@@ -131,6 +131,12 @@ class _ParamSet:
     func._param_sets (consumed only by @test's expansion below)."""
 
     values: dict[str, Any] = field(default_factory=dict)
+    # Names in `values` whose value goes to that FIXTURE's request.param
+    # (pytest's indirect parametrize) instead of being bound as a test
+    # kwarg. The values themselves stay in `values` -- this set only
+    # changes routing at @test expansion time, so ids/case_id templates
+    # see indirect values exactly like direct ones.
+    indirect_names: set[str] = field(default_factory=set)
     id: str | None = None
     case_id: str | None = None
     tags: set[str] = field(default_factory=set)
@@ -201,7 +207,11 @@ def fixture(
     return decorator
 
 
-def parametrize(arg_names: str | tuple[str, ...] | list[str], arg_values: list[Any]):
+def parametrize(
+    arg_names: str | tuple[str, ...] | list[str],
+    arg_values: list[Any],
+    indirect: bool | list[str] | tuple[str, ...] = False,
+):
     """Stacks parametrization metadata onto the function; @test expands it
     into one TestItem per combination when it registers the test.
     Stacking multiple @parametrize decorators produces the cartesian
@@ -210,6 +220,17 @@ def parametrize(arg_names: str | tuple[str, ...] | list[str], arg_values: list[A
     `arg_names` is a comma-separated string ("a, b") or, pytest-style, a
     tuple/list of names (("a", "b")) -- migrated suites commonly use the
     latter form.
+
+    `indirect` (pytest-compatible): True marks EVERY name as indirect; a
+    list/tuple marks that subset. An indirect name must be a FIXTURE
+    (used by this test directly in its signature, transitively via
+    another fixture, or autouse) whose function accepts `request` --
+    the per-combination value is delivered to that fixture as
+    `request.param` instead of being passed to the test as a kwarg,
+    and it REPLACES the fixture's own static params=[...] (if any) for
+    this test, exactly like pytest's indirect parametrize. The test
+    still receives the fixture's resolved VALUE for names in its
+    signature.
 
     Decorator order matters: @parametrize must sit closer to the function
     than @test (i.e. @test on top, @parametrize directly above def),
@@ -220,6 +241,20 @@ def parametrize(arg_names: str | tuple[str, ...] | list[str], arg_values: list[A
         names = [str(n).strip() for n in arg_names]
     else:
         names = [n.strip() for n in arg_names.split(",")]
+
+    if indirect is True:
+        indirect_names = set(names)
+    elif not indirect:
+        indirect_names = set()
+    else:
+        indirect_names = {str(n).strip() for n in indirect}
+        unknown = indirect_names - set(names)
+        if unknown:
+            raise ValueError(
+                f"@parametrize indirect={sorted(unknown)}: these names are not in "
+                f"arg_names {names} -- indirect entries must be a subset of the "
+                f"names being parametrized."
+            )
 
     def decorator(func):
         if getattr(func, "_ctrlrunner_registered", False):
@@ -234,10 +269,36 @@ def parametrize(arg_names: str | tuple[str, ...] | list[str], arg_values: list[A
         existing = getattr(func, "_param_sets", None) or [_ParamSet()]
         combined = []
         for base in existing:
+            # Stacked decorators re-parametrizing the same name already
+            # silently last-wins on the VALUE -- but the name's ROLE
+            # (direct kwarg vs indirect fixture param) flipping between
+            # levels would silently mis-route values, so that's an error.
+            role_conflicts = {
+                n
+                for n in set(base.values) & set(names)
+                if (n in base.indirect_names) != (n in indirect_names)
+            }
+            if role_conflicts:
+                raise ValueError(
+                    f"@parametrize on '{func.__name__}': {sorted(role_conflicts)} "
+                    f"appear(s) in stacked @parametrize decorators with conflicting "
+                    f"direct/indirect roles -- a name must be consistently direct or "
+                    f"consistently indirect across every level."
+                )
             for values in arg_values:
                 if isinstance(values, param):
                     entry = values
                     values_tuple = entry.values
+                elif len(names) == 1:
+                    # Single argname: the row IS the value, even when
+                    # it's a tuple -- pytest semantics
+                    # (@parametrize("x", [(1, 2)]) gives x=(1, 2), it
+                    # doesn't unpack). Unconditional tuple-unpacking
+                    # here used to crash on this shape with an opaque
+                    # zip() ValueError; tuple values are the norm for
+                    # indirect fixture params (e.g. (persona, flags)).
+                    entry = None
+                    values_tuple = (values,)
                 else:
                     entry = None
                     values_tuple = values if isinstance(values, tuple) else (values,)
@@ -272,6 +333,7 @@ def parametrize(arg_names: str | tuple[str, ...] | list[str], arg_values: list[A
 
                 merged = _ParamSet(
                     values={**base.values, **combo},
+                    indirect_names=base.indirect_names | indirect_names,
                     id=merged_id,
                     case_id=base.case_id or entry_case_id,
                     tags=base.tags | (entry.tags if entry else set()),
@@ -308,6 +370,28 @@ def _collect_parametrized_fixtures(names, fixtures, seen=None):
             found[name] = fx.param_values
         found.update(_collect_parametrized_fixtures(fx.params, fixtures, seen))
     return found
+
+
+def _fixture_closure(names, fixtures) -> set:
+    """The set of fixture names reachable from `names` (a test's
+    signature params) through the fixture dependency graph, plus every
+    autouse fixture and ITS dependencies -- the worker resolves autouse
+    fixtures for every test (worker.py builds names_to_resolve as
+    item.params + autouse names), so an autouse fixture is just as
+    legitimate an indirect-parametrize target as one named in the
+    signature."""
+    queue = list(names) + [n for n, fx in fixtures.items() if fx.autouse]
+    reachable = set()
+    while queue:
+        name = queue.pop()
+        if name in reachable:
+            continue
+        fx = fixtures.get(name)
+        if fx is None:
+            continue
+        reachable.add(name)
+        queue.extend(fx.params)
+    return reachable
 
 
 def _cartesian(mapping: dict[str, list[Any]]) -> list[dict[str, Any]]:
@@ -442,7 +526,47 @@ def test(
         base_tags = tags or set()
         source_path = Path(inspect.getsourcefile(func) or func.__code__.co_filename)
 
-        fixture_param_map = _collect_parametrized_fixtures(sig_params, get_fixtures())
+        # Indirect parametrize validation happens at registration, not
+        # first resolve -- same import-order stance as fixture params=
+        # discovery below: the fixture must already exist (be defined
+        # above/earlier than) when @test runs.
+        all_indirect = set().union(*(ps.indirect_names for ps in explicit_param_sets))
+        fixtures_now = get_fixtures()
+        if all_indirect:
+            reachable = _fixture_closure(sig_params, fixtures_now)
+            for name in sorted(all_indirect):
+                fx = fixtures_now.get(name)
+                if fx is None:
+                    raise ValueError(
+                        f"@parametrize(..., indirect=...) on '{func.__name__}': no "
+                        f"fixture named '{name}' is registered. If it exists, it is "
+                        f"probably defined AFTER this test in module import order -- "
+                        f"@test looks the fixture up at decoration time, so move the "
+                        f"@fixture definition for '{name}' above (earlier than) this "
+                        f"test."
+                    )
+                if not fx.wants_request:
+                    raise ValueError(
+                        f"@parametrize(..., indirect=...) on '{func.__name__}': "
+                        f"fixture '{name}' takes no 'request' parameter, so it has "
+                        f"no way to receive the indirect value. Add `request` to its "
+                        f"signature and read request.param."
+                    )
+                if name not in reachable:
+                    raise ValueError(
+                        f"@parametrize(..., indirect=...) on '{func.__name__}': "
+                        f"fixture '{name}' is not used by this test -- it is neither "
+                        f"in the test's signature, nor a transitive dependency of its "
+                        f"fixtures, nor autouse. An indirect value for a fixture that "
+                        f"never gets resolved would be silently ignored."
+                    )
+
+        fixture_param_map = _collect_parametrized_fixtures(sig_params, fixtures_now)
+        # A test's indirect params REPLACE the target fixture's own
+        # static params=[...] for that test (pytest semantics) -- drop
+        # such fixtures from the map BEFORE the cartesian product, or
+        # each test would multiply by both value sets.
+        fixture_param_map = {k: v for k, v in fixture_param_map.items() if k not in all_indirect}
         fixture_param_sets = _cartesian(fixture_param_map)
 
         func._ctrlrunner_registered = True
@@ -505,12 +629,31 @@ def test(
                 resolved_case_id = (
                     effective_case_id.format(**combined) if effective_case_id else None
                 )
+                # Direct values bind into the function as kwargs;
+                # indirect values route to their fixture's request.param
+                # via fixture_param_overrides below. An indirect name in
+                # the test signature deliberately stays in
+                # remaining_params, so the resolver injects the FIXTURE's
+                # resolved value as the kwarg (the test receives the
+                # fixture instance, never the raw param) -- pytest
+                # semantics. Getting this split backwards would silently
+                # pass the raw param value as the kwarg.
+                direct_values = {
+                    k: v
+                    for k, v in explicit_pset.values.items()
+                    if k not in explicit_pset.indirect_names
+                }
+                indirect_values = {
+                    k: v
+                    for k, v in explicit_pset.values.items()
+                    if k in explicit_pset.indirect_names
+                }
                 bound_func = (
-                    functools.partial(call_target, **explicit_pset.values)
-                    if explicit_pset.values
+                    functools.partial(call_target, **direct_values)
+                    if direct_values
                     else call_target
                 )
-                remaining_params = [p for p in sig_params if p not in explicit_pset.values]
+                remaining_params = [p for p in sig_params if p not in direct_values]
                 item = TestItem(
                     id=test_id,
                     func=bound_func,
@@ -521,7 +664,9 @@ def test(
                     properties=dict(base_properties),
                     param_values=combined,
                     retries=retries,
-                    fixture_param_overrides=dict(fixture_pset),
+                    # No key overlap: indirect names were excluded from
+                    # fixture_param_map before _cartesian above.
+                    fixture_param_overrides={**fixture_pset, **indirect_values},
                     source_path=source_path,
                     expected_failure=(
                         {

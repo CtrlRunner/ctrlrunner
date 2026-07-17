@@ -4,12 +4,14 @@ the project-wide context the libcst transformer (pass 2) needs:
 
     - fixture index: which fixture names are defined where (so we know
       whether a `page` parameter is the user's own fixture or
-      pytest-playwright's, and where to inject params=[...]);
-    - indirect-parametrize collection: every
-      @pytest.mark.parametrize("fx", values, indirect=True) is recorded
-      against the fixture it targets, so pass 2 can move the values onto
-      the fixture definition (possibly in another file, e.g. conftest.py)
-      and drop the decorator from the test.
+      pytest-playwright's);
+    - indirect-parametrize collection: every fixture name targeted by a
+      @pytest.mark.parametrize(..., indirect=...) anywhere in the
+      project is recorded, so pass 2 can add a `request` parameter to
+      that fixture's definition (possibly in another file, e.g.
+      conftest.py) if it lacks one. The values themselves stay on the
+      tests' decorators -- ctrlrunner's @parametrize supports indirect=
+      natively, so pass 2 passes them through verbatim.
 """
 
 import ast
@@ -35,7 +37,6 @@ class IndirectInjection:
     """One indirect parametrize found on a test, targeting one fixture."""
 
     fixture_name: str
-    values_source: str  # source text of the argvalues expression
     test_path: Path
     test_lineno: int
 
@@ -48,22 +49,6 @@ class ProjectIndex:
 
     def fixture_defined(self, name: str) -> bool:
         return name in self.fixtures
-
-    def params_for(self, fixture_name: str) -> str | None:
-        """Values source to inject into the fixture definition, or None
-        if migration of this indirect parametrize is not safe:
-        conflicting value sets, several fixture definitions with the
-        same name, or the fixture is already parametrized."""
-        injections = self.injections.get(fixture_name)
-        if not injections:
-            return None
-        sources = {i.values_source for i in injections}
-        if len(sources) != 1:
-            return None
-        defs = self.fixtures.get(fixture_name, [])
-        if len(defs) != 1 or defs[0].has_params:
-            return None
-        return injections[0].values_source
 
 
 def discover_files(paths) -> list[Path]:
@@ -102,9 +87,55 @@ def _is_fixture_decorator(dec: ast.expr) -> bool:
     return _decorator_dotted_name(dec) in ("pytest.fixture", "fixture")
 
 
+def _record_parametrize_indirect(dec: ast.expr, lineno: int, path: Path, index: ProjectIndex):
+    """Shared by both function-decorator and class-decorator scanning --
+    pytest's class-level @pytest.mark.parametrize(..., indirect=...)
+    applies to every method the same way a method's own does, so it
+    needs the exact same recording (keyed by fixture name, agnostic to
+    whether the decorator sat on a class or a function).
+
+    Records every fixture name targeted by indirect= -- True means all
+    names, a list/tuple means that subset. Only the NAMES are needed
+    (to add `request` to the fixture definitions); the values stay on
+    the test's decorator, passed through verbatim by pass 2."""
+    if _decorator_dotted_name(dec) not in ("pytest.mark.parametrize", "mark.parametrize"):
+        return
+    if not isinstance(dec, ast.Call) or len(dec.args) < 2:
+        return
+    indirect = next((kw.value for kw in dec.keywords if kw.arg == "indirect"), None)
+    if indirect is None:
+        return
+    argnames_node = dec.args[0]
+    if not (isinstance(argnames_node, ast.Constant) and isinstance(argnames_node.value, str)):
+        return
+    names = [n.strip() for n in argnames_node.value.split(",")]
+
+    if isinstance(indirect, ast.Constant):
+        targeted = names if indirect.value is True else []
+    elif isinstance(indirect, (ast.List, ast.Tuple)):
+        listed = {e.value for e in indirect.elts if isinstance(e, ast.Constant)}
+        targeted = [n for n in names if n in listed]
+    else:
+        return  # dynamic indirect expression -- can't resolve names statically
+
+    for nm in targeted:
+        index.injections.setdefault(nm, []).append(
+            IndirectInjection(fixture_name=nm, test_path=path, test_lineno=lineno)
+        )
+
+
 def _scan_file(path: Path, source: str, index: ProjectIndex):
     tree = ast.parse(source, filename=str(path))
     for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            # A class-level indirect parametrize applies to every method
+            # in the class the same way a method's own would -- pass 2's
+            # transformer replays it per-method, so pass 1 must be able
+            # to resolve it the same way.
+            for dec in node.decorator_list:
+                _record_parametrize_indirect(dec, node.lineno, path, index)
+            continue
+
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         arg_names = [a.arg for a in node.args.args + node.args.kwonlyargs]
@@ -125,38 +156,7 @@ def _scan_file(path: Path, source: str, index: ProjectIndex):
                 )
                 continue
 
-            if _decorator_dotted_name(dec) not in ("pytest.mark.parametrize", "mark.parametrize"):
-                continue
-            if not isinstance(dec, ast.Call) or len(dec.args) < 2:
-                continue
-            indirect = next((kw.value for kw in dec.keywords if kw.arg == "indirect"), None)
-            if indirect is None:
-                continue
-            argnames_node = dec.args[0]
-            if not (
-                isinstance(argnames_node, ast.Constant) and isinstance(argnames_node.value, str)
-            ):
-                continue
-            names = [n.strip() for n in argnames_node.value.split(",")]
-            # Only the fully-automatable shape: a single argname with
-            # indirect=True or indirect=["that_name"]. Anything else is
-            # left for the transformer to TODO-annotate.
-            full = isinstance(indirect, ast.Constant) and indirect.value is True
-            listed = (
-                isinstance(indirect, (ast.List, ast.Tuple))
-                and [getattr(e, "value", None) for e in indirect.elts] == names
-            )
-            if len(names) == 1 and (full or listed):
-                values_src = ast.get_source_segment(source, dec.args[1]) or ""
-                if values_src:
-                    index.injections.setdefault(names[0], []).append(
-                        IndirectInjection(
-                            fixture_name=names[0],
-                            values_source=values_src,
-                            test_path=path,
-                            test_lineno=node.lineno,
-                        )
-                    )
+            _record_parametrize_indirect(dec, node.lineno, path, index)
 
 
 def scan(paths) -> ProjectIndex:

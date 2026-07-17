@@ -11,8 +11,11 @@ What gets converted automatically:
                                            pytest.param(x, id=..., marks=[...])
                                            -> param(x, id=..., case_id=...,
                                            xfail=..., skip=..., tags={...}))
-    @pytest.mark.parametrize(..., indirect=True)
-                                        -> params=[...] on the target fixture
+    @pytest.mark.parametrize(..., indirect=...)
+                                        -> @parametrize(..., indirect=...) kept
+                                           verbatim (ctrlrunner supports it
+                                           natively); the target fixture gets a
+                                           `request` parameter added if missing
                                            (cross-file, via the scanner index)
     @pytest.mark.skip/skipif            -> skip(...) call at the top of the body
     @pytest.mark.xfail                  -> fail(..., strict=...) call at the top
@@ -323,6 +326,7 @@ class _FnPlan:
         self.needs_request_param = False
         self.todos: list[str] = []
         self.marker_conversions = 0
+        self.remove_statements: list[cst.CSTNode] = []
 
 
 class MigrationTransformer(cst.CSTTransformer):
@@ -345,9 +349,24 @@ class MigrationTransformer(cst.CSTTransformer):
         self.needed_imports: set[str] = set()  # names from ctrlrunner
         self.playwright_imports: set[str] = set()
         self._class_stack: list[dict] = []
+        self._fn_stack: list[dict] = []
         self._converted_any = False
 
     # ---------- helpers -------------------------------------------------
+
+    def leave_Module(self, original_node, updated_node):
+        # _rewrite_add_marker_statement adds "record_property" to
+        # needed_imports eagerly (before it's known whether the call
+        # will later be promoted to @test(case_id=...) and removed
+        # entirely) -- prune it here, once the whole file's final shape
+        # is known, if no surviving call to record_property(...) remains
+        # anywhere (the common case: a file's only add_marker(case_id)
+        # got promoted, so the import would otherwise be unused).
+        if "record_property" in self.needed_imports and not m.findall(
+            updated_node, m.Call(func=m.Name("record_property"))
+        ):
+            self.needed_imports.discard("record_property")
+        return updated_node
 
     def _line(self, node) -> int:
         try:
@@ -397,17 +416,34 @@ class MigrationTransformer(cst.CSTTransformer):
 
     # ---------- classes --------------------------------------------------
 
+    # Class-level marker kinds that already have a working per-method
+    # handler (_mark_<name>) -- these get replayed onto every method via
+    # _plan_function instead of being flagged "apply per-method manually".
+    _PER_METHOD_CLASS_MARKERS = ("skip", "skipif", "xfail", "usefixtures", "parametrize")
+
     def visit_ClassDef(self, node: cst.ClassDef) -> None:
         info = {
             "name": node.name.value,
             "convertible": False,
             "converted_methods": 0,
             "is_test_class": False,
+            "class_markers": [],
         }
         if node.name.value.startswith("Test") or self._has_pytest_marks(node.decorators):
             info["is_test_class"] = True
             bases = [b for b in node.bases if not m.matches(b.value, m.Name("object"))]
             info["convertible"] = not bases
+        if info["convertible"]:
+            # Captured here (before any method is visited) since by
+            # leave_ClassDef time every method has already been visited
+            # and rebuilt -- too late to push these onto per-method plans.
+            for dec in node.decorators:
+                canonical = self._decorator_canonical(dec) or ""
+                if not canonical.startswith("pytest.mark."):
+                    continue
+                marker = canonical[len("pytest.mark.") :]
+                if marker in self._PER_METHOD_CLASS_MARKERS:
+                    info["class_markers"].append(dec)
         self._class_stack.append(info)
 
     def _has_pytest_marks(self, decorators) -> bool:
@@ -474,12 +510,12 @@ class MigrationTransformer(cst.CSTTransformer):
                         f"on class {info['name']} -- left as-is; convert manually to "
                         f"@test_class(retries=...)"
                     )
-            elif marker in ("skip", "skipif", "xfail", "usefixtures", "parametrize"):
-                todos.append(
-                    f"class-level @pytest.mark.{marker} on "
-                    f"{info['name']} -- apply per-method manually"
-                )
-                kept.append(dec)
+            elif marker in self._PER_METHOD_CLASS_MARKERS:
+                # Already replayed onto every method's own plan via
+                # _plan_function/_plan_decorator (see visit_ClassDef's
+                # class_markers stash) -- just drop the class decorator,
+                # no TODO needed.
+                continue
             elif self.case_id_marker and marker == self.case_id_marker:
                 # @test_class has no case_id kwarg (one case id can't
                 # describe several methods) -- must not degrade to a tag.
@@ -513,7 +549,17 @@ class MigrationTransformer(cst.CSTTransformer):
 
     # ---------- functions --------------------------------------------------
 
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
+        # Pushed for every function def (sync/async, nested closures
+        # included) so a statement-level rewrite deep inside the body
+        # (e.g. add_marker -> record_property) can stash a decision for
+        # the enclosing function's leave_FunctionDef to finalize once the
+        # function's classification (is_test, existing case_id=, ...) is
+        # known -- something a child node can never know on its own.
+        self._fn_stack.append({"stmt": None, "arg": None, "todo_entry": None})
+
     def leave_FunctionDef(self, original_node, updated_node):
+        frame = self._fn_stack.pop()
         name = updated_node.name.value
 
         if name.startswith("pytest_"):
@@ -529,7 +575,7 @@ class MigrationTransformer(cst.CSTTransformer):
                 leading_lines=[*updated_node.leading_lines, _todo_line(msg)]
             )
 
-        plan = self._plan_function(original_node, updated_node)
+        plan = self._plan_function(original_node, updated_node, frame)
         if plan is None:
             return updated_node
 
@@ -548,7 +594,7 @@ class MigrationTransformer(cst.CSTTransformer):
 
         return self._rebuild_function(original_node, updated_node, plan)
 
-    def _plan_function(self, original_node, updated_node) -> _FnPlan | None:
+    def _plan_function(self, original_node, updated_node, frame: dict) -> _FnPlan | None:
         """Classify and collect every decision; None -> leave untouched."""
         name = updated_node.name.value
         plan = _FnPlan()
@@ -594,6 +640,15 @@ class MigrationTransformer(cst.CSTTransformer):
             plan.is_async = True
             return plan
 
+        if in_class:
+            # Class-level skip/skipif/xfail/usefixtures/parametrize,
+            # stashed at visit_ClassDef time -- replayed per-method
+            # through the exact same dispatch as the method's own
+            # decorators, first so a same-kind method-level marker
+            # (e.g. its own usefixtures) is appended after it.
+            for dec in self._class_stack[-1]["class_markers"]:
+                self._plan_decorator(dec, plan, original_node)
+
         for dec in updated_node.decorators:
             self._plan_decorator(dec, plan, original_node)
 
@@ -603,7 +658,29 @@ class MigrationTransformer(cst.CSTTransformer):
         # the time leave_FunctionDef fires, so converted uses no longer
         # count as remaining request.* usage.
         self._plan_request_usage(updated_node, plan)
+        self._plan_add_marker_promotion(plan, frame)
         return plan
+
+    def _plan_add_marker_promotion(self, plan: _FnPlan, frame: dict):
+        """If a request.node.add_marker(<case-id-marker>(x)) call was
+        stashed by _rewrite_add_marker_statement earlier in this same
+        function's body, and this function ends up as a real @test with
+        no case_id already set by a decorator-form marker, promote the
+        stashed value onto @test(case_id=...) and drop the
+        record_property(...) statement it had fallen back to. Otherwise
+        leave that statement exactly as already built (record_property +
+        its own TODO comment)."""
+        if frame["stmt"] is None:
+            return
+        already_has_case_id = any(a.startswith("case_id=") for a in plan.test_args)
+        if plan.is_test and not already_has_case_id:
+            plan.test_args.append(f"case_id={frame['arg']}")
+            plan.remove_statements.append(frame["stmt"])
+            # The fallback report entry for this exact statement no
+            # longer applies -- it got fully migrated, not left half-done.
+            entry = frame.get("todo_entry")
+            if entry is not None and entry in self.report.todos:
+                self.report.todos.remove(entry)
 
     # ----- decorators ----------
 
@@ -626,12 +703,24 @@ class MigrationTransformer(cst.CSTTransformer):
         if handler is not None:
             handler(args, plan, fn_node, dec)
         else:
+            # Not auto-converted to @test(properties={...}): a custom
+            # marker's argument may be purely descriptive (safe to treat
+            # as metadata), or it may be read back at runtime by a
+            # fixture/hook via request.node.get_closest_marker(...) (e.g.
+            # a feature-flag guard fixture) -- properties=... is inert
+            # JUnit-report metadata only, nothing feeds it back into
+            # fixtures, so silently "converting" a functional marker this
+            # way would drop real behavior with no error. Static analysis
+            # can't tell the two apart, so this always needs a human.
             plan.tags.add(marker)
             plan.marker_conversions += 1
             if args:
                 plan.todos.append(
                     f"marker '{marker}' had arguments ({_code(dec.decorator)}) -- "
-                    f"dropped; consider properties={{...}} on @test"
+                    f"dropped; if this marker is only descriptive, consider "
+                    f"properties={{...}} on @test, but if a fixture/hook reads "
+                    f"it at runtime (e.g. via get_closest_marker), it needs a "
+                    f"different manual conversion"
                 )
 
     def _plan_case_id_marker(self, args, plan: _FnPlan, dec: cst.Decorator):
@@ -696,13 +785,14 @@ class MigrationTransformer(cst.CSTTransformer):
                     f"fixture argument '{key}={src}' has no ctrlrunner equivalent -- dropped"
                 )
 
-        # Cross-file indirect parametrize -> params=[...] injection.
-        fixture_name = fn_node.name.value
-        injected = self.index.params_for(fixture_name)
-        if injected and not any(a.startswith("params=") for a in plan.fixture_args):
-            plan.fixture_args.append(f"params={injected}")
+        # Cross-file indirect parametrize: the values stay on the tests'
+        # @parametrize(..., indirect=...) decorators (passed through
+        # verbatim by _mark_parametrize, which also does the report
+        # counting) -- the fixture side only needs a `request` parameter
+        # to receive them as request.param. _rebuild_function adds it
+        # only if the signature doesn't already have one.
+        if fn_node.name.value in self.index.injections:
             plan.needs_request_param = True
-            self.report.add("indirect")
 
     def _mark_parametrize(self, args, plan, fn_node, dec):
         if len(args) < 2:
@@ -720,22 +810,9 @@ class MigrationTransformer(cst.CSTTransformer):
         # indirect=False is semantically identical to omitting indirect
         # entirely -- only an explicit indirect=True (or a bare truthy
         # value) means the "indirect" case; treating indirect=False as
-        # truthy left an otherwise-convertible parametrize case
-        # unconverted with a misleading "could not be auto-migrated"
-        # TODO.
+        # truthy would add a pointless indirect=False to the output.
         is_indirect = indirect is not None and _code(indirect).strip() != "False"
 
-        if is_indirect:
-            handled = self._plan_indirect(argnames, argvalues, plan, fn_node)
-            if not handled:
-                plan.kept_decorators.append(dec)
-                plan.todos.append(
-                    "indirect parametrize could not be auto-migrated (multi-arg "
-                    "indirect, conflicting value sets across tests, fixture not "
-                    "found, or fixture already parametrized) -- move the values "
-                    "to @fixture(params=[...]) manually"
-                )
-            return
         if ids is not None:
             plan.todos.append(
                 "parametrize ids=... dropped -- ctrlrunner derives the test id suffix from the values"
@@ -751,27 +828,25 @@ class MigrationTransformer(cst.CSTTransformer):
         if converter.used_param:
             self.needed_imports.add("param")
             self.report.add("params", converter.converted_params)
-        plan.parametrize_srcs.append(f"parametrize({_code(argnames)}, {_code(new_values)})")
+        if is_indirect:
+            # ctrlrunner's @parametrize supports indirect= natively
+            # (same shape as pytest: True, or a list of names), so the
+            # decorator passes through nearly verbatim -- values,
+            # names, and the indirect expression all keep their
+            # original source. The target fixture gets a `request`
+            # parameter added if it lacks one (see _plan_fixture's
+            # injections check). No value relocation, no conflict
+            # analysis, no bail-outs.
+            plan.parametrize_srcs.append(
+                f"parametrize({_code(argnames)}, {_code(new_values)}, "
+                f"indirect={_code(indirect)})"
+            )
+            self.report.add("indirect")
+        else:
+            plan.parametrize_srcs.append(f"parametrize({_code(argnames)}, {_code(new_values)})")
+            self.report.add("parametrize")
         plan.marker_conversions += 1
-        self.report.add("parametrize")
         self.needed_imports.add("parametrize")
-
-    def _plan_indirect(self, argnames, argvalues, plan, fn_node) -> bool:
-        if not m.matches(argnames, m.SimpleString()):
-            return False
-        evaluated = cst.ensure_type(argnames, cst.SimpleString).evaluated_value
-        if not isinstance(evaluated, str):  # bytes literal -- not a valid argnames string
-            return False
-        names = [n.strip() for n in evaluated.split(",")]
-        if len(names) != 1:
-            return False
-        injected = self.index.params_for(names[0])
-        if injected is None or injected != _code(argvalues).strip():
-            return False
-        # Values land on the fixture definition (possibly another file);
-        # here the decorator is simply dropped.
-        plan.marker_conversions += 1
-        return True
 
     def _mark_skip(self, args, plan, fn_node, dec):
         reason = _str_arg(args, 0, "reason")
@@ -864,9 +939,11 @@ class MigrationTransformer(cst.CSTTransformer):
     def _mark_usefixtures(self, args, plan, fn_node, dec):
         for arg in args:
             if m.matches(arg.value, m.SimpleString()):
-                plan.extra_params.append(
-                    cst.ensure_type(arg.value, cst.SimpleString).evaluated_value
-                )
+                name = cst.ensure_type(arg.value, cst.SimpleString).evaluated_value
+                # A class-level usefixtures(...) and a method's own can
+                # name the same fixture -- don't double-append it.
+                if name not in plan.extra_params:
+                    plan.extra_params.append(name)
                 plan.marker_conversions += 1
             else:
                 plan.todos.append(
@@ -971,6 +1048,8 @@ class MigrationTransformer(cst.CSTTransformer):
         if plan.needs_request_param and "request" not in existing:
             params.append(cst.Param(name=cst.Name("request")))
         body = updated_node.body
+        if plan.remove_statements:
+            body = self._remove_statements(body, plan.remove_statements)
         if plan.body_inserts:
             body = self._insert_into_body(body, plan.body_inserts)
 
@@ -988,6 +1067,20 @@ class MigrationTransformer(cst.CSTTransformer):
             body=body,
             leading_lines=leading,
         )
+
+    def _remove_statements(self, body, remove: list[cst.CSTNode]):
+        """Drop statements from body by identity (the exact node objects
+        stashed earlier, e.g. by _rewrite_add_marker_statement once
+        promoted onto @test(case_id=...)) -- safe because libcst's
+        bottom-up transform replaces child references in the parent
+        tuple without re-cloning already-finalized children. Falls back
+        to a bare `pass` if removal would leave an empty suite."""
+        remove_ids = {id(n) for n in remove}
+        if isinstance(body, cst.SimpleStatementSuite):
+            kept = [s for s in body.body if id(s) not in remove_ids]
+            return body.with_changes(body=kept or [cst.Pass()])
+        kept = [s for s in body.body if id(s) not in remove_ids]
+        return body.with_changes(body=kept or [cst.SimpleStatementLine(body=[cst.Pass()])])
 
     def _insert_into_body(self, body, inserts: list[str]):
         statements = [cst.parse_statement(src) for src in inserts]
@@ -1086,7 +1179,21 @@ class MigrationTransformer(cst.CSTTransformer):
         leading = list(updated_node.leading_lines)
         if not _has_todo(leading, msg):
             leading.append(_todo_line(msg))
-        return updated_node.with_changes(body=new_body, leading_lines=leading)
+        result = updated_node.with_changes(body=new_body, leading_lines=leading)
+        # Stash for the enclosing function's leave_FunctionDef: if it
+        # turns out to be a real @test with no case_id set another way,
+        # it will promote this to @test(case_id=...) and drop this
+        # statement entirely instead of falling back to record_property
+        # -- including retracting the report entry just added above
+        # (todo_entry) so the report doesn't keep a stale "not selectable
+        # via --case-id" line for something that got fully migrated. The
+        # needed_imports.add("record_property") above is reconciled
+        # separately, in leave_Module, once the whole file is done.
+        if self._fn_stack:
+            self._fn_stack[-1]["stmt"] = result
+            self._fn_stack[-1]["arg"] = arg_code
+            self._fn_stack[-1]["todo_entry"] = (self._line(original_node), msg)
+        return result
 
     def leave_With(self, original_node, updated_node):
         return self._annotate_manual_pytest_use(original_node, updated_node)

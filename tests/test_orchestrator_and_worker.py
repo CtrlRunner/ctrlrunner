@@ -19,6 +19,7 @@ from ctrlrunner.execution.coverage_support import CoverageConfig, finalize_cover
 from ctrlrunner.execution.orchestrator import (
     Orchestrator,
     _chunk,
+    discover_and_import,
     discover_conftests,
     discover_modules,
 )
@@ -222,6 +223,152 @@ class DiscoverConftestsTests(unittest.TestCase):
 
             self.assertEqual([m.resolve() for m in modules], [(root / "conftest.py").resolve()])
 
+    def test_ancestor_conftests_discovered_up_to_git_boundary(self):
+        # A run scoped to a deep subdirectory must still pick up conftest.py
+        # files defined at ancestor levels (project root, intermediate
+        # dirs) -- previously only descendants of `root` were found at
+        # all, so shared setup registered above a scoped run's root was
+        # silently skipped.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            project_root = Path(tmp) / "project"
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / "conftest.py").write_text("")
+            mid = project_root / "spec" / "web"
+            mid.mkdir(parents=True)
+            (mid / "conftest.py").write_text("")
+            sub = mid / "gepm_dataset"
+            sub.mkdir()
+            (sub / "conftest.py").write_text("")
+
+            modules = [m.resolve() for m in discover_conftests(str(sub))]
+
+            self.assertEqual(
+                modules,
+                [
+                    (project_root / "conftest.py").resolve(),
+                    (mid / "conftest.py").resolve(),
+                    (sub / "conftest.py").resolve(),
+                ],
+            )
+
+    def test_ancestor_walk_stops_at_git_boundary_not_further(self):
+        # A conftest.py above the .git boundary must NOT be picked up --
+        # the walk stops there, same convention as
+        # migrate/config_migrator.py's find_pyproject.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            outer = Path(tmp) / "outer"
+            outer.mkdir()
+            (outer / "conftest.py").write_text("")  # outside the repo -- must be ignored
+            project_root = outer / "project"
+            (project_root / ".git").mkdir(parents=True)
+            sub = project_root / "sub"
+            sub.mkdir()
+
+            modules = [m.resolve() for m in discover_conftests(str(sub))]
+
+            self.assertEqual(modules, [])
+
+    def test_project_root_promoted_to_front_even_if_already_on_sys_path(self):
+        # A dev/editable install (`uv run`, `pip install -e .`) can
+        # already have the project root on sys.path via a .pth file or
+        # similar -- just far down the list, after site-packages/.venv
+        # entries. A naive "insert only if not already present" guard
+        # would see it there and leave it in that low-priority spot,
+        # silently defeating the ancestor-priority ordering below it
+        # (this is exactly what a real uv-run environment hit: the
+        # project root's conftest.py lost to a closer, unrelated one
+        # even after the ordering direction itself was fixed).
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            project_root = Path(tmp) / "project"
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / "conftest.py").write_text("")
+            mid = project_root / "spec" / "web"
+            mid.mkdir(parents=True)
+            (mid / "conftest.py").write_text("")
+            sub = mid / "gepm_dataset"
+            sub.mkdir()
+            (sub / "conftest.py").write_text("")
+
+            original_sys_path = list(sys.path)
+            try:
+                # Simulate the polluted environment: project root already
+                # on sys.path, buried at the end -- as a venv/editable
+                # install would leave it, not freshly inserted at the front.
+                sys.path.append(str(project_root))
+
+                discover_conftests(str(sub))
+
+                self.assertEqual(Path(sys.path[0]).resolve(), project_root.resolve())
+            finally:
+                sys.path[:] = original_sys_path
+
+
+class AncestorConftestImportResolutionTests(unittest.TestCase):
+    """End-to-end regression: a bare `from conftest import x` in a test
+    file scoped several directories below the project root must resolve
+    to the project-root conftest.py, not silently pick up whichever
+    same-named conftest.py Python's own import machinery happens to find
+    first."""
+
+    def test_bare_conftest_import_reaches_the_project_root_definition(self):
+        from ctrlrunner.execution.worker import module_name_for_path
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            project_root = Path(tmp) / "project"
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / "conftest.py").write_text(
+                "def shared_guard(value):\n    return ('root-guard', value)\n"
+            )
+            sub = project_root / "spec" / "web" / "gepm_dataset"
+            sub.mkdir(parents=True)
+            # A DIFFERENT, unrelated conftest.py at the scoped level --
+            # must not shadow the root one for the bare import below.
+            (sub / "conftest.py").write_text("LOCAL_ONLY = True\n")
+            (sub / "test_x.py").write_text(
+                "from conftest import shared_guard\n\nRESULT = shared_guard(42)\n"
+            )
+
+            discover_and_import(str(sub), force_reload=True)
+
+            mod = sys.modules[module_name_for_path(sub / "test_x.py")]
+            self.assertEqual(mod.RESULT, ("root-guard", 42))
+
+    def test_bare_conftest_import_reaches_root_even_with_an_intervening_ancestor_conftest(self):
+        # Regression for the actual reported failure: when the scoped run
+        # root is a directory BELOW one that itself has its own unrelated
+        # conftest.py (so the ancestor walk collects TWO+ conftest.py
+        # files, not one), sys.path insertion order must still put the
+        # project root ahead of the intervening one. A prior version of
+        # discover_conftests' insertion loop reversed that order, so the
+        # nearer, unrelated conftest.py won the bare `from conftest
+        # import x` lookup instead -- this only surfaces with 2+
+        # ancestors, which test_bare_conftest_import_reaches_the_
+        # project_root_definition above (a single ancestor) can't catch.
+        from ctrlrunner.execution.worker import module_name_for_path
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            project_root = Path(tmp) / "project"
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / "conftest.py").write_text(
+                "def shared_guard(value):\n    return ('root-guard', value)\n"
+            )
+            gepm_dataset = project_root / "spec" / "web" / "gepm_dataset"
+            gepm_dataset.mkdir(parents=True)
+            # An intervening ancestor conftest.py, closer to the test file
+            # than the project root, that does NOT define shared_guard --
+            # must not shadow the root one for the bare import below.
+            (gepm_dataset / "conftest.py").write_text("LOCAL_ONLY = True\n")
+            tabs = gepm_dataset / "gepm_dashboard_tabs"
+            tabs.mkdir()
+            (tabs / "test_x.py").write_text(
+                "from conftest import shared_guard\n\nRESULT = shared_guard(42)\n"
+            )
+
+            discover_and_import(str(tabs), force_reload=True)
+
+            mod = sys.modules[module_name_for_path(tabs / "test_x.py")]
+            self.assertEqual(mod.RESULT, ("root-guard", 42))
+
 
 class FilePathRootOrchestratorTests(unittest.TestCase):
     """End-to-end regression for the CLI bug: `ctrlrunner suite/test_one.py`
@@ -247,6 +394,79 @@ class FilePathRootOrchestratorTests(unittest.TestCase):
         self.assertEqual(len(reporter.results), 1)
         self.assertEqual(reporter.results[0].outcome, "passed")
         self.assertTrue(reporter.results[0].test_id.endswith("test_a"))
+
+
+class IndirectParametrizeEndToEndTests(unittest.TestCase):
+    """@parametrize(..., indirect=...) through the real worker path:
+    a stateful generator fixture (setup + teardown, request.param-driven
+    -- the migrated-Playwright-mock shape) receives a different value
+    from each test, teardown runs per test, and a single parametrized
+    variant is selectable by its full bracketed id."""
+
+    def setUp(self):
+        registry.reset()
+
+    SUITE = (
+        "from ctrlrunner import fixture, parametrize, test\n\n"
+        "import json, os\n\n"
+        "LOG = os.environ['INDIRECT_E2E_LOG']\n\n"
+        "def _log(event):\n"
+        "    with open(LOG, 'a') as f:\n"
+        "        f.write(json.dumps(event) + '\\n')\n\n"
+        "@fixture()\n"
+        "def features_enabled(request):\n"
+        "    _log({'setup': request.param})\n"
+        "    yield request.param\n"
+        "    _log({'teardown': request.param})\n\n"
+        "@test(timeout=10)\n"
+        "@parametrize('features_enabled', ['flag-a'], indirect=True)\n"
+        "def test_one(features_enabled):\n"
+        "    assert features_enabled == 'flag-a'\n\n"
+        "@test(timeout=10)\n"
+        "@parametrize('features_enabled', ['flag-b'], indirect=True)\n"
+        "def test_two(features_enabled):\n"
+        "    assert features_enabled == 'flag-b'\n"
+    )
+
+    def test_each_test_feeds_its_own_value_and_teardown_runs(self):
+        import json
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "events.jsonl"
+            (root / "test_indirect.py").write_text(self.SUITE)
+            with mock.patch.dict(os.environ, {"INDIRECT_E2E_LOG": str(log_path)}):
+                orch = Orchestrator(str(root), 1, 30.0)
+                reporter = orch.run()
+
+            self.assertEqual(len(reporter.results), 2)
+            self.assertEqual({r.outcome for r in reporter.results}, {"passed"})
+            self.assertEqual(
+                sorted(r.test_id.split("[")[-1].rstrip("]") for r in reporter.results),
+                ["flag-a", "flag-b"],
+            )
+            events = [json.loads(line) for line in log_path.read_text().splitlines()]
+            self.assertIn({"setup": "flag-a"}, events)
+            self.assertIn({"teardown": "flag-a"}, events)
+            self.assertIn({"setup": "flag-b"}, events)
+            self.assertIn({"teardown": "flag-b"}, events)
+
+    def test_single_variant_selectable_by_full_bracketed_id(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "events.jsonl"
+            (root / "test_indirect.py").write_text(self.SUITE)
+            with mock.patch.dict(os.environ, {"INDIRECT_E2E_LOG": str(log_path)}):
+                orch = Orchestrator(
+                    str(root), 1, 30.0, test_ids=["suite.test_indirect::test_two[flag-b]"]
+                )
+                reporter = orch.run()
+
+            self.assertEqual(len(reporter.results), 1)
+            self.assertEqual(reporter.results[0].outcome, "passed")
+            self.assertTrue(reporter.results[0].test_id.endswith("[flag-b]"))
 
 
 class AlwaysCaptureOrderingRegressionTests(unittest.TestCase):

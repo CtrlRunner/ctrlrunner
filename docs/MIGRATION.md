@@ -49,15 +49,16 @@ both sides at once.
 | `pytest.param(x, id=..., marks=[...])` in values | `param(x, id=..., case_id=..., xfail=..., xfail_strict=..., skip=..., tags={...})` — the case-id marker becomes `case_id=`, `xfail`/`skip` marks become flat kwargs, other marks become per-param tags; `skipif`/`raises=`/conditions leave the `pytest.param` untouched + TODO |
 | `@pytest.mark.test_case_id("7412675")` | `@test(case_id="7412675")` (marker name configurable via `--case-id-marker`; class-level use is flagged instead — `@test_class` has no `case_id`) |
 | `request.node.add_marker(pytest.mark.test_case_id(x))` | `record_property("test_case_id", x)` + TODO — the value lands in the JUnit/JSON report as the same property the reporter uses for `case_id`, but is **not** selectable via `--case-id`; a now-unused `request` parameter is dropped from the signature |
-| `@pytest.mark.parametrize("fx", vals, indirect=True)` | decorator removed; `params=vals` added to the `fx` fixture definition, even in another file; `request` added to its signature if missing |
+| `@pytest.mark.parametrize(..., indirect=...)` (any shape: `indirect=True`, `indirect=["fx"]`, mixed direct+indirect names, non-literal values, conflicting value sets across tests, already-parametrized fixture) | `@parametrize(..., indirect=...)` kept nearly verbatim — ctrlrunner supports `indirect=` natively with pytest semantics (the test's value reaches the fixture as `request.param`, replacing the fixture's own `params=[...]` for that test); `request` is added to the target fixture's signature if missing, even in another file. `pytest.param(...)` rows convert the same way as in a direct parametrize |
 | `@pytest.mark.skip(reason=r)` | `skip(description=r)` as the first body statement |
 | `@pytest.mark.skipif(cond, reason=r)` | `skip(cond, r)` as the first body statement |
 | `@pytest.mark.xfail(cond, reason=r, strict=s)` | `fail(cond, description=r, strict=s)`; `strict=False` pinned explicitly when absent (pytest and ctrlrunner defaults differ) |
 | `@pytest.mark.timeout(N)` (pytest-timeout) | `@test(timeout=N)` |
 | `@pytest.mark.flaky(reruns=N)` (pytest-rerunfailures) | `@test(retries=N)` |
 | `@pytest.mark.usefixtures("db")` | `db` appended to the function signature |
-| `@pytest.mark.<custom>` | `@test(tags={"<custom>"})` |
-| `class TestX:` (no base classes) | `@test_class(...)`; class-level `timeout`/`flaky`/custom marks become `test_class` arguments |
+| `@pytest.mark.<custom>` (no args) | `@test(tags={"<custom>"})` |
+| `@pytest.mark.<custom>(x)` (has args) | kept as a tag, `x` is **dropped** + TODO — deliberately not auto-converted to `@test(properties=...)`, since a custom marker's argument may be read back at runtime by a fixture/hook (see "Marker-driven guard fixtures" below); there's no static way to tell that apart from a purely descriptive marker |
+| `class TestX:` (no base classes) | `@test_class(...)`; class-level `timeout`/`flaky`/custom marks become `test_class` arguments; class-level `skip`/`skipif`/`xfail`/`usefixtures`/`parametrize` are replayed onto *every* method via the same per-method conversion a method's own marker would get (a class-level `parametrize` genuinely parametrizes each method independently, matching pytest) |
 | `pytest.skip(msg)` call | `skip(description=msg)` |
 | `pytest.fail(msg)` call | `raise AssertionError(msg)` |
 | `pytest.xfail(msg)` call | `fail(description=msg)` + `raise AssertionError(msg)` (pytest's xfail also stops the test) |
@@ -111,13 +112,105 @@ line in the report:
 - Async tests (`async def` / `@pytest.mark.asyncio`) — ctrlrunner is
   sync-only; wrap the body with `asyncio.run()`.
 - `xfail(raises=...)`, string `skipif` conditions (old pytest style),
-  fixture `ids=` / `name=` aliases, class-level `skip`/`skipif`/
-  `xfail`/`usefixtures`/`parametrize`, non-trivial `indirect=`
-  shapes, `pytest.skip(allow_module_level=True)`.
+  fixture `ids=` / `name=` aliases, a class-level case-id marker
+  (`@test_class` has no `case_id` — one id can't describe several
+  methods), `pytest.skip(allow_module_level=True)`.
+- Custom markers with arguments (`@pytest.mark.<custom>(x)`) — see
+  "Marker-driven guard fixtures" below if the marker is read back by a
+  fixture/hook at runtime, not just reported as metadata.
 - pytest-playwright configuration fixtures (`browser_name`,
   `browser_context_args`, ...) — use
   `ctrlrunner.playwright.playwright_fixtures.configure()` or the `--browser`/
   `--trace`/`--screenshot` CLI flags.
+
+## Manual conversion recipes
+
+Patterns the tool intentionally never auto-migrates because doing so
+would require inferring runtime behavior it can't see statically.
+
+### Marker-driven guard fixtures
+
+A common pytest pattern: a custom marker carries a value, and a fixture
+(pulled in via `usefixtures`) reads that value off the marker at
+runtime via `request.node.get_closest_marker(...)` to decide whether to
+guard/skip/xfail the test.
+
+```python
+# pytest
+def _get_guard_value(request):
+    marker = request.node.get_closest_marker("some_condition")
+    return marker.args[0] if marker is not None else None
+
+@pytest.fixture
+def some_guard(request, other_fixture):
+    value = _get_guard_value(request)
+    if value is None:
+        return
+    if some_runtime_check(value):
+        reason = f"guarded: {value}"
+        request.node.add_marker(pytest.mark.xfail(reason=reason, strict=False))
+        pytest.xfail(reason=reason)
+
+@pytest.mark.some_condition(SomeEnum.VALUE)
+@pytest.mark.usefixtures("some_guard")
+def test_thing(other_fixture, request):
+    ...
+```
+
+The migration tool converts the *shape* of everything except the
+marker-reading fixture itself — that part needs a one-time manual
+rewrite, after which every call site becomes a mechanical,
+find-and-replaceable transform. The fixture **stays a fixture**;
+ctrlrunner's `@parametrize(..., indirect=True)` delivers a per-test
+value to it as `request.param`, exactly like pytest's indirect
+parametrize:
+
+1. **Delete the marker-reading helper** (`_get_guard_value` above) —
+   nothing needs `get_closest_marker` once the value arrives as
+   `request.param` instead.
+2. **Have the fixture read `request.param`** where it used to read the
+   marker:
+
+   ```python
+   @fixture()
+   def some_guard(request, other_fixture):
+       value = request.param
+       if value is not None and some_runtime_check(value):
+           reason = f"guarded: {value}"
+           fail(description=reason, strict=False)
+           raise AssertionError(reason)
+   ```
+
+   (`fail(...)` + `raise` is exactly what the tool already generates
+   for a standalone `pytest.xfail(msg)` call — see the conversion
+   table above.)
+3. **Replace the marker pair on every test with an indirect
+   parametrize**, carrying that test's own value:
+
+   ```python
+   @test()
+   @parametrize("some_guard", [SomeEnum.VALUE], indirect=True)
+   def test_thing(some_guard, other_fixture):
+       ...
+   ```
+
+   (`some_guard` sits in the signature because the original
+   `usefixtures("some_guard")` converts to exactly that — an indirect
+   target must be requested by the test: signature, transitive fixture
+   dependency, or autouse, same rule as pytest.) Different tests pass
+   different values, same as the pytest original;
+   the value even shows up in each test's id suffix. (If literally
+   every test wants the same value, `@fixture(params=[SomeEnum.VALUE])`
+   on the fixture itself works too — but the indirect form keeps the
+   value visible at the test, which usually reads better for a guard.)
+
+The tool won't do step 1 or 2 for you automatically: recognizing "this
+marker's argument is consumed by a fixture at runtime" requires reading
+the fixture's implementation, which is exactly the kind of guess that
+silently drops behavior when wrong (see the `properties=...` row above).
+But tests that already used pytest's `indirect=True` (rather than a
+custom marker) to feed the fixture migrate fully automatically — see
+the `indirect=` row in the conversion table.
 
 ## Recommended workflow
 

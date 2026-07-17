@@ -748,7 +748,23 @@ class ParamHelperTests(unittest.TestCase):
 
         items = registry.get_tests()
         self.assertEqual(len(items), 3)
-        self.assertEqual({i.param_values["x"] for i in items}, {1, 2, 3})
+        # pytest semantics: with a single argname a tuple row is the
+        # VALUE itself, never unpacked -- (2,) stays (2,). (The old
+        # behavior unpacked 1-element tuples and crashed on longer
+        # ones, so nothing consistent is being broken.)
+        self.assertEqual({i.param_values["x"] for i in items}, {1, (2,), 3})
+
+    def test_single_argname_tuple_value_is_not_unpacked(self):
+        # The real-world indirect shape: one fixture name, each row a
+        # multi-element tuple destined for request.param whole. Used to
+        # crash with an opaque zip() ValueError.
+        @registry.test()
+        @registry.parametrize("x", [("persona", ["flag-a", "flag-b"])])
+        def sample(x):
+            pass
+
+        item = registry.get_tests()[0]
+        self.assertEqual(item.param_values["x"], ("persona", ["flag-a", "flag-b"]))
 
     def test_stacked_parametrize_with_case_id_on_both_levels_raises(self):
         with self.assertRaises(ValueError):
@@ -829,6 +845,213 @@ class ParamHelperTests(unittest.TestCase):
         import ctrlrunner
 
         self.assertIs(ctrlrunner.param, registry.param)
+
+
+class IndirectParametrizeTests(unittest.TestCase):
+    """@parametrize(..., indirect=...) -- per-test fixture
+    parametrization (pytest's indirect parametrize): the test supplies
+    the value a fixture receives as request.param."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_single_name_indirect_routes_value_to_fixture_override(self):
+        import functools
+
+        @registry.fixture()
+        def user(request):
+            return request.param
+
+        @registry.test()
+        @registry.parametrize("user", [1, 2], indirect=True)
+        def sample(user):
+            pass
+
+        items = registry.get_tests()
+        self.assertEqual(len(items), 2)
+        self.assertEqual(
+            sorted(i.fixture_param_overrides["user"] for i in items), [1, 2]
+        )
+        for item in items:
+            # the fixture stays injectable -- its resolved VALUE reaches
+            # the test as the kwarg, so 'user' must remain in params and
+            # must NOT be bound into the function as a raw value
+            self.assertIn("user", item.params)
+            self.assertNotIsInstance(item.func, functools.partial)
+            # indirect values still drive ids and param_values
+            self.assertIn(str(item.fixture_param_overrides["user"]), item.id)
+            self.assertEqual(
+                item.param_values["user"], item.fixture_param_overrides["user"]
+            )
+
+    def test_mixed_direct_and_indirect_names_split_routing(self):
+        import functools
+
+        @registry.fixture()
+        def fx(request):
+            return request.param
+
+        @registry.test()
+        @registry.parametrize("fx, label", [(10, "a"), (20, "b")], indirect=["fx"])
+        def sample(fx, label):
+            pass
+
+        items = sorted(registry.get_tests(), key=lambda i: i.id)
+        self.assertEqual(len(items), 2)
+        first = items[0]
+        self.assertEqual(first.fixture_param_overrides, {"fx": 10})
+        # label is bound directly (partial), so it leaves params
+        self.assertIsInstance(first.func, functools.partial)
+        self.assertEqual(first.func.keywords, {"label": "a"})
+        self.assertNotIn("label", first.params)
+        self.assertIn("fx", first.params)
+        # both values appear in the id suffix and param_values
+        self.assertIn("10-a", first.id)
+        self.assertEqual(first.param_values, {"fx": 10, "label": "a"})
+
+    def test_stacked_indirect_and_direct_decorators_compose(self):
+        @registry.fixture()
+        def fx(request):
+            return request.param
+
+        @registry.test()
+        @registry.parametrize("fx", ["x", "y"], indirect=True)
+        @registry.parametrize("n", [1, 2])
+        def sample(fx, n):
+            pass
+
+        items = registry.get_tests()
+        self.assertEqual(len(items), 4)
+        for item in items:
+            self.assertEqual(set(item.fixture_param_overrides), {"fx"})
+            self.assertIn(item.fixture_param_overrides["fx"], ("x", "y"))
+
+    def test_indirect_replaces_fixtures_own_static_params(self):
+        @registry.fixture(params=["static-a", "static-b"])
+        def fx(request):
+            return request.param
+
+        @registry.test()
+        @registry.parametrize("fx", ["from-test"], indirect=True)
+        def sample(fx):
+            pass
+
+        items = registry.get_tests()
+        # no cartesian doubling with the fixture's own params -- the
+        # test's indirect value wins outright (pytest semantics)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].fixture_param_overrides, {"fx": "from-test"})
+
+    def test_transitive_fixture_target_is_reachable(self):
+        @registry.fixture()
+        def inner(request):
+            return request.param
+
+        @registry.fixture()
+        def outer(inner):
+            return inner
+
+        @registry.test()
+        @registry.parametrize("inner", [7], indirect=True)
+        def sample(outer):
+            pass
+
+        item = registry.get_tests()[0]
+        self.assertEqual(item.fixture_param_overrides, {"inner": 7})
+        # transitive target is not in the signature, so never a kwarg
+        self.assertEqual(item.params, ["outer"])
+
+    def test_autouse_fixture_is_a_valid_indirect_target(self):
+        @registry.fixture(autouse=True)
+        def guard(request):
+            return request.param
+
+        @registry.test()
+        @registry.parametrize("guard", ["v"], indirect=True)
+        def sample():
+            pass
+
+        item = registry.get_tests()[0]
+        self.assertEqual(item.fixture_param_overrides, {"guard": "v"})
+
+    def test_unknown_fixture_name_raises_with_import_order_hint(self):
+        with self.assertRaises(ValueError) as ctx:
+
+            @registry.test()
+            @registry.parametrize("nope", [1], indirect=True)
+            def sample(nope):
+                pass
+
+        self.assertIn("no fixture named 'nope'", str(ctx.exception))
+        self.assertIn("import order", str(ctx.exception))
+
+    def test_fixture_without_request_param_raises(self):
+        @registry.fixture()
+        def fx():
+            return 1
+
+        with self.assertRaises(ValueError) as ctx:
+
+            @registry.test()
+            @registry.parametrize("fx", [1], indirect=True)
+            def sample(fx):
+                pass
+
+        self.assertIn("request", str(ctx.exception))
+
+    def test_unreachable_fixture_raises(self):
+        @registry.fixture()
+        def unused(request):
+            return request.param
+
+        with self.assertRaises(ValueError) as ctx:
+
+            @registry.test()
+            @registry.parametrize("unused", [1], indirect=True)
+            def sample():
+                pass
+
+        self.assertIn("not used by this test", str(ctx.exception))
+
+    def test_indirect_subset_must_be_within_arg_names(self):
+        with self.assertRaises(ValueError) as ctx:
+            registry.parametrize("a, b", [(1, 2)], indirect=["c"])
+        self.assertIn("subset", str(ctx.exception))
+
+    def test_stacked_role_conflict_raises(self):
+        @registry.fixture()
+        def fx(request):
+            return request.param
+
+        with self.assertRaises(ValueError) as ctx:
+
+            @registry.parametrize("fx", [1], indirect=True)
+            @registry.parametrize("fx", [2])
+            def sample(fx):
+                pass
+
+        self.assertIn("conflicting direct/indirect roles", str(ctx.exception))
+
+    def test_param_entries_metadata_merges_with_indirect(self):
+        @registry.fixture()
+        def fx(request):
+            return request.param
+
+        @registry.test(case_id="TC-{fx}")
+        @registry.parametrize(
+            "fx",
+            [registry.param(1, id="one", tags={"slow"}), registry.param(2, xfail="bug")],
+            indirect=True,
+        )
+        def sample(fx):
+            pass
+
+        items = sorted(registry.get_tests(), key=lambda i: i.id)
+        by_override = {i.fixture_param_overrides["fx"]: i for i in items}
+        self.assertTrue(by_override[1].id.endswith("[one]"))
+        self.assertIn("slow", by_override[1].tags)
+        self.assertEqual(by_override[1].case_id, "TC-1")
+        self.assertIsNotNone(by_override[2].expected_failure)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ CATEGORY_LABELS = {
     "params": "pytest.param(id=/marks=) -> param(...)",
     "runtime_calls": "pytest.skip()/fail()/xfail() calls rewritten",
     "test_classes": "test classes -> @test_class",
-    "indirect": "indirect parametrize -> fixture params=[...]",
+    "indirect": "indirect parametrize -> @parametrize(..., indirect=...)",
     "playwright": "pytest-playwright fixtures -> ctrlrunner.playwright.playwright_fixtures",
     "imports": "import lines added/removed",
     "config": "pyproject.toml options -> ctrlrunner.toml",

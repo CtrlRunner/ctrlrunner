@@ -122,11 +122,13 @@ def my_fixture(...):
   (screenshot, trace) when a test using this fixture fails. Must never
   raise. Called for every fixture resolved for that test, including
   transitive dependencies.
-- `params=[...]` — parametrizes the **fixture** itself (pytest's
-  "indirect parametrization"). The fixture must accept `request` and
-  read `request.param`. Any test that (transitively) depends on it is
-  automatically multiplied, one variant per value, combined via
-  cartesian product with any `@parametrize` on the test.
+- `params=[...]` — parametrizes the **fixture** itself. The fixture
+  must accept `request` and read `request.param`. Any test that
+  (transitively) depends on it is automatically multiplied, one variant
+  per value, combined via cartesian product with any `@parametrize` on
+  the test. For a *per-test* value instead (each test feeding the
+  fixture its own value), use `@parametrize(..., indirect=True)` on the
+  test — see below.
 - `autouse=True` — resolved (setup/teardown) for every test in the run,
   even if no test names it as a parameter.
 
@@ -147,6 +149,48 @@ spelled out, rather than silently registering one un-parametrized test.
 
 `arg_names` is a comma-separated string (`"a, b"`) or, pytest-style, a
 tuple/list of names (`("a", "b")`).
+
+With a **single** arg name, each entry in the values list is that
+combination's value as-is — a tuple entry is **not** unpacked
+(`@parametrize("x", [(1, 2)])` gives `x == (1, 2)`), matching pytest.
+
+#### `indirect=` — per-test fixture parametrization
+
+`indirect=True` (all names) or `indirect=["name", ...]` (a subset)
+routes each combination's value to that **fixture**'s `request.param`
+instead of passing it to the test as a kwarg — pytest's indirect
+parametrize, with the same semantics:
+
+```python
+@fixture()
+def features_enabled(request):
+    handler = mock_features(*request.param)   # this test's own value
+    yield handler
+    handler.clear()
+
+@test(case_id="7113491")
+@parametrize("features_enabled",
+             [(PersonaType.GEPM, [FeatureFlags.Dashboard])],
+             indirect=True)
+def test_dashboard_tab(features_enabled):
+    ...
+```
+
+- Each test feeds the shared fixture its **own** value — unlike
+  `@fixture(params=[...])`, which applies one value set to every
+  dependent test.
+- The test still receives the fixture's resolved **value** as its
+  kwarg (never the raw param), and the value appears in the test id
+  suffix like any other parametrize value.
+- An indirect value **replaces** the fixture's own `params=[...]` (if
+  any) for that test — no cartesian doubling.
+- The target must be a fixture the test actually uses (signature,
+  transitive dependency of its fixtures, or autouse) whose function
+  accepts `request`; anything else raises at registration with the fix
+  spelled out.
+- Module/session-scoped fixtures get one cached instance **per
+  value** — two tests passing different values to a session fixture
+  get two instances, both torn down at scope end.
 
 ### `param()` — per-combination metadata
 

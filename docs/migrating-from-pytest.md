@@ -3,8 +3,10 @@
 [← Back to README](../README.md)
 
 `ctrlrunner.migrate` automates the bulk of a pytest -> ctrlrunner
-conversion — decorators, markers, parametrize (including indirect,
-cross-file into `conftest.py`), test classes, runtime
+conversion — decorators, markers, parametrize (including `indirect=`,
+which ctrlrunner supports natively — the decorator passes through
+verbatim and the target fixture gets a `request` parameter added if
+missing, even cross-file in `conftest.py`), test classes, runtime
 `pytest.skip/fail/xfail` calls, pytest-playwright fixtures, imports.
 Whatever has no ctrlrunner equivalent gets a
 `# TODO(ctrlrunner-migrate): ...` comment in place plus a summary report.

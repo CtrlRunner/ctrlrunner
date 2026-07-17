@@ -341,6 +341,11 @@ class RuntimeCallTests(MigrateTestCase):
 
 
 class IndirectParametrizeTests(MigrateTestCase):
+    """pytest's @parametrize(..., indirect=...) passes through nearly
+    verbatim -- ctrlrunner supports indirect= natively, so values stay
+    on the test's decorator; the fixture side only needs a `request`
+    parameter (added if missing)."""
+
     FILES = {
         "conftest.py": (
             "import pytest\n\n@pytest.fixture\ndef user(request):\n    return request.param\n"
@@ -353,14 +358,20 @@ class IndirectParametrizeTests(MigrateTestCase):
         ),
     }
 
-    def test_values_move_to_fixture_definition(self):
+    def test_indirect_true_passes_through_verbatim(self):
         report, out = self.migrate(dict(self.FILES))
-        self.assertIn("@fixture(params=[1, 2])", out["conftest.py"])
-        self.assertNotIn("parametrize", out["test_a.py"])
+        self.assertIn('@parametrize("user", [1, 2], indirect=True)', out["test_a.py"])
         self.assertIn("@test()", out["test_a.py"])
+        # values do NOT move to the fixture definition anymore
+        self.assertNotIn("params=", out["conftest.py"])
+        self.assertIn("def user(request):", out["conftest.py"])
         self.assertEqual(report.totals()["indirect"], 1)
 
-    def test_conflicting_value_sets_fall_back_to_todo(self):
+    def test_conflicting_value_sets_across_tests_migrate_cleanly(self):
+        # Two tests feeding the same fixture DIFFERENT values used to be
+        # a bail-out (a single shared params=[...] can't carry both) --
+        # native indirect= keeps each test's own values on its own
+        # decorator, so this now migrates with no TODO.
         files = dict(self.FILES)
         files["test_b.py"] = (
             "import pytest\n\n"
@@ -369,8 +380,52 @@ class IndirectParametrizeTests(MigrateTestCase):
             "    assert user\n"
         )
         report, out = self.migrate(files)
-        self.assertNotIn("params=", out.get("conftest.py", "params= absent"))
-        self.assertTrue(
+        self.assertIn('@parametrize("user", [1, 2], indirect=True)', out["test_a.py"])
+        self.assertIn('@parametrize("user", [3], indirect=True)', out["test_b.py"])
+        self.assertFalse(
+            any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
+        )
+
+    def test_fixture_without_request_gets_one_added(self):
+        _, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n@pytest.fixture\ndef user():\n    return 1\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.parametrize("user", [1, 2], indirect=True)\n'
+                    "def test_one(user):\n"
+                    "    assert user\n"
+                ),
+            }
+        )
+        self.assertIn("def user(request):", out["conftest.py"])
+
+    def test_already_parametrized_fixture_migrates_cleanly(self):
+        # A fixture that already has its own params=[...] used to be a
+        # bail-out; with native indirect the test's values simply
+        # override the fixture's own for that test (pytest semantics),
+        # so both sides pass through unchanged.
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n"
+                    "@pytest.fixture(params=[9])\n"
+                    "def user(request):\n"
+                    "    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.parametrize("user", [1, 2], indirect=True)\n'
+                    "def test_one(user):\n"
+                    "    assert user\n"
+                ),
+            }
+        )
+        self.assertIn("params=[9]", out["conftest.py"])
+        self.assertIn('@parametrize("user", [1, 2], indirect=True)', out["test_a.py"])
+        self.assertFalse(
             any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
         )
 
@@ -395,6 +450,125 @@ class IndirectParametrizeTests(MigrateTestCase):
         self.assertFalse(
             any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
         )
+
+
+class MixedIndirectParametrizeTests(MigrateTestCase):
+    """Multi-name @parametrize with indirect= -- everything passes
+    through verbatim now (names, values, indirect list), including
+    shapes that used to bail: named-constant argvalues, non-literal
+    argvalues, row-length oddities, pytest.param rows (converted to
+    ctrlrunner param() like any direct parametrize)."""
+
+    def test_mixed_indirect_and_direct_names_pass_through(self):
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n"
+                    "@pytest.fixture\n"
+                    "def graphql_features_enabled(request):\n"
+                    "    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "TEST_CONFIGS_ENABLED = [(1, 'case1'), (2, 'case2')]\n\n"
+                    "@pytest.mark.parametrize(\n"
+                    '    "graphql_features_enabled,test_id",\n'
+                    "    TEST_CONFIGS_ENABLED,\n"
+                    '    indirect=["graphql_features_enabled"],\n'
+                    ")\n"
+                    "def test_one(graphql_features_enabled, test_id):\n"
+                    "    assert test_id\n"
+                ),
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn(
+            '@parametrize("graphql_features_enabled,test_id", TEST_CONFIGS_ENABLED, '
+            'indirect=["graphql_features_enabled"])',
+            code,
+        )
+        # values stay on the test -- nothing moves to the fixture
+        self.assertNotIn("params=", out["conftest.py"])
+        self.assertEqual(report.totals()["indirect"], 1)
+
+    def test_indirect_true_with_multiple_names_passes_through(self):
+        # Used to be unsupported (bailed with a TODO); now verbatim.
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n"
+                    "@pytest.fixture\ndef a(request):\n    return request.param\n\n"
+                    "@pytest.fixture\ndef b(request):\n    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.parametrize("a,b", [(1, 10), (2, 20)], indirect=True)\n'
+                    "def test_one(a, b):\n"
+                    "    assert a and b\n"
+                ),
+            }
+        )
+        self.assertIn(
+            '@parametrize("a,b", [(1, 10), (2, 20)], indirect=True)', out["test_a.py"]
+        )
+        self.assertFalse(
+            any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
+        )
+
+    def test_non_literal_argvalues_pass_through(self):
+        # A dynamic argvalues expression used to force a bail-out (the
+        # old approach had to see inside the list to split columns);
+        # verbatim pass-through has no such constraint.
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n@pytest.fixture\ndef user(request):\n    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "@pytest.mark.parametrize(\n"
+                    '    "user,label",\n'
+                    "    build_configs(),\n"
+                    '    indirect=["user"],\n'
+                    ")\n"
+                    "def test_one(user, label):\n"
+                    "    assert label\n"
+                ),
+            }
+        )
+        self.assertIn(
+            '@parametrize("user,label", build_configs(), indirect=["user"])',
+            out["test_a.py"],
+        )
+        self.assertFalse(
+            any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
+        )
+
+    def test_pytest_param_rows_convert_like_direct_parametrize(self):
+        _, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n@pytest.fixture\ndef user(request):\n    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "@pytest.mark.parametrize(\n"
+                    '    "user,label",\n'
+                    "    [pytest.param(1, 'a'), pytest.param(2, 'b', id='two')],\n"
+                    '    indirect=["user"],\n'
+                    ")\n"
+                    "def test_one(user, label):\n"
+                    "    assert label\n"
+                ),
+            }
+        )
+        code = out["test_a.py"]
+        # bare pytest.param rows collapse to plain tuples; id= survives
+        # via ctrlrunner's param() -- same conversion as direct
+        # parametrize, now applied inside an indirect one too
+        self.assertIn("indirect=[\"user\"]", code)
+        self.assertNotIn("pytest.param", code)
+        self.assertIn("param(2, 'b', id='two')", code)
 
 
 class PlaywrightAndImportTests(MigrateTestCase):
@@ -737,7 +911,12 @@ class CaseIdMarkerTests(MigrateTestCase):
 
 
 class AddMarkerTests(MigrateTestCase):
-    def test_literal_add_marker_becomes_record_property(self):
+    def test_literal_add_marker_promotes_to_test_case_id(self):
+        # request.node.add_marker(pytest.mark.<case-id-marker>(x)) on a
+        # plain test with no decorator-form case_id already set ->
+        # promoted straight to @test(case_id=x); the record_property
+        # fallback and its "--case-id" caveat TODO only apply when
+        # promotion isn't possible (see the fallback test below).
         report, out = self.migrate(
             {
                 "test_a.py": (
@@ -749,19 +928,59 @@ class AddMarkerTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        self.assertIn("record_property('test_case_id', \"7392947\")", code)
-        self.assertIn("from ctrlrunner import", code)
-        self.assertIn("record_property", code.split("\n")[0] + code)
+        self.assertIn('@test(case_id="7392947")', code)
+        # the record_property(...) call/statement is gone, and so is the
+        # import for it (leave_Module prunes needed_imports once it's
+        # known nothing in the file still calls record_property)
+        self.assertNotIn("record_property", code)
+        self.assertNotIn("add_marker", code)
         # request no longer used -> parameter dropped
         self.assertIn("def test_one():", code)
         self.assertNotIn("import pytest", code)
-        self.assertTrue(
-            any(
-                "not selectable via --case-id" in msg.lower() or "--case-id" in msg
-                for f in report.files
-                for _, msg in f.todos
-            )
+        # the fallback "not selectable via --case-id" report entry for
+        # this exact statement must be retracted, not just superseded --
+        # otherwise the report claims manual work remains on something
+        # that's already fully migrated
+        self.assertFalse(any("--case-id" in msg for f in report.files for _, msg in f.todos))
+
+    def test_promotion_falls_back_when_decorator_case_id_already_set(self):
+        # A decorator-form case_id marker already claimed @test(case_id=...)
+        # -- @test takes a single case_id, so the add_marker call can't
+        # also set it; falls back to record_property(...) + the
+        # "--case-id" caveat TODO, exactly as before this feature existed.
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.test_case_id("100")\n'
+                    "def test_one(request):\n"
+                    '    request.node.add_marker(pytest.mark.test_case_id("200"))\n'
+                    "    assert True\n"
+                )
+            }
         )
+        code = out["test_a.py"]
+        self.assertIn('case_id="100"', code)
+        self.assertIn("record_property('test_case_id', \"200\")", code)
+        self.assertTrue(any("--case-id" in msg for f in report.files for _, msg in f.todos))
+
+    def test_nested_helper_function_does_not_corrupt_promotion(self):
+        # a closure defined inside the test must not desynchronize the
+        # function-scoped stash stack used for promotion.
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "def test_one(request):\n"
+                    "    def helper():\n"
+                    "        return 1\n"
+                    '    request.node.add_marker(pytest.mark.test_case_id(str(helper())))\n'
+                    "    assert True\n"
+                )
+            }
+        )
+        self.assertIn("@test(case_id=str(helper()))", out["test_a.py"])
+        self.assertNotIn("record_property", out["test_a.py"])
 
     def test_dynamic_argument_converted_verbatim(self):
         _, out = self.migrate(
@@ -776,7 +995,7 @@ class AddMarkerTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        self.assertIn("record_property('test_case_id', test_id)", code)
+        self.assertIn("@test(case_id=test_id)", code)
         self.assertIn("def test_one():", code)
 
     def test_subscript_argument_converted_verbatim(self):
@@ -791,7 +1010,7 @@ class AddMarkerTests(MigrateTestCase):
                 )
             }
         )
-        self.assertIn("record_property('test_case_id', IDS['a'])", out["test_a.py"])
+        self.assertIn("@test(case_id=IDS['a'])", out["test_a.py"])
 
     def test_other_marker_via_add_marker_gets_todo_only(self):
         report, out = self.migrate(
@@ -828,9 +1047,13 @@ class AddMarkerTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        self.assertIn("record_property('test_case_id', \"1\")", code)
+        # promotion still happens (unrelated to the remaining
+        # request.config usage) -- the add_marker statement is gone
+        self.assertIn('@test(case_id="1")', code)
+        self.assertNotIn("record_property", code)
         self.assertIn("def test_one(request):", code)  # still used -> kept
         self.assertTrue(any("request.config" in msg for f in report.files for _, msg in f.todos))
+        self.assertFalse(any("--case-id" in msg for f in report.files for _, msg in f.todos))
 
     def test_add_marker_idempotent_second_run(self):
         _, out = self.migrate(
@@ -845,6 +1068,259 @@ class AddMarkerTests(MigrateTestCase):
         )
         _, out2 = self.migrate({"test_a.py": out["test_a.py"]})
         self.assertEqual(out2, {})
+
+
+class CustomMarkerWithArgsTests(MigrateTestCase):
+    """A custom @pytest.mark.<name>(x) always keeps its old, conservative
+    behavior: the marker name becomes a tag, the argument is dropped, and
+    a TODO is left -- deliberately NOT auto-converted to
+    @test(properties={...}), since some custom markers are purely
+    descriptive (safe as metadata) while others are read back at runtime
+    by a fixture/hook (e.g. via request.node.get_closest_marker(...), a
+    feature-flag guard fixture being a real example) -- properties=... on
+    @test is inert JUnit-report metadata only, so silently "converting" a
+    functional marker that way would drop real behavior with no error.
+    Static analysis can't reliably tell the two apart, so this always
+    needs a human, regardless of arg count/shape."""
+
+    def test_single_arg_custom_marker_drops_arg_keeps_tag_and_todo(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.ff_export_guard(FeatureFlags.X)\n'
+                    "def test_one():\n"
+                    "    assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        self.assertIn("tags={'ff_export_guard'}", decorator_line)
+        self.assertNotIn("properties=", decorator_line)
+        # the argument is gone from the decorator itself (it may still be
+        # echoed inside the TODO comment's quote of the original marker)
+        self.assertNotIn("FeatureFlags.X", decorator_line)
+        self.assertTrue(any("dropped" in msg for f in report.files for _, msg in f.todos))
+
+    def test_multi_arg_custom_marker_drops_args_keeps_tag_and_todo(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.testrail("C123", "extra")\n'
+                    "def test_one():\n"
+                    "    assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        self.assertIn("tags={'testrail'}", decorator_line)
+        self.assertNotIn("properties=", decorator_line)
+        self.assertTrue(any("dropped" in msg for f in report.files for _, msg in f.todos))
+
+    def test_keyword_arg_custom_marker_drops_args_keeps_tag_and_todo(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.testrail(id="C123")\n'
+                    "def test_one():\n"
+                    "    assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        self.assertIn("tags={'testrail'}", decorator_line)
+        self.assertNotIn("properties=", decorator_line)
+        self.assertTrue(any("dropped" in msg for f in report.files for _, msg in f.todos))
+
+    def test_bare_custom_marker_no_args_no_todo(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n@pytest.mark.smoke\ndef test_one():\n    assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn("tags={'smoke'}", code)
+        self.assertNotIn("properties=", code)
+        self.assertFalse(any("dropped" in msg for f in report.files for _, msg in f.todos))
+
+
+class ClassLevelMarkerDistributionTests(MigrateTestCase):
+    """Class-level usefixtures/skip/skipif/xfail/parametrize all bailed
+    out with 'apply per-method manually' before -- they're now replayed
+    onto every method via the same per-method _mark_* handlers."""
+
+    def test_class_level_usefixtures_applied_to_every_method(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.usefixtures("db")\n'
+                    "class TestThing:\n"
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                    "    def test_two(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn("def test_one(self, db):", code)
+        self.assertIn("def test_two(self, db):", code)
+        self.assertNotIn("usefixtures", code)
+
+    def test_class_level_skip_inserted_into_every_method_body(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.skip(reason="wip")\n'
+                    "class TestThing:\n"
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('skip(description="wip")', code)
+        self.assertNotIn("@pytest.mark.skip", code)
+
+    def test_class_level_xfail_per_method(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.xfail(reason="flaky")\n'
+                    "class TestThing:\n"
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('fail(description="flaky"', code)
+        self.assertNotIn("@pytest.mark.xfail", code)
+
+    def test_class_level_parametrize_applied_independently_to_each_method(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.parametrize("x", [1, 2])\n'
+                    "class TestThing:\n"
+                    "    def test_one(self, x):\n"
+                    "        assert x\n"
+                    "    def test_two(self, x):\n"
+                    "        assert x\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertEqual(code.count('@parametrize("x", [1, 2])'), 2)
+        self.assertEqual(report.totals()["parametrize"], 2)
+
+    def test_class_level_indirect_parametrize_per_method(self):
+        _, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n@pytest.fixture\ndef user(request):\n    return request.param\n"
+                ),
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.parametrize("user", [1, 2], indirect=True)\n'
+                    "class TestThing:\n"
+                    "    def test_one(self, user):\n"
+                    "        assert user\n"
+                    "    def test_two(self, user):\n"
+                    "        assert user\n"
+                ),
+            }
+        )
+        # class-level indirect parametrize is replayed per-method as a
+        # verbatim @parametrize(..., indirect=True) on each method
+        code = out["test_a.py"]
+        self.assertEqual(
+            code.count('@parametrize("user", [1, 2], indirect=True)'), 2
+        )
+        # values stay on the tests -- nothing moves to the fixture
+        self.assertNotIn("params=", out["conftest.py"])
+
+    def test_class_level_and_method_level_usefixtures_deduped(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.usefixtures("db")\n'
+                    "class TestThing:\n"
+                    '    @pytest.mark.usefixtures("db")\n'
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        method_line = next(l for l in code.splitlines() if "def test_one" in l)
+        self.assertEqual(method_line.count("db"), 1)
+
+    def test_timeout_and_flaky_still_go_to_test_class_unchanged(self):
+        # regression guard: the two genuinely class-only markers are
+        # unaffected by this change.
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "@pytest.mark.timeout(10)\n"
+                    "@pytest.mark.flaky(reruns=2)\n"
+                    "class TestThing:\n"
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        self.assertIn("@test_class(timeout=10, retries=2)", out["test_a.py"])
+
+    def test_class_level_case_id_marker_still_kept_with_todo(self):
+        # regression guard against CaseIdMarkerTests.
+        # test_class_level_marker_kept_with_todo_not_a_tag -- untouched
+        # by this fix (case_id has no per-method-distribution equivalent).
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    '@pytest.mark.test_case_id("100")\n'
+                    "class TestThing:\n"
+                    "    def test_one(self):\n"
+                    "        assert True\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('@pytest.mark.test_case_id("100")', code)
+        self.assertTrue(any("per-method" in msg for f in report.files for _, msg in f.todos))
+
+    def test_unittest_class_bases_leave_class_markers_untouched(self):
+        # non-convertible classes (base classes) never reach per-method
+        # dispatch -- the class-level marker must stay exactly as-is.
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import unittest\n"
+                    "import pytest\n\n"
+                    '@pytest.mark.usefixtures("db")\n'
+                    "class TestOld(unittest.TestCase):\n"
+                    "    def test_ok(self):\n"
+                    "        self.assertTrue(True)\n"
+                )
+            }
+        )
+        code = out.get("test_a.py", "")
+        self.assertIn('@pytest.mark.usefixtures("db")', code)
 
 
 class PytestParamConversionTests(MigrateTestCase):

@@ -72,13 +72,20 @@ _POLL_INTERVAL = 0.05
 
 
 def discover_conftests(root: str):
-    """Finds every conftest.py under root, shallowest first, so shared
-    fixtures defined at a higher directory level are registered before
-    ones in subdirectories override or extend them. Test files never
-    need to import these explicitly -- same convenience as pytest's
-    conftest.py, but it's just a plain import list, not a plugin hook.
-    Returns Path objects (not module names) -- see import_module_by_path
-    in worker.py for how each is actually imported.
+    """Finds every conftest.py that applies to `root`: every ANCESTOR
+    directory's conftest.py (walking upward to a .git boundary or the
+    filesystem root -- same convention as migrate/config_migrator.py's
+    find_pyproject, so a run scoped to one subdirectory still picks up
+    shared setup registered at the project root) PLUS every conftest.py
+    at or below root itself. Returned shallowest first overall (farthest
+    ancestor, ..., nearest ancestor, root's own, ..., deepest
+    descendant), so shared fixtures defined at a higher directory level
+    are registered before ones in subdirectories override or extend
+    them. Test files never need to import these explicitly -- same
+    convenience as pytest's conftest.py, but it's just a plain import
+    list, not a plugin hook. Returns Path objects (not module names) --
+    see import_module_by_path in worker.py for how each is actually
+    imported.
 
     root may also be a single file (pytest-style `ctrlrunner tests/test_x.py`)
     -- conftest discovery then runs over its containing directory, same as
@@ -88,7 +95,47 @@ def discover_conftests(root: str):
         root_path = root_path.parent
     if str(root_path.parent) not in sys.path:
         sys.path.insert(0, str(root_path.parent))
-    return sorted(root_path.rglob("conftest.py"), key=lambda p: len(p.parts))
+
+    ancestors: list[Path] = []
+    directory = root_path.parent
+    while True:
+        candidate = directory / "conftest.py"
+        if candidate.is_file():
+            ancestors.append(candidate)
+        if (directory / ".git").exists() or directory.parent == directory:
+            break
+        directory = directory.parent
+    # Walked nearest -> farthest. sys.path.insert(0, ...) means whatever
+    # is inserted LAST ends up at sys.path[0] (highest priority), so to
+    # put the farthest ancestor (the project root, typically) at
+    # sys.path[0] we must insert it LAST -- i.e. insert in the SAME
+    # nearest -> farthest order the walk already produced. (A prior
+    # version of this loop reversed that order, which put the NEAREST
+    # ancestor at sys.path[0] instead -- backwards from the intent
+    # below, and the exact bug behind a `from conftest import X` in a
+    # test file resolving to a closer, unrelated conftest.py instead of
+    # the project root's.) Highest priority for plain `import conftest`
+    # -style statements a test file might use to reach a *non*-fixture
+    # name defined there.
+    #
+    # ALWAYS promote to sys.path[0], even if the directory is already
+    # present somewhere else in sys.path -- a dev/editable install (`uv
+    # run`, `pip install -e .`) can already have the project root on
+    # sys.path via a .pth file or similar, just far down the list
+    # (after site-packages/.venv entries). A plain "insert only if
+    # absent" guard would see it already present and leave it at that
+    # low-priority position, silently defeating this whole ordering
+    # scheme -- remove any existing occurrence first so the insert
+    # actually re-establishes priority instead of being a no-op.
+    for ancestor_dir in [a.parent for a in ancestors]:
+        path_str = str(ancestor_dir)
+        while path_str in sys.path:
+            sys.path.remove(path_str)
+        sys.path.insert(0, path_str)
+    ancestors.reverse()  # shallowest (farthest) first, to match the return-order contract
+
+    descendants = sorted(root_path.rglob("conftest.py"), key=lambda p: len(p.parts))
+    return ancestors + descendants
 
 
 def discover_modules(root: str):
@@ -113,8 +160,21 @@ def _dotted_module_name(root_path: Path, path: Path) -> str:
     are built from (func.__module__), so it's computed exactly as
     before: relative to root_path.parent. It is NOT what a file is
     keyed under in sys.modules (see worker.import_module_by_path) --
-    that's a deliberate split, kept entirely separate from this name."""
-    rel = path.relative_to(root_path.parent).with_suffix("")
+    that's a deliberate split, kept entirely separate from this name.
+
+    `path` is normally a descendant of root_path.parent (a test file or
+    a conftest.py at/below root), for which relative_to() always
+    succeeds -- unchanged from before. discover_conftests now also
+    surfaces ANCESTOR conftest.py files (above root_path.parent, up to
+    a .git boundary), which relative_to() can't express as a subpath;
+    for those, fall back to <containing dir name>.conftest -- still
+    unique enough for sys.modules aliasing purposes, and ancestor
+    conftest.py files are never test files, so there's no existing test
+    id/JUnit classname convention to preserve for them."""
+    try:
+        rel = path.relative_to(root_path.parent).with_suffix("")
+    except ValueError:
+        rel = Path(path.parent.name) / path.with_suffix("").name
     return ".".join(rel.parts)
 
 
