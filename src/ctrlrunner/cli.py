@@ -463,6 +463,12 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         "--report-name", default=None, help="Report subdirectory name (default: html-report)"
     )
     parser.add_argument(
+        "--report-title",
+        default=None,
+        help="Title shown in the HTML report header (default: 'Test Results'). "
+        "Also settable via ctrlrunner.toml's 'report_title'.",
+    )
+    parser.add_argument(
         "--report-timestamp",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -840,6 +846,7 @@ def _run_main(args, shim):
             sys.exit(1)
     reports_dir = args.reports_dir or config.get("reports_dir", "reports")
     report_name = args.report_name or config.get("report_name", "html-report")
+    report_title = args.report_title or config.get("report_title", "Test Results")
 
     strict_override = True if args.strict_tags else None
     try:
@@ -1394,7 +1401,7 @@ def _run_main(args, shim):
         report_path.write_text(
             render_html(
                 reporter.results,
-                suite_name=Path(root).name,
+                suite_name=report_title,
                 artifact_mode=artifact_mode,
                 report_dir=str(html_artifacts_dir),
                 coverage_summary=(

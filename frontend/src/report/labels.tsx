@@ -40,39 +40,11 @@ export function TagLabel({ tag, colorIndex }: { tag: string; colorIndex?: number
   );
 }
 
-export function GroupLabel({ dimension, value }: { dimension: string; value: string }) {
-  const applyToken = useApplyToken();
-  return (
-    <span
-      className={`label label-wrap label-${labelColorIndex(`${dimension}=${value}`)}`}
-      title={`Filter by ${dimension}=${value} (Ctrl/Cmd-click to combine)`}
-      onClick={(e) => {
-        e.stopPropagation();
-        applyToken(`g:${dimension}=${value}`, e.metaKey || e.ctrlKey);
-      }}
-    >
-      {value}
-    </span>
-  );
-}
-
-export function LabelsRow({
-  test,
-  activeDimension,
-  showGroup,
-}: {
-  test: TestData;
-  activeDimension?: string;
-  showGroup?: boolean;
-}) {
+export function LabelsRow({ test }: { test: TestData }) {
   const tags = [...test.tags].sort();
-  const groupValue = activeDimension ? test.groups[activeDimension] : undefined;
-  if (!tags.length && !(showGroup && groupValue)) return null;
+  if (!tags.length) return null;
   return (
     <span className="label-row">
-      {showGroup && groupValue && activeDimension ? (
-        <GroupLabel dimension={activeDimension} value={groupValue} />
-      ) : null}
       {tags.map((tag) => (
         <TagLabel key={tag} tag={tag} />
       ))}

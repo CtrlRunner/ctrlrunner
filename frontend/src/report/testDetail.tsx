@@ -328,7 +328,7 @@ export function TestDetailView({ model, testId }: { model: ReportModel; testId: 
             near timeout
           </span>
         ) : null}
-        <LabelsRow test={test} activeDimension={model.activeDimension} showGroup />
+        <LabelsRow test={test} />
       </div>
 
       {test.error || test.assertDetails ? (

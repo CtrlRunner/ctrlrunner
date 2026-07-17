@@ -203,7 +203,7 @@ def _load_static_page() -> str:
 
 def render_html(
     results: list[Result],
-    suite_name: str = "ctrlrunner",
+    suite_name: str = "Test Results",
     artifact_mode: str = "files",
     report_dir: str | None = None,
     coverage_summary: dict | None = None,

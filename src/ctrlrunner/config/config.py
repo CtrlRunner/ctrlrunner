@@ -22,6 +22,7 @@ it; it just sets defaults so CI/dev don't need to repeat the same flags.
 
     reports_dir = "reports"
     report_name = "html-report"
+    # report_title = "My Project"  # HTML report header title (default: "Test Results")
     report_timestamp = false
     keep_reports = 10
     artifact_mode = "files"
@@ -130,6 +131,7 @@ KNOWN_KEYS = frozenset(
         "fully_parallel",
         "reports_dir",
         "report_name",
+        "report_title",
         "report_timestamp",
         "keep_reports",
         "artifact_mode",

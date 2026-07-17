@@ -204,16 +204,6 @@ pre,
   border: 1px solid transparent;
 }
 
-/* For long group-value chips (e.g. "module") only -- overflow-wrap on
-   every .label collapses its min-content size for ancestor flex
-   layouts, letting unrelated siblings squeeze and mid-word-break
-   ordinary short tags despite flex-shrink:0 protecting them locally. */
-.label-wrap {
-  max-width: 260px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 .label-0 {
   background: var(--label-0-bg);
   color: var(--label-0-fg);

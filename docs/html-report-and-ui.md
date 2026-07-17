@@ -131,7 +131,11 @@ managed reports directory.
 --html-report                    # write to <report_dir>/report.html
 --html-report custom/path.html   # or: write to this exact path instead
 --artifact-mode files|base64     # default: files
+--report-title "My Project"      # header title (default: "Test Results")
 ```
+
+`--report-title` is also settable via `ctrlrunner.toml`'s `report_title` key; the CLI flag
+takes precedence.
 
 A single self-contained file (data + markup + styling + JS all inline,
 no build step, no server) — open it directly via `file://`. Grouped by
