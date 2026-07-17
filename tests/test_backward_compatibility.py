@@ -35,7 +35,7 @@ class AbsentConfigDefaultsToOffTests(unittest.TestCase):
     resolve to its pre-feature default: None/{}/DEFAULT_DIMENSIONS,
     never a new required key, never a behavior change."""
 
-    def test_grouping_absent_returns_module_only_default(self):
+    def test_grouping_absent_returns_file_only_default(self):
         self.assertEqual(load_grouping_dimensions({}), DEFAULT_DIMENSIONS)
 
     def test_registered_tags_absent_returns_none(self):
@@ -124,10 +124,10 @@ class ConfigNestingGotchaTests(unittest.TestCase):
             )
             config = load_config(str(path))
             dims = load_grouping_dimensions(config)
-            # "module" is force-added (prepended) since the user's
+            # "file" is force-added (prepended) since the user's
             # custom dimension list omitted it -- it's always present
             # for backward compatibility.
-            self.assertEqual([d.name for d in dims], ["module", "team"])
+            self.assertEqual([d.name for d in dims], ["file", "team"])
 
     def test_bare_grouping_header_is_silently_a_sibling_table_not_nested(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -141,7 +141,7 @@ class ConfigNestingGotchaTests(unittest.TestCase):
             )
             config = load_config(str(path))
             dims = load_grouping_dimensions(config)
-            self.assertEqual([d.name for d in dims], ["module"])  # silently the default, not "team"
+            self.assertEqual([d.name for d in dims], ["file"])  # silently the default, not "team"
 
 
 class CliEndToEndBackwardCompatibilityTests(unittest.TestCase):

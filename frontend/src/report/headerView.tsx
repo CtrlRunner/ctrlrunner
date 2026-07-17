@@ -156,7 +156,7 @@ export function HeaderView({ model }: { model: ReportModel }) {
           type="search"
           className="search-input"
           spellCheck={false}
-          placeholder="Search: text  s:failed  @tag  g:module=api  case:C123  !token"
+          placeholder="Search: text  s:failed  @tag  g:file=api  case:C123  !token"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />

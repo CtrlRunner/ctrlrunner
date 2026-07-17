@@ -4,7 +4,7 @@
 //   s:<outcome>   outcome filter; several s: tokens OR together.
 //                 s:skipped also matches fixme (a skip flavor).
 //   @<tag>        tag filter; several @ tokens AND together.
-//   g:<dim>=<val> grouping-dimension filter (module, or any configured
+//   g:<dim>=<val> grouping-dimension filter (file, or any configured
 //                 dimension); value is a substring match.
 //   case:<id>     case-id substring match.
 //   <free text>   substring match over id + caseId + tags + outcome +

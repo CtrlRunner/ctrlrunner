@@ -6,8 +6,8 @@ import { buildTree, type TreeCallbacks, TreeView } from './testTree';
 
 export function UiApp() {
   const [allTests, setAllTests] = React.useState<TestInfo[]>([]);
-  const [dimensions, setDimensions] = React.useState<string[]>(['module']);
-  const [activeDimension, setActiveDimension] = React.useState('module');
+  const [dimensions, setDimensions] = React.useState<string[]>(['file']);
+  const [activeDimension, setActiveDimension] = React.useState('file');
   const [resultsById, setResultsById] = React.useState<Record<string, LiveResult>>({});
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -47,7 +47,7 @@ export function UiApp() {
     (async () => {
       const data = await fetchTests();
       setAllTests(data.tests);
-      const dims = data.dimensions?.length ? data.dimensions : ['module'];
+      const dims = data.dimensions?.length ? data.dimensions : ['file'];
       setDimensions(dims);
       setActiveDimension(dims[0]);
       setResultsById(data.lastResults || {});

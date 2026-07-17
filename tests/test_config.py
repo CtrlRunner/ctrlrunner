@@ -72,7 +72,7 @@ class NestedGroupingTableTests(unittest.TestCase):
     a bare `[grouping]` header in ctrlrunner.toml is a sibling TOML table,
     NOT nested under `[ctrlrunner]` -- load_config() would silently drop
     it (since it only returns data["ctrlrunner"]), and grouping would
-    silently fall back to the default "module"-only dimension with no
+    silently fall back to the default "file"-only dimension with no
     error at all. `[ctrlrunner.grouping]` is the correct nesting. This
     test locks in the correct behavior against a real file on disk, not
     just the in-memory dict load_grouping_dimensions() already covers
@@ -89,11 +89,11 @@ class NestedGroupingTableTests(unittest.TestCase):
             )
             config = load_config(str(path))
             dims = load_grouping_dimensions(config)
-            # module is always force-included for backward compatibility
+            # file is always force-included for backward compatibility
             # even though this config's dimensions list only names "team" -- this test's
             # actual subject (correct [ctrlrunner.grouping] nesting parse)
             # is proven by "team" being present at all.
-            self.assertEqual([d.name for d in dims], ["module", "team"])
+            self.assertEqual([d.name for d in dims], ["file", "team"])
 
     def test_bare_grouping_header_is_silently_a_sibling_table_not_nested(self):
         # documents the gotcha itself: this is what NOT to write. A bare
@@ -111,7 +111,7 @@ class NestedGroupingTableTests(unittest.TestCase):
             )
             config = load_config(str(path))
             dims = load_grouping_dimensions(config)
-            self.assertEqual([d.name for d in dims], ["module"])  # silently the default, not "team"
+            self.assertEqual([d.name for d in dims], ["file"])  # silently the default, not "team"
 
 
 class ConfigValidationTests(unittest.TestCase):

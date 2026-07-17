@@ -63,24 +63,24 @@ def _summary_lines(results, duration):
             if r.error:
                 lines.extend(f"      {line}" for line in r.error.splitlines())
 
-    by_module: dict[str, list] = {}
+    by_file: dict[str, list] = {}
     for r in results:
-        module = r.groups.get("module") if r.groups else None
-        if module is None:
+        file_key = r.groups.get("file") if r.groups else None
+        if file_key is None:
             continue
-        by_module.setdefault(module, []).append(r)
+        by_file.setdefault(file_key, []).append(r)
 
-    if len(by_module) >= 2:
+    if len(by_file) >= 2:
         lines.append("")
-        lines.append("By module:")
-        name_width = max(len(m) for m in by_module) if by_module else 0
-        for module in sorted(by_module):
-            module_results = by_module[module]
-            m_total = len(module_results)
-            m_passed = sum(1 for r in module_results if r.outcome == "passed")
-            m_failed = sum(1 for r in module_results if r.outcome == "failed")
+        lines.append("By file:")
+        name_width = max(len(f) for f in by_file) if by_file else 0
+        for file_key in sorted(by_file):
+            file_results = by_file[file_key]
+            m_total = len(file_results)
+            m_passed = sum(1 for r in file_results if r.outcome == "passed")
+            m_failed = sum(1 for r in file_results if r.outcome == "failed")
             lines.append(
-                f"  {module.ljust(name_width)}  {m_total:>3} total  "
+                f"  {file_key.ljust(name_width)}  {m_total:>3} total  "
                 f"{m_passed:>3} passed  {m_failed:>3} failed"
             )
 

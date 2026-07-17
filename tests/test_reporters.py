@@ -206,12 +206,12 @@ class JsonReporterTests(unittest.TestCase):
                     outcome="passed",
                     error=None,
                     duration=0.1,
-                    groups={"module": "mod", "team": "backend"},
+                    groups={"file": "mod.py", "team": "backend"},
                 )
             ]
             reporter.on_run_end(results, 1.0)
             payload = json.loads(path.read_text())
-            self.assertEqual(payload["tests"][0]["groups"], {"module": "mod", "team": "backend"})
+            self.assertEqual(payload["tests"][0]["groups"], {"file": "mod.py", "team": "backend"})
 
     def test_project_field_and_top_level_projects_list(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -384,8 +384,8 @@ class SummaryLinesFlakyTests(unittest.TestCase):
         self.assertNotIn("flaky", lines[0])
 
 
-class SummaryLinesModuleBreakdownTests(unittest.TestCase):
-    def test_breakdown_table_appears_with_two_or_more_modules(self):
+class SummaryLinesFileBreakdownTests(unittest.TestCase):
+    def test_breakdown_table_appears_with_two_or_more_files(self):
         from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [
@@ -394,21 +394,21 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod_a"},
+                groups={"file": "mod_a.py"},
             ),
             Result(
                 test_id="mod_a::test_2",
                 outcome="failed",
                 error="x",
                 duration=0.1,
-                groups={"module": "mod_a"},
+                groups={"file": "mod_a.py"},
             ),
             Result(
                 test_id="mod_b::test_1",
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod_b"},
+                groups={"file": "mod_b.py"},
             ),
         ]
         lines = _summary_lines(results, 1.0)
@@ -416,7 +416,7 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
         self.assertIn("mod_a", joined)
         self.assertIn("mod_b", joined)
 
-    def test_no_breakdown_table_with_a_single_module(self):
+    def test_no_breakdown_table_with_a_single_file(self):
         from ctrlrunner.reporting.reporters import _summary_lines
 
         results = [
@@ -425,7 +425,7 @@ class SummaryLinesModuleBreakdownTests(unittest.TestCase):
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod_a"},
+                groups={"file": "mod_a.py"},
             ),
         ]
         lines = _summary_lines(results, 1.0)

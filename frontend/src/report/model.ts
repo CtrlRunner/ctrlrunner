@@ -84,8 +84,8 @@ function outcomeWeight(test: TestData): number {
 
 export type SortMode =
   | 'failures'
-  | 'module-asc'
-  | 'module-desc'
+  | 'file-asc'
+  | 'file-desc'
   | 'duration-desc'
   | 'duration-asc'
   | 'flaky-first'
@@ -95,8 +95,8 @@ export const DEFAULT_SORT_MODE: SortMode = 'failures';
 
 export const SORT_MODE_LABELS: Record<SortMode, string> = {
   failures: 'Failures first',
-  'module-asc': 'Module (A→Z)',
-  'module-desc': 'Module (Z→A)',
+  'file-asc': 'File (A→Z)',
+  'file-desc': 'File (Z→A)',
   'duration-desc': 'Duration (slowest first)',
   'duration-asc': 'Duration (fastest first)',
   'flaky-first': 'Flaky first',
@@ -114,10 +114,10 @@ function nearTimeoutCount(group: Group): number {
 function sortGroups(groups: Group[], sortMode: SortMode): Group[] {
   const sorted = [...groups];
   switch (sortMode) {
-    case 'module-asc':
+    case 'file-asc':
       sorted.sort((a, b) => a.label.localeCompare(b.label));
       break;
-    case 'module-desc':
+    case 'file-desc':
       sorted.sort((a, b) => b.label.localeCompare(a.label));
       break;
     case 'duration-desc':
@@ -149,7 +149,7 @@ export function buildModel(
   const activeDimension =
     requestedDimension && report.dimensions.includes(requestedDimension)
       ? requestedDimension
-      : report.dimensions[0] || 'module';
+      : report.dimensions[0] || 'file';
 
   const filter = new Filter(query);
   const totalStats = emptyStats();

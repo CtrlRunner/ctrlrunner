@@ -8,6 +8,13 @@ timeout = 30.0
 reporter = ["line"]      # 'json' is always appended (results.json is written by
                          # every run); custom reporters: "module.path:ClassName"
 
+[ctrlrunner.grouping]
+dimensions = [
+  { name = "file",   strategy = "file" },                     # today's default -- list explicitly to keep it alongside custom ones
+  { name = "suite",  strategy = "path", depth = 1 },          # tests/web/cases/... -> "cases"
+  { name = "team",   strategy = "tag_prefix", prefix = "team_" },
+]
+
 # Scheduling default: tests in one FILE run in order in one worker;
 # files run in parallel across workers. Set true to distribute every
 # test individually instead (@test_class(fully_parallel=...) overrides

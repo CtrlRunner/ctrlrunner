@@ -181,15 +181,28 @@
   text-decoration: underline;
 }
 
+.group-summary-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
 .group-summary-table {
   width: 100%;
-  margin-top: 8px;
   border-collapse: collapse;
   background: var(--panel-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   font-size: 12.5px;
+}
+
+.group-summary-table-label {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .group-summary-table th,
@@ -296,6 +309,16 @@
 .test-row-case {
   font-size: 12px;
   color: var(--muted);
+}
+
+.test-row-path {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .row-media {

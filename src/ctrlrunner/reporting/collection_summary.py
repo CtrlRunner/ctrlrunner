@@ -4,20 +4,22 @@ starts, regardless of --reporter (JsonReporter deliberately prints
 nothing else, so this is a plain print(), not a ConsoleReporter
 method -- it's the only way this shows up for every reporter choice).
 
-Only uses fields known at SELECTION time (module, from TestItem.id;
-tags, from TestItem.tags) -- quarantine/outcome aren't known yet, so
-they're deliberately not part of this summary.
+Only uses fields known at SELECTION time (source file, from
+TestItem.id; tags, from TestItem.tags) -- quarantine/outcome aren't
+known yet, so they're deliberately not part of this summary.
 """
 
 from collections import Counter
 
+from .grouping import group_by_file
+
 
 def format_collection_summary(tests: list) -> str:
     total = len(tests)
-    modules = {t.id.partition("::")[0] for t in tests}
+    files = {group_by_file(t) for t in tests}
     test_word = "test" if total == 1 else "tests"
-    module_word = "module" if len(modules) == 1 else "modules"
-    line = f"Collected {total} {test_word} across {len(modules)} {module_word}"
+    file_word = "file" if len(files) == 1 else "files"
+    line = f"Collected {total} {test_word} across {len(files)} {file_word}"
 
     tag_counts = Counter(tag for t in tests for tag in t.tags)
     if tag_counts:

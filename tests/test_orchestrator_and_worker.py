@@ -1153,7 +1153,7 @@ class GroupingIntegrationTests(unittest.TestCase):
     def setUp(self):
         registry.reset()
 
-    def test_default_no_config_groups_by_module_only(self):
+    def test_default_no_config_groups_by_file_only(self):
         from ctrlrunner.reporting.grouping import DEFAULT_DIMENSIONS
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -1166,8 +1166,8 @@ class GroupingIntegrationTests(unittest.TestCase):
             self.assertEqual(orch.grouping_dimensions, DEFAULT_DIMENSIONS)
             reporter = orch.run()
             result = reporter.results[0]
-            self.assertIn("module", result.groups)
-            self.assertTrue(result.groups["module"].endswith("test_a"))
+            self.assertIn("file", result.groups)
+            self.assertTrue(result.groups["file"].endswith("test_a.py"))
 
     def test_custom_dimensions_computed_and_attached_to_results(self):
         from ctrlrunner.reporting.grouping import GroupingDimension
@@ -1188,7 +1188,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             reporter = orch.run()
             result = reporter.results[0]
             self.assertEqual(result.groups, {"team": "backend", "owner": "alice"})
-            self.assertNotIn("module", result.groups)  # not force-injected
+            self.assertNotIn("file", result.groups)  # not force-injected
 
     def test_groups_present_on_cancelled_results_too(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -1209,7 +1209,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             reporter = orch.run()
 
             self.assertEqual(reporter.results[0].outcome, "cancelled")
-            self.assertIn("module", reporter.results[0].groups)
+            self.assertIn("file", reporter.results[0].groups)
 
     def test_groups_included_in_event_envelope_payload(self):
         from ctrlrunner.reporting.events import EventSubscriber
@@ -1231,7 +1231,7 @@ class GroupingIntegrationTests(unittest.TestCase):
             orch.run()
 
         self.assertIn("groups", received[0])
-        self.assertIn("module", received[0]["groups"])
+        self.assertIn("file", received[0]["groups"])
 
 
 class RunProjectsIntegrationTests(unittest.TestCase):
@@ -3857,7 +3857,7 @@ class CollectionSummaryPrintTests(unittest.TestCase):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 Orchestrator(str(root), num_workers=1, default_timeout=30.0).run()
-        self.assertIn("Collected 1 test across 1 module", buf.getvalue())
+        self.assertIn("Collected 1 test across 1 file", buf.getvalue())
 
 
 class GrepFilterOrchestratorTests(unittest.TestCase):

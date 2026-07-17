@@ -42,11 +42,11 @@ it; it just sets defaults so CI/dev don't need to repeat the same flags.
     # Optional: additional ways to group tests in the HTML report / UI
     # Mode, with a dropdown to switch between them. Note the nesting --
     # [ctrlrunner.grouping], not a bare [grouping] (which would be a
-    # sibling table, silently ignored). Absent entirely = "module" only,
+    # sibling table, silently ignored). Absent entirely = "file" only,
     # exactly like today.
     # [ctrlrunner.grouping]
     # dimensions = [
-    #     { name = "module", strategy = "module" },
+    #     { name = "file", strategy = "file" },
     #     { name = "team", strategy = "tag_prefix", prefix = "team_" },
     # ]
 

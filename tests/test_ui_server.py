@@ -92,8 +92,8 @@ class UIServerTests(unittest.TestCase):
     def test_api_tests_includes_dimensions_and_per_test_groups(self):
         resp = urllib.request.urlopen(self.url + "api/tests", timeout=3)
         data = json.loads(resp.read())
-        self.assertEqual(data["dimensions"], ["module"])
-        self.assertTrue(all("groups" in t and "module" in t["groups"] for t in data["tests"]))
+        self.assertEqual(data["dimensions"], ["file"])
+        self.assertTrue(all("groups" in t and "file" in t["groups"] for t in data["tests"]))
 
     def test_api_tests_includes_num_workers(self):
         resp = urllib.request.urlopen(self.url + "api/tests", timeout=3)

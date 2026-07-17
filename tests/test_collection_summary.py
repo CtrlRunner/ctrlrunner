@@ -9,14 +9,14 @@ def _item(id_, tags=None):
 
 
 class FormatCollectionSummaryTests(unittest.TestCase):
-    def test_single_test_single_module(self):
+    def test_single_test_single_file(self):
         summary = format_collection_summary([_item("mod::test_a")])
-        self.assertEqual(summary, "Collected 1 test across 1 module")
+        self.assertEqual(summary, "Collected 1 test across 1 file")
 
     def test_plural_counts(self):
         tests = [_item("mod_a::test_1"), _item("mod_a::test_2"), _item("mod_b::test_1")]
         summary = format_collection_summary(tests)
-        self.assertEqual(summary, "Collected 3 tests across 2 modules")
+        self.assertEqual(summary, "Collected 3 tests across 2 files")
 
     def test_tag_counts_included_when_present(self):
         tests = [
@@ -34,7 +34,7 @@ class FormatCollectionSummaryTests(unittest.TestCase):
 
     def test_empty_list(self):
         summary = format_collection_summary([])
-        self.assertEqual(summary, "Collected 0 tests across 0 modules")
+        self.assertEqual(summary, "Collected 0 tests across 0 files")
 
 
 if __name__ == "__main__":

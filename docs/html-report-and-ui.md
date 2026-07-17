@@ -58,15 +58,15 @@ grouping dimension, no extra `[grouping]` config needed.
 
 ## Grouping model (HTML report / UI Mode)
 
-Both the HTML report and UI Mode group tests by module by default --
-no config needed, identical to before. Add `[grouping]` to
+Both the HTML report and UI Mode group tests by file (the test's source
+file path) by default -- no config needed. Add `[grouping]` to
 `ctrlrunner.toml` for additional ways to group, with a dropdown switcher
 to pick between them:
 
 ```toml
 [ctrlrunner.grouping]
 dimensions = [
-  { name = "module", strategy = "module" },                  # today's default -- list explicitly to keep it alongside custom ones
+  { name = "file",   strategy = "file" },                     # today's default -- list explicitly to keep it alongside custom ones
   { name = "suite",  strategy = "path", depth = 1 },          # tests/web/cases/... -> "cases"
   { name = "team",   strategy = "tag_prefix", prefix = "team_" },  # team_backend -> "backend"
   { name = "owner",  strategy = "property", key = "owner" },
@@ -79,7 +79,8 @@ table, so a sub-table needs the dotted prefix to actually nest inside
 it rather than becoming its own unrelated top-level table that gets
 silently ignored.)
 
-- **`module`** -- the dotted module path (today's only option).
+- **`file`** -- the test's source file path, relative to the test root,
+  in filesystem form (e.g. `examples/test_x.py`; today's default).
 - **`path`** -- a directory segment from the test's file path, `depth`
   segments deep relative to the test root (0-based; `depth=1` with root
   `tests/` and file `tests/web/cases/test_x.py` groups by `cases`).
@@ -87,10 +88,17 @@ silently ignored.)
   (`team_backend` -> `backend` under `prefix = "team_"`).
 - **`property`** -- groups by an `@test(properties={...})` value.
 
-No `[grouping]` config at all = today's exact module-only grouping,
-zero behavior change. A custom `dimensions` list does **not** silently
-add `module` back in -- list it explicitly if you want it alongside
-your custom dimensions.
+No `[grouping]` config at all = file-only grouping. A custom
+`dimensions` list does **not** silently add `file` back in -- list it
+explicitly if you want it alongside your custom dimensions.
+
+**Breaking change:** the grouping strategy previously named `module`
+(the dotted Python module path, e.g. `examples.test_x`) has been
+renamed to `file` and now produces a real filesystem path instead
+(`examples/test_x.py`). A `ctrlrunner.toml` still using
+`strategy = "module"` will now raise `ValueError: unknown strategy
+'module'` at startup -- update it to `strategy = "file"`. There's no
+silent aliasing between the two.
 
 ## Reports directory
 
@@ -139,7 +147,7 @@ takes precedence.
 
 A single self-contained file (data + markup + styling + JS all inline,
 no build step, no server) — open it directly via `file://`. Grouped by
-module, filterable by outcome (pass/fail/skip/fixme/expected-failure),
+file, filterable by outcome (pass/fail/skip/fixme/expected-failure),
 searchable by ID/case ID/tag, with error text, the step tree, and
 artifact links shown per test on click.
 
@@ -159,12 +167,13 @@ bar to jump to that test's detail view. Deep-linkable via
 `#?panel=timeline`. Falls back to a friendly empty state on older
 reports generated before this feature.
 
-The per-module summary table (toggle "Show summary by module") ends
-with a bold **Total** row. A "Sort" dropdown next to the module/tag
-grouping switcher reorders the test list: failures first (default),
-module A→Z/Z→A, duration slowest/fastest-first, flaky-first, or
-near-timeout-first — all computed client-side from the already-embedded
-report JSON, deep-linkable via `#?sort=...`.
+The per-file summary table (toggle "Show summary by file") is always
+sorted by its first column ascending, and ends with a bold **Total**
+row. A "Sort" dropdown next to the file/tag grouping switcher separately
+reorders the test list: failures first (default), file A→Z/Z→A,
+duration slowest/fastest-first, flaky-first, or near-timeout-first —
+all computed client-side from the already-embedded report JSON,
+deep-linkable via `#?sort=...`.
 
 `--artifact-mode` only affects **images**: `files` (default) copies
 every artifact — screenshots and trace zips alike — into

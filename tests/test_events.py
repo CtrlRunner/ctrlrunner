@@ -76,7 +76,7 @@ class UnifiedResultShapeTests(unittest.TestCase):
             attempts=2,
             artifacts=("shot.png",),
             steps=[{"name": "test body"}],
-            groups={"module": "mod"},
+            groups={"file": "mod.py"},
             project="smoke",
             retries_configured=1,
             worker_restart_overhead=0.5,

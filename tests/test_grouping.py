@@ -23,15 +23,15 @@ def _item(id_="mod::test_x", source_path=None, tags=None, properties=None):
 
 
 class LoadGroupingDimensionsTests(unittest.TestCase):
-    def test_absent_config_returns_default_module_dimension(self):
+    def test_absent_config_returns_default_file_dimension(self):
         dims = load_grouping_dimensions({})
         self.assertEqual(dims, DEFAULT_DIMENSIONS)
 
-    def test_custom_dimensions_force_include_module_when_omitted(self):
-        # Module must always be present -- every existing consumer
+    def test_custom_dimensions_force_include_file_when_omitted(self):
+        # "file" must always be present -- every existing consumer
         # (the default HTML report view, historical grouping behavior)
         # relies on it, so a user adding a custom dimension without
-        # re-listing "module" must not silently lose it.
+        # re-listing "file" must not silently lose it.
         dims = load_grouping_dimensions(
             {
                 "grouping": {
@@ -40,26 +40,26 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
             }
         )
         names = [d.name for d in dims]
-        self.assertEqual(names, ["module", "team"])  # "module" auto-added, prepended
+        self.assertEqual(names, ["file", "team"])  # "file" auto-added, prepended
 
-    def test_module_not_duplicated_when_already_listed(self):
+    def test_file_not_duplicated_when_already_listed(self):
         dims = load_grouping_dimensions(
             {
                 "grouping": {
                     "dimensions": [
                         {"name": "team", "strategy": "tag_prefix", "prefix": "team_"},
-                        {"name": "module", "strategy": "module"},
+                        {"name": "file", "strategy": "file"},
                     ]
                 }
             }
         )
         names = [d.name for d in dims]
-        self.assertEqual(names, ["team", "module"])  # order preserved, no duplicate prepended
+        self.assertEqual(names, ["team", "file"])  # order preserved, no duplicate prepended
 
     def test_explicit_empty_dimensions_still_raises(self):
         # The deliberate exception: an explicit empty list is user intent
         # gone wrong and must still fail fast, not be "fixed" by
-        # auto-adding module.
+        # auto-adding file.
         with self.assertRaises(ValueError):
             load_grouping_dimensions({"grouping": {"dimensions": []}})
 
@@ -69,9 +69,17 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
                 {"grouping": {"dimensions": [{"name": "x", "strategy": "not_a_real_strategy"}]}}
             )
 
+    def test_old_module_strategy_now_raises(self):
+        # "module" was renamed to "file" -- an old config still using
+        # strategy="module" must fail loudly, not be silently aliased.
+        with self.assertRaises(ValueError):
+            load_grouping_dimensions(
+                {"grouping": {"dimensions": [{"name": "module", "strategy": "module"}]}}
+            )
+
     def test_missing_name_or_strategy_raises(self):
         with self.assertRaises(ValueError):
-            load_grouping_dimensions({"grouping": {"dimensions": [{"strategy": "module"}]}})
+            load_grouping_dimensions({"grouping": {"dimensions": [{"strategy": "file"}]}})
         with self.assertRaises(ValueError):
             load_grouping_dimensions({"grouping": {"dimensions": [{"name": "x"}]}})
 
@@ -117,7 +125,7 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
 
     def test_empty_grouping_table_raises_same_as_explicit_empty_dimensions(self):
         # A bare [ctrlrunner.grouping] header with no keys at all
-        # is falsy and today silently returns the module default -- but
+        # is falsy and today silently returns the file default -- but
         # an explicit `dimensions = []` already (correctly) raises.
         # Both are "the user configured grouping and got nothing usable"
         # and must fail the same way.
@@ -129,7 +137,7 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
             {
                 "grouping": {
                     "dimensions": [
-                        {"name": "module", "strategy": "module"},
+                        {"name": "file", "strategy": "file"},
                         {"name": "suite", "strategy": "path", "depth": 1},
                         {"name": "team", "strategy": "tag_prefix", "prefix": "team_"},
                         {"name": "owner", "strategy": "property", "key": "owner"},
@@ -142,10 +150,17 @@ class LoadGroupingDimensionsTests(unittest.TestCase):
 
 
 class ComputeGroupsTests(unittest.TestCase):
-    def test_module_strategy_matches_old_hardcoded_split(self):
+    def test_file_strategy_derives_relative_path_from_dotted_id(self):
         item = _item(id_="pkg.mod::test_x[chromium]")
-        groups = compute_groups(item, [GroupingDimension(name="module", strategy="module")])
-        self.assertEqual(groups, {"module": "pkg.mod"})
+        groups = compute_groups(item, [GroupingDimension(name="file", strategy="file")])
+        self.assertEqual(groups, {"file": "pkg/mod.py"})
+
+    def test_file_strategy_needs_no_source_path(self):
+        # Unlike the "path" strategy, "file" reads only item.id -- a
+        # bare TestItem with source_path=None still resolves correctly.
+        item = _item(id_="examples.test_selftest::test_hangs", source_path=None)
+        groups = compute_groups(item, [GroupingDimension(name="file", strategy="file")])
+        self.assertEqual(groups, {"file": "examples/test_selftest.py"})
 
     def test_path_strategy_worked_example_from_the_plan(self):
         # the plan's own motivating example: tests/web/cases/... -> "cases"
@@ -206,7 +221,7 @@ class ComputeGroupsTests(unittest.TestCase):
             properties={"owner": "alice"},
         )
         dims = [
-            GroupingDimension(name="module", strategy="module"),
+            GroupingDimension(name="file", strategy="file"),
             GroupingDimension(name="suite", strategy="path", options={"depth": 0}),
             GroupingDimension(name="team", strategy="tag_prefix", options={"prefix": "team_"}),
             GroupingDimension(name="owner", strategy="property", options={"key": "owner"}),
@@ -215,7 +230,7 @@ class ComputeGroupsTests(unittest.TestCase):
         self.assertEqual(
             groups,
             {
-                "module": "pkg.mod",
+                "file": "pkg/mod.py",
                 "suite": "web",
                 "team": "backend",
                 "owner": "alice",

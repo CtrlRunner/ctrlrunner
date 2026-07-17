@@ -4,18 +4,17 @@ A generic grouping strategy system for the HTML report / UI Mode, replacing the 
 html_report.py's and ui_frontend.py's JS (a duplication risk: the two
 could silently drift in how they parsed test_id).
 
-"module" stays the always-available default dimension when no
-`[grouping]` config exists at all -- zero config, zero behavior change,
-identical to the old hardcoded split. A `[grouping]` section otherwise
-uses whatever dimensions are listed, but "module" is always force-added
-(prepended, not duplicated) if the user's list omits it -- module is
-"always present ... for backward compatibility" (every existing
+"file" stays the always-available default dimension when no
+`[grouping]` config exists at all -- it groups by the test's relative
+source-file path (e.g. "examples/test_x.py"). A `[grouping]` section
+otherwise uses whatever dimensions are listed, but "file" is always
+force-added (prepended, not duplicated) if the user's list omits it --
+it's "always present ... for backward compatibility" (every existing
 consumer, including the HTML report's default grouped view, relies on
 it), so an incomplete custom dimension list must not silently drop it.
 The one deliberate exception: an explicitly PRESENT but empty
-`dimensions = []` is user intent gone wrong, not "omitted module" --
-it still raises (see below) rather than being "fixed" by auto-adding
-module.
+`dimensions = []` is user intent gone wrong, not "omitted file" -- it
+still raises (see below) rather than being "fixed" by auto-adding file.
 """
 
 from dataclasses import dataclass, field
@@ -25,23 +24,23 @@ from ..core.registry import TestItem
 
 UNGROUPED = "ungrouped"
 
-_VALID_STRATEGIES = {"module", "path", "tag_prefix", "property"}
+_VALID_STRATEGIES = {"file", "path", "tag_prefix", "property"}
 
 
 @dataclass
 class GroupingDimension:
     name: str
-    strategy: str  # "module" | "path" | "tag_prefix" | "property"
+    strategy: str  # "file" | "path" | "tag_prefix" | "property"
     options: dict = field(default_factory=dict)
 
 
-DEFAULT_DIMENSIONS = [GroupingDimension(name="module", strategy="module")]
+DEFAULT_DIMENSIONS = [GroupingDimension(name="file", strategy="file")]
 
 
 def load_grouping_dimensions(config: dict) -> list[GroupingDimension]:
-    """Returns DEFAULT_DIMENSIONS (just "module") if `[grouping]` is
-    absent from config entirely -- the zero-config, zero-behavior-change
-    default. Raises ValueError immediately (not per-test, later) for an
+    """Returns DEFAULT_DIMENSIONS (just "file") if `[grouping]` is
+    absent from config entirely -- the zero-config default. Raises
+    ValueError immediately (not per-test, later) for an
     unknown strategy or a strategy missing its required option, so a
     config typo fails fast at startup rather than silently mis-grouping
     every test in the run. An explicitly PRESENT but empty [grouping]
@@ -97,13 +96,19 @@ def load_grouping_dimensions(config: dict) -> list[GroupingDimension]:
     if not dimensions:
         raise ValueError("[grouping] section present but 'dimensions' is empty.")
 
-    if not any(d.name == "module" for d in dimensions):
-        dimensions.insert(0, GroupingDimension(name="module", strategy="module"))
+    if not any(d.name == "file" for d in dimensions):
+        dimensions.insert(0, GroupingDimension(name="file", strategy="file"))
     return dimensions
 
 
-def _group_by_module(item: TestItem) -> str:
-    return item.id.partition("::")[0]
+def group_by_file(item: TestItem) -> str:
+    """The test's relative source-file path (e.g. "examples/test_x.py"),
+    derived from the dotted module prefix of item.id -- func.__module__
+    is already computed relative to the test root at import time (see
+    orchestrator.py's _dotted_module_name), so converting dots to
+    slashes and appending ".py" reproduces the real relative path
+    without any further filesystem/root handling here."""
+    return item.id.partition("::")[0].replace(".", "/") + ".py"
 
 
 def _group_by_path(item: TestItem, depth: int, root: str | None) -> str:
@@ -139,8 +144,8 @@ def compute_groups(
 ) -> dict[str, str]:
     groups = {}
     for dim in dimensions:
-        if dim.strategy == "module":
-            groups[dim.name] = _group_by_module(item)
+        if dim.strategy == "file":
+            groups[dim.name] = group_by_file(item)
         elif dim.strategy == "path":
             groups[dim.name] = _group_by_path(item, dim.options["depth"], root)
         elif dim.strategy == "tag_prefix":

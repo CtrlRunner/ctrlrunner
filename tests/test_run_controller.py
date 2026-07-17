@@ -158,14 +158,14 @@ class RunControllerTests(unittest.TestCase):
         self.assertTrue(rc.wait_until_idle(timeout=10))
         self.assertEqual(list(rc._last_results.values())[0].outcome, "cancelled")
 
-    def test_list_tests_includes_groups_computed_by_default_module_dimension(self):
+    def test_list_tests_includes_groups_computed_by_default_file_dimension(self):
         rc = self._make()
         tests = rc.list_tests()
-        self.assertTrue(all("groups" in t and "module" in t["groups"] for t in tests))
+        self.assertTrue(all("groups" in t and "file" in t["groups"] for t in tests))
 
-    def test_dimension_names_defaults_to_module(self):
+    def test_dimension_names_defaults_to_file(self):
         rc = self._make()
-        self.assertEqual(rc.dimension_names(), ["module"])
+        self.assertEqual(rc.dimension_names(), ["file"])
 
     def test_custom_grouping_dimensions_used_for_list_and_names(self):
         from ctrlrunner.reporting.grouping import GroupingDimension
@@ -177,7 +177,7 @@ class RunControllerTests(unittest.TestCase):
         self.assertEqual(rc.dimension_names(), ["team"])
         tests = rc.list_tests()
         self.assertTrue(all("team" in t["groups"] for t in tests))
-        self.assertTrue(all("module" not in t["groups"] for t in tests))
+        self.assertTrue(all("file" not in t["groups"] for t in tests))
 
     def test_cancel_without_a_run_does_not_raise(self):
         rc = self._make()

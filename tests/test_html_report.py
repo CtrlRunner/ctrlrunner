@@ -178,19 +178,19 @@ class HtmlReportTests(unittest.TestCase):
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod", "team": "backend"},
+                groups={"file": "mod.py", "team": "backend"},
             ),
             Result(
                 test_id="mod::b",
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod", "team": "frontend", "owner": "bob"},
+                groups={"file": "mod.py", "team": "frontend", "owner": "bob"},
             ),
         ]
         out = render_html(results)
         data = _extract_embedded_data(out)
-        self.assertEqual(data["dimensions"], ["module", "team", "owner"])
+        self.assertEqual(data["dimensions"], ["file", "team", "owner"])
 
     def test_dimensions_list_empty_when_no_groups_present(self):
         results = [Result(test_id="mod::a", outcome="passed", error=None, duration=0.1)]
@@ -205,12 +205,12 @@ class HtmlReportTests(unittest.TestCase):
                 outcome="passed",
                 error=None,
                 duration=0.1,
-                groups={"module": "mod"},
+                groups={"file": "mod.py"},
             )
         ]
         out = render_html(results)
         data = _extract_embedded_data(out)
-        self.assertEqual(data["tests"][0]["groups"], {"module": "mod"})
+        self.assertEqual(data["tests"][0]["groups"], {"file": "mod.py"})
 
     def test_invalid_artifact_mode_raises(self):
         with self.assertRaises(ValueError):

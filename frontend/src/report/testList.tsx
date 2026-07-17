@@ -17,6 +17,20 @@ import {
 
 const AUTO_EXPAND_LIMIT = 200;
 
+// Strips the file/module prefix (before the first "::") and, for
+// class-based tests, the class name too (before the last "." that
+// precedes a parametrize "[...]" suffix, so params containing dots
+// like "[1.5]" are never mistaken for the class separator).
+function testDisplayName(id: string): string {
+  const idx = id.indexOf('::');
+  const afterFile = idx === -1 ? id : id.slice(idx + 2);
+  const bracketIdx = afterFile.indexOf('[');
+  const base = bracketIdx === -1 ? afterFile : afterFile.slice(0, bracketIdx);
+  const suffix = bracketIdx === -1 ? '' : afterFile.slice(bracketIdx);
+  const dotIdx = base.lastIndexOf('.');
+  return (dotIdx === -1 ? base : base.slice(dotIdx + 1)) + suffix;
+}
+
 function DimensionSwitcher({ model }: { model: ReportModel }) {
   const params = useSearchParams();
   const dims = model.report.dimensions;
@@ -76,79 +90,88 @@ function GroupSummaryTable({ model }: { model: ReportModel }) {
   const [open, setOpen] = React.useState(false);
   if (model.groups.length < 2) return null;
   const q = params.get('q') || '';
+  const sortedGroups = [...model.groups].sort((a, b) => a.label.localeCompare(b.label));
   return (
     <div className="group-summary">
       <button className="group-summary-toggle" type="button" onClick={() => setOpen(!open)}>
         {open ? 'Hide' : 'Show'} summary by {model.activeDimension}
       </button>
       {open ? (
-        <table className="group-summary-table">
-          <thead>
-            <tr>
-              <th>{model.activeDimension}</th>
-              <th>Total</th>
-              <th>Passed</th>
-              <th>Failed</th>
-              <th>Skipped</th>
-              <th>Expected failure</th>
-              <th>Quarantined</th>
-              <th>Pass rate</th>
-              <th>Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {model.groups.map((g) => {
-              const token = `g:${model.activeDimension}=${g.label}`;
-              const href = hashFor(withParam(params, 'q', filterWithToken(q, token, false)));
-              return (
-                <tr key={g.label}>
-                  <td>
-                    <Link href={href}>{g.label}</Link>
-                  </td>
-                  <td>{g.stats.total}</td>
-                  <td className={g.stats.passed ? 'cell-passed' : 'cell-zero'}>{g.stats.passed}</td>
-                  <td className={g.stats.failed ? 'cell-failed' : 'cell-zero'}>{g.stats.failed}</td>
-                  <td className={g.stats.skipped ? '' : 'cell-zero'}>{g.stats.skipped}</td>
-                  <td className={g.stats.expectedFailure ? '' : 'cell-zero'}>
-                    {g.stats.expectedFailure}
-                  </td>
-                  <td className={g.stats.quarantined ? 'cell-quarantined' : 'cell-zero'}>
-                    {g.stats.quarantined}
-                  </td>
-                  <td className={passRateClass(passRate(g.stats))}>
-                    {formatPassRate(passRate(g.stats))}
-                  </td>
-                  <td>{formatDuration(g.stats.duration)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td>{model.filteredStats.total}</td>
-              <td className={model.filteredStats.passed ? 'cell-passed' : 'cell-zero'}>
-                {model.filteredStats.passed}
-              </td>
-              <td className={model.filteredStats.failed ? 'cell-failed' : 'cell-zero'}>
-                {model.filteredStats.failed}
-              </td>
-              <td className={model.filteredStats.skipped ? '' : 'cell-zero'}>
-                {model.filteredStats.skipped}
-              </td>
-              <td className={model.filteredStats.expectedFailure ? '' : 'cell-zero'}>
-                {model.filteredStats.expectedFailure}
-              </td>
-              <td className={model.filteredStats.quarantined ? 'cell-quarantined' : 'cell-zero'}>
-                {model.filteredStats.quarantined}
-              </td>
-              <td className={passRateClass(passRate(model.filteredStats))}>
-                {formatPassRate(passRate(model.filteredStats))}
-              </td>
-              <td>{formatDuration(model.filteredStats.duration)}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <div className="group-summary-table-wrap">
+          <table className="group-summary-table">
+            <thead>
+              <tr>
+                <th>{model.activeDimension}</th>
+                <th>Total</th>
+                <th>Passed</th>
+                <th>Failed</th>
+                <th>Skipped</th>
+                <th>Expected failure</th>
+                <th>Quarantined</th>
+                <th>Pass rate</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedGroups.map((g) => {
+                const token = `g:${model.activeDimension}=${g.label}`;
+                const href = hashFor(withParam(params, 'q', filterWithToken(q, token, false)));
+                return (
+                  <tr key={g.label}>
+                    <td>
+                      <Link className="group-summary-table-label" href={href} title={g.label}>
+                        {g.label}
+                      </Link>
+                    </td>
+                    <td>{g.stats.total}</td>
+                    <td className={g.stats.passed ? 'cell-passed' : 'cell-zero'}>
+                      {g.stats.passed}
+                    </td>
+                    <td className={g.stats.failed ? 'cell-failed' : 'cell-zero'}>
+                      {g.stats.failed}
+                    </td>
+                    <td className={g.stats.skipped ? '' : 'cell-zero'}>{g.stats.skipped}</td>
+                    <td className={g.stats.expectedFailure ? '' : 'cell-zero'}>
+                      {g.stats.expectedFailure}
+                    </td>
+                    <td className={g.stats.quarantined ? 'cell-quarantined' : 'cell-zero'}>
+                      {g.stats.quarantined}
+                    </td>
+                    <td className={passRateClass(passRate(g.stats))}>
+                      {formatPassRate(passRate(g.stats))}
+                    </td>
+                    <td>{formatDuration(g.stats.duration)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td>{model.filteredStats.total}</td>
+                <td className={model.filteredStats.passed ? 'cell-passed' : 'cell-zero'}>
+                  {model.filteredStats.passed}
+                </td>
+                <td className={model.filteredStats.failed ? 'cell-failed' : 'cell-zero'}>
+                  {model.filteredStats.failed}
+                </td>
+                <td className={model.filteredStats.skipped ? '' : 'cell-zero'}>
+                  {model.filteredStats.skipped}
+                </td>
+                <td className={model.filteredStats.expectedFailure ? '' : 'cell-zero'}>
+                  {model.filteredStats.expectedFailure}
+                </td>
+                <td className={model.filteredStats.quarantined ? 'cell-quarantined' : 'cell-zero'}>
+                  {model.filteredStats.quarantined}
+                </td>
+                <td className={passRateClass(passRate(model.filteredStats))}>
+                  {formatPassRate(passRate(model.filteredStats))}
+                </td>
+                <td>{formatDuration(model.filteredStats.duration)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       ) : null}
     </div>
   );
@@ -163,6 +186,7 @@ function TestRow({ test }: { test: TestData }) {
   const hasTrace = test.artifacts?.some((a) => a.label.endsWith('.zip'));
   const hasSubRow =
     test.caseId ||
+    test.groups.file ||
     test.tags.length > 0 ||
     test.quarantined ||
     test.nearTimeout ||
@@ -174,13 +198,18 @@ function TestRow({ test }: { test: TestData }) {
       <div className="test-row-main">
         <StatusIcon outcome={test.outcome} />
         <Link className="test-row-title mono" href={detailHref}>
-          {test.id}
+          {testDisplayName(test.id)}
         </Link>
         <span className="test-row-duration">{formatDuration(test.duration)}</span>
       </div>
       {hasSubRow ? (
         <div className="test-row-sub">
           {test.caseId ? <span className="test-row-case mono">{test.caseId}</span> : null}
+          {test.groups.file ? (
+            <span className="test-row-path mono" title={test.groups.file}>
+              {test.groups.file}
+            </span>
+          ) : null}
           <LabelsRow test={test} />
           {test.quarantined ? (
             <span className="flag" title={test.quarantineReason || 'no reason given'}>
