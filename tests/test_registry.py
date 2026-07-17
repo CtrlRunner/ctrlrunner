@@ -379,15 +379,27 @@ class TestClassTests(unittest.TestCase):
         self.assertTrue(item.id.endswith("::top_level_test"))
         self.assertIsNone(item.class_name)
 
-    def test_self_is_bound_to_none_not_a_real_instance(self):
+    def test_self_is_class_proxy_inside_test_class(self):
+        # self is a _ClassProxy, not a real instance -- but class-level
+        # constants are readable through it.
         @registry.test_class()
         class Suite:
+            CONSTANT = 42
+
             @registry.test()
             def test_a(self):
-                assert self is None
+                assert self.CONSTANT == 42
 
-        item = registry.get_tests()[0]
-        item.func()  # must not raise
+        registry.get_tests()[0].func()  # must not raise
+
+    def test_self_outside_test_class_is_none(self):
+        # A standalone @test function whose first param is named 'self'
+        # (no enclosing @test_class) still gets None -- old behavior preserved.
+        @registry.test()
+        def test_standalone(self):
+            assert self is None
+
+        registry.get_tests()[0].func()  # must not raise
 
     def test_self_does_not_leak_into_fixture_resolution_params(self):
         @registry.test_class()

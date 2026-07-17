@@ -39,6 +39,33 @@ _tests: list["TestItem"] = []
 _test_ids: set[str] = set()
 
 
+class _ClassProxy:
+    """Passed as 'self' to @test methods inside a @test_class.
+
+    Reads fall through to the owning class, so class-level constants
+    (EXPECTED_COLUMNS = [...], BASE_URL = "...") are accessible via
+    self.CONSTANT without instantiating the class.
+
+    Writes always raise AttributeError -- the no-instance-state
+    invariant is fully preserved.
+    """
+
+    __slots__ = ("_cls",)
+
+    def __init__(self, cls: type) -> None:
+        object.__setattr__(self, "_cls", cls)
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(object.__getattribute__(self, "_cls"), name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError(
+            f"@test methods may not write to 'self' (attempted: self.{name} = ...). "
+            f"Classes decorated with @test_class are metadata containers -- "
+            f"class-level constants are readable via self, but instance state is forbidden."
+        )
+
+
 @dataclass
 class Fixture:
     name: str
@@ -519,7 +546,18 @@ def test(
         # than just documenting it as a convention.
         has_self = bool(raw_sig_params) and raw_sig_params[0] == "self"
         sig_params = raw_sig_params[1:] if has_self else raw_sig_params
-        call_target = (lambda *a, **kw: func(None, *a, **kw)) if has_self else func
+        if has_self:
+            _class_ref: list[type | None] = [None]
+
+            def call_target(*a: Any, **kw: Any) -> Any:
+                proxy: _ClassProxy | None = (
+                    _ClassProxy(_class_ref[0]) if _class_ref[0] is not None else None
+                )
+                return func(proxy, *a, **kw)
+
+            call_target.__dict__["_class_ref"] = _class_ref
+        else:
+            call_target = func
 
         explicit_param_sets = getattr(func, "_param_sets", None) or [_ParamSet()]
         base_properties = properties or {}
@@ -863,6 +901,16 @@ def test_class(
                     # single-attempt; the group loop owns all retrying.
                     None if serial else retries,
                 )
+                # Inject the owning class so 'self' becomes a _ClassProxy(cls),
+                # allowing reads of class-level constants. Unwrap functools.partial
+                # first: parametrized items store a partial wrapping the original
+                # call_target, and the _class_ref slot lives on call_target itself.
+                _base_func = item.func
+                if isinstance(_base_func, functools.partial):
+                    _base_func = _base_func.func
+                _class_ref_slot = getattr(_base_func, "_class_ref", None)
+                if _class_ref_slot is not None:
+                    _class_ref_slot[0] = cls
                 if serial:
                     module = item.id.split("::")[0]
                     item.serial_group = f"{module}::{cls.__name__}"
