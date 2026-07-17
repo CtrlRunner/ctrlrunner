@@ -137,6 +137,8 @@
   "135": "origin_allowed",
   "136": "Param Metadata Execution Tests",
   "137": "SingleProjectRunUnchangedTests",
+  "138": "ChunkTests",
+  "139": "SingleProjectRunUnchangedTests",
   "140": "test_reporter.py",
   "142": "ui_server.py",
   "143": "Config Package Docstring",

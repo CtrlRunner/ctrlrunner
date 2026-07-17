@@ -60,6 +60,8 @@ def _summary_lines(results, duration):
         if r.outcome == "failed":
             suffix = f"  [{r.case_id}]" if r.case_id else ""
             lines.append(f"  \u2717 {r.test_id}{suffix}")
+            if r.error:
+                lines.extend(f"      {line}" for line in r.error.splitlines())
 
     by_module: dict[str, list] = {}
     for r in results:

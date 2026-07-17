@@ -50,6 +50,28 @@ class DotsReporterTests(unittest.TestCase):
         self.assertTrue(output.startswith(".F"))
         self.assertIn("2 tests, 1 passed, 1 failed", output)
         self.assertIn("mod::b", output)
+        self.assertIn("      boom", output)
+
+    def test_prints_multiline_error_indented_under_failure(self):
+        reporter = DotsReporter()
+        results = [
+            Result(
+                test_id="mod::c",
+                outcome="failed",
+                error="Traceback (most recent call last):\n  File x\nValueError: boom",
+                duration=0.1,
+            ),
+        ]
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            for r in results:
+                reporter.on_test_end(r)
+            reporter.on_run_end(results, 0.5)
+        output = buf.getvalue()
+        self.assertIn("  ✗ mod::c", output)
+        self.assertIn("      Traceback (most recent call last):", output)
+        self.assertIn("        File x", output)
+        self.assertIn("      ValueError: boom", output)
 
     def test_prints_distinct_symbols_for_skip_fixme_xfail(self):
         reporter = DotsReporter()
@@ -81,6 +103,7 @@ class LineReporterTests(unittest.TestCase):
         self.assertIn("[2/2] mod::b", output)
         self.assertIn("\u2717 mod::b", output)
         self.assertIn("1 passed, 1 failed", output)
+        self.assertIn("      boom", output)
 
     def test_retry_attempts_do_not_inflate_counter_past_total(self):
         reporter = LineReporter()

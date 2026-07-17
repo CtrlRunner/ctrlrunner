@@ -193,12 +193,13 @@ pre,
 /* Label pills */
 .label {
   display: inline-block;
+  max-width: 260px;
   padding: 1px 9px;
   border-radius: 2em;
   font-size: 11.5px;
   font-weight: 600;
   line-height: 18px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   cursor: pointer;
   border: 1px solid transparent;
 }
