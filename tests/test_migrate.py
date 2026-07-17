@@ -389,9 +389,7 @@ class IndirectParametrizeTests(MigrateTestCase):
     def test_fixture_without_request_gets_one_added(self):
         _, out = self.migrate(
             {
-                "conftest.py": (
-                    "import pytest\n\n@pytest.fixture\ndef user():\n    return 1\n"
-                ),
+                "conftest.py": ("import pytest\n\n@pytest.fixture\ndef user():\n    return 1\n"),
                 "test_a.py": (
                     "import pytest\n\n"
                     '@pytest.mark.parametrize("user", [1, 2], indirect=True)\n'
@@ -508,9 +506,7 @@ class MixedIndirectParametrizeTests(MigrateTestCase):
                 ),
             }
         )
-        self.assertIn(
-            '@parametrize("a,b", [(1, 10), (2, 20)], indirect=True)', out["test_a.py"]
-        )
+        self.assertIn('@parametrize("a,b", [(1, 10), (2, 20)], indirect=True)', out["test_a.py"])
         self.assertFalse(
             any("indirect parametrize" in msg for f in report.files for _, msg in f.todos)
         )
@@ -566,7 +562,7 @@ class MixedIndirectParametrizeTests(MigrateTestCase):
         # bare pytest.param rows collapse to plain tuples; id= survives
         # via ctrlrunner's param() -- same conversion as direct
         # parametrize, now applied inside an indirect one too
-        self.assertIn("indirect=[\"user\"]", code)
+        self.assertIn('indirect=["user"]', code)
         self.assertNotIn("pytest.param", code)
         self.assertIn("param(2, 'b', id='two')", code)
 
@@ -974,7 +970,7 @@ class AddMarkerTests(MigrateTestCase):
                     "def test_one(request):\n"
                     "    def helper():\n"
                     "        return 1\n"
-                    '    request.node.add_marker(pytest.mark.test_case_id(str(helper())))\n'
+                    "    request.node.add_marker(pytest.mark.test_case_id(str(helper())))\n"
                     "    assert True\n"
                 )
             }
@@ -1088,14 +1084,14 @@ class CustomMarkerWithArgsTests(MigrateTestCase):
             {
                 "test_a.py": (
                     "import pytest\n\n"
-                    '@pytest.mark.ff_export_guard(FeatureFlags.X)\n'
+                    "@pytest.mark.ff_export_guard(FeatureFlags.X)\n"
                     "def test_one():\n"
                     "    assert True\n"
                 )
             }
         )
         code = out["test_a.py"]
-        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        decorator_line = next(line for line in code.splitlines() if line.startswith("@test("))
         self.assertIn("tags={'ff_export_guard'}", decorator_line)
         self.assertNotIn("properties=", decorator_line)
         # the argument is gone from the decorator itself (it may still be
@@ -1115,7 +1111,7 @@ class CustomMarkerWithArgsTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        decorator_line = next(line for line in code.splitlines() if line.startswith("@test("))
         self.assertIn("tags={'testrail'}", decorator_line)
         self.assertNotIn("properties=", decorator_line)
         self.assertTrue(any("dropped" in msg for f in report.files for _, msg in f.todos))
@@ -1132,7 +1128,7 @@ class CustomMarkerWithArgsTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        decorator_line = next(l for l in code.splitlines() if l.startswith("@test("))
+        decorator_line = next(line for line in code.splitlines() if line.startswith("@test("))
         self.assertIn("tags={'testrail'}", decorator_line)
         self.assertNotIn("properties=", decorator_line)
         self.assertTrue(any("dropped" in msg for f in report.files for _, msg in f.todos))
@@ -1245,9 +1241,7 @@ class ClassLevelMarkerDistributionTests(MigrateTestCase):
         # class-level indirect parametrize is replayed per-method as a
         # verbatim @parametrize(..., indirect=True) on each method
         code = out["test_a.py"]
-        self.assertEqual(
-            code.count('@parametrize("user", [1, 2], indirect=True)'), 2
-        )
+        self.assertEqual(code.count('@parametrize("user", [1, 2], indirect=True)'), 2)
         # values stay on the tests -- nothing moves to the fixture
         self.assertNotIn("params=", out["conftest.py"])
 
@@ -1265,7 +1259,7 @@ class ClassLevelMarkerDistributionTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        method_line = next(l for l in code.splitlines() if "def test_one" in l)
+        method_line = next(line for line in code.splitlines() if "def test_one" in line)
         self.assertEqual(method_line.count("db"), 1)
 
     def test_timeout_and_flaky_still_go_to_test_class_unchanged(self):

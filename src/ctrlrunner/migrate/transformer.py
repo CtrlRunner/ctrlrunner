@@ -838,8 +838,7 @@ class MigrationTransformer(cst.CSTTransformer):
             # injections check). No value relocation, no conflict
             # analysis, no bail-outs.
             plan.parametrize_srcs.append(
-                f"parametrize({_code(argnames)}, {_code(new_values)}, "
-                f"indirect={_code(indirect)})"
+                f"parametrize({_code(argnames)}, {_code(new_values)}, indirect={_code(indirect)})"
             )
             self.report.add("indirect")
         else:

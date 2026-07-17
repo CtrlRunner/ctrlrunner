@@ -869,9 +869,7 @@ class IndirectParametrizeTests(unittest.TestCase):
 
         items = registry.get_tests()
         self.assertEqual(len(items), 2)
-        self.assertEqual(
-            sorted(i.fixture_param_overrides["user"] for i in items), [1, 2]
-        )
+        self.assertEqual(sorted(i.fixture_param_overrides["user"] for i in items), [1, 2])
         for item in items:
             # the fixture stays injectable -- its resolved VALUE reaches
             # the test as the kwarg, so 'user' must remain in params and
@@ -880,9 +878,7 @@ class IndirectParametrizeTests(unittest.TestCase):
             self.assertNotIsInstance(item.func, functools.partial)
             # indirect values still drive ids and param_values
             self.assertIn(str(item.fixture_param_overrides["user"]), item.id)
-            self.assertEqual(
-                item.param_values["user"], item.fixture_param_overrides["user"]
-            )
+            self.assertEqual(item.param_values["user"], item.fixture_param_overrides["user"])
 
     def test_mixed_direct_and_indirect_names_split_routing(self):
         import functools
