@@ -108,10 +108,6 @@ export function HeaderView({ model }: { model: ReportModel }) {
           {report.suiteName}
         </h1>
         <PassRateBadge rate={passRate(stats)} />
-        <span className="report-meta">
-          {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
-          {formatMetaDuration(report)}
-        </span>
         <button
           className="theme-toggle"
           type="button"
@@ -136,6 +132,10 @@ export function HeaderView({ model }: { model: ReportModel }) {
           Timeline
         </button>
       </div>
+      <span className="report-meta">
+        {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
+        {formatMetaDuration(report)}
+      </span>
       {report.coverage ? (
         <div className="coverage-summary">
           Coverage: {report.coverage.percent.toFixed(1)}%

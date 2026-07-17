@@ -161,32 +161,46 @@ function TestRow({ test }: { test: TestData }) {
     (a) => a.href.startsWith('data:image/') || /\.(png|jpe?g|gif|webp)$/i.test(a.label),
   );
   const hasTrace = test.artifacts?.some((a) => a.label.endsWith('.zip'));
+  const hasSubRow =
+    test.caseId ||
+    test.tags.length > 0 ||
+    test.quarantined ||
+    test.nearTimeout ||
+    hasImage ||
+    hasTrace ||
+    test.attempts > 1;
   return (
     <div className="test-row">
-      <StatusIcon outcome={test.outcome} />
-      <Link className="test-row-title mono" href={detailHref}>
-        {test.id}
-      </Link>
-      {test.caseId ? <span className="test-row-case mono">{test.caseId}</span> : null}
-      <LabelsRow test={test} />
-      {test.quarantined ? (
-        <span className="flag" title={test.quarantineReason || 'no reason given'}>
-          quarantined
-        </span>
+      <div className="test-row-main">
+        <StatusIcon outcome={test.outcome} />
+        <Link className="test-row-title mono" href={detailHref}>
+          {test.id}
+        </Link>
+        <span className="test-row-duration">{formatDuration(test.duration)}</span>
+      </div>
+      {hasSubRow ? (
+        <div className="test-row-sub">
+          {test.caseId ? <span className="test-row-case mono">{test.caseId}</span> : null}
+          <LabelsRow test={test} />
+          {test.quarantined ? (
+            <span className="flag" title={test.quarantineReason || 'no reason given'}>
+              quarantined
+            </span>
+          ) : null}
+          {test.nearTimeout ? (
+            <span className="flag" title="Finished at or above 80% of its configured timeout">
+              near timeout
+            </span>
+          ) : null}
+          {hasImage ? <ImageIcon className="row-media" title="Has screenshots" /> : null}
+          {hasTrace ? <TraceIcon className="row-media" title="Has a trace" /> : null}
+          {test.attempts > 1 ? (
+            <span className="flag flag-info" title="Number of attempts">
+              ×{test.attempts}
+            </span>
+          ) : null}
+        </div>
       ) : null}
-      {test.nearTimeout ? (
-        <span className="flag" title="Finished at or above 80% of its configured timeout">
-          near timeout
-        </span>
-      ) : null}
-      {hasImage ? <ImageIcon className="row-media" title="Has screenshots" /> : null}
-      {hasTrace ? <TraceIcon className="row-media" title="Has a trace" /> : null}
-      {test.attempts > 1 ? (
-        <span className="flag flag-info" title="Number of attempts">
-          ×{test.attempts}
-        </span>
-      ) : null}
-      <span className="test-row-duration">{formatDuration(test.duration)}</span>
     </div>
   );
 }

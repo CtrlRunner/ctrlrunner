@@ -41,9 +41,11 @@
 }
 
 .report-meta {
+  display: block;
   color: var(--muted);
   font-size: 12.5px;
-  flex: 1;
+  margin-top: 4px;
+  white-space: nowrap;
 }
 
 .theme-toggle {
@@ -246,8 +248,8 @@
 
 .test-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 7px 12px;
   border-bottom: 1px solid var(--border-muted);
   min-width: 0;
@@ -259,6 +261,23 @@
 
 .test-row:hover {
   background: var(--hover-bg);
+}
+
+.test-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Aligned under the title, past the status icon (icon width + gap). */
+.test-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 22px;
+  min-width: 0;
 }
 
 .test-row-title {
