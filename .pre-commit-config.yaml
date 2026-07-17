@@ -1,0 +1,26 @@
+# Mirrors the "lint" job in .github/workflows/*.yml (ruff check, ruff
+# format --check, ty check) so failures are caught locally before push
+# instead of burning a CI cycle. Local hooks run through `uv run` so
+# they always use this project's pinned ruff/ty versions (pyproject.toml)
+# rather than a separately pinned hook-repo revision that could drift.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        files: \.py$
+      - id: ruff-format-check
+        name: ruff format --check
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        files: \.py$
+      - id: ty-check
+        name: ty check
+        entry: uv run ty check
+        language: system
+        pass_filenames: false
+        files: \.py$

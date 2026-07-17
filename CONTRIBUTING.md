@@ -32,6 +32,10 @@ uv run ty check           # type check (src/ctrlrunner/ only; see [tool.ty.src])
 
 Config for all three lives in `pyproject.toml` (`[tool.ruff]`, `[tool.ty]`).
 
+Optionally, run `uv run pre-commit install` once to wire these three checks up as a git
+pre-commit hook (`.pre-commit-config.yaml`) — same commands CI's `lint` job runs, so
+failures surface locally in seconds instead of after a push.
+
 ## Before opening a PR
 
 - `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check`, and
