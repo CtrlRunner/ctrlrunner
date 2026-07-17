@@ -158,6 +158,13 @@ class ConfigValidationTests(unittest.TestCase):
         # in ctrlrunner.toml must not trigger the "typo?" warning.
         cfg, warns = self._load("[ctrlrunner]\nimport_timeout = 120.0\n")
         self.assertEqual(cfg, {"import_timeout": 120.0})
+
+    def test_options_table_is_known_and_produces_no_warning(self):
+        cfg, warns = self._load(
+            '[ctrlrunner]\n[ctrlrunner.options]\nenv = "staging"\npersona = "US"\n'
+        )
+        self.assertEqual(cfg["options"], {"env": "staging", "persona": "US"})
+        self.assertEqual(warns, [])
         self.assertEqual(warns, [])
 
     def test_default_warn_goes_to_stderr(self):

@@ -219,8 +219,8 @@ def _show_report(argv):
         sys.exit(1)
 
 
-def _ui(argv):
-    parser = argparse.ArgumentParser(prog="ctrlrunner ui")
+def _build_ui_parser(add_help: bool = True) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="ctrlrunner ui", add_help=add_help)
     parser.add_argument("root", nargs="?", default=None, help="Directory to discover tests in")
     parser.add_argument("-n", "--num-workers", type=_num_workers_arg, default=None)
     parser.add_argument("--timeout", type=float, default=None)
@@ -252,10 +252,52 @@ def _ui(argv):
         help="Run browsers headed. --no-headed explicitly forces headless, "
         "overriding a truthy ctrlrunner.toml 'headed' (default: headless)",
     )
+    return parser
+
+
+def _ui(argv):
+    from .config.addoption import AddoptionError, collect_declarations
+    from .core.options import set_options
+
+    # Same two-phase parse as the run command (see _parse_run_args /
+    # _guess_root): conftests are imported to learn ctrlrunner_addoption
+    # flags, then the real parser (with those flags materialized)
+    # parses argv. root is found via _guess_root rather than trusted
+    # from this first parse_known_args, since it's the token vulnerable
+    # to argparse's positional-run ambiguity against unknown flags.
+    base_parser = _build_ui_parser(add_help=False)
+    args_a, _unknown = base_parser.parse_known_args(argv)
+    config_a = load_config(args_a.config)
+    guessed_root = _guess_root(argv, base_parser)
+
+    try:
+        shim = collect_declarations([guessed_root or config_a.get("root") or "tests"])
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as e:
+        print(
+            f"Error: while importing conftest for option declarations: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    parser = _build_ui_parser(add_help=True)
+    try:
+        shim.apply_to(parser)
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
     args = parser.parse_args(argv)
 
     config = load_config(args.config)
     root = args.root or config.get("root") or "tests"
+    try:
+        options = shim.resolve(config.get("options", {}), args)
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    set_options(options)
     num_workers, worker_constraints, fully_parallel = _resolve_worker_settings(args, config)
     timeout = args.timeout if args.timeout is not None else config.get("timeout", 30.0)
     headed = args.headed if args.headed is not None else config.get("headed", False)
@@ -292,6 +334,7 @@ def _ui(argv):
         open_browser=not args.no_browser,
         block=True,
         playwright_config=playwright_config,
+        options=options,
         tag_registry=tag_registry,
         grouping_dimensions=grouping_dimensions,
         quarantine=quarantine_config,
@@ -367,7 +410,18 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "flaky-report":
         return _flaky_report(sys.argv[2:])
 
-    parser = argparse.ArgumentParser(prog="ctrlrunner")
+    args, shim = _parse_run_args()
+    return _run_main(args, shim)
+
+
+def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
+    """The run subcommand's full argparse surface, buildable twice: once
+    with add_help=False for the phase-A parse_known_args (so -h can't
+    exit early with help that lacks the conftest-declared custom
+    options), and once with add_help=True for the real phase-B parse.
+    --version stays registered here, so `ctrlrunner --version` exits in
+    phase A before any conftest import."""
+    parser = argparse.ArgumentParser(prog="ctrlrunner", add_help=add_help)
     parser.add_argument("--version", action="version", version=f"ctrlrunner {__version__}")
     parser.add_argument(
         "root",
@@ -609,8 +663,105 @@ def main():
         f"(default: id,caseId,tags). json always includes every field. "
         f"Valid: {', '.join(list_output.ALL_FIELDS)}",
     )
+    return parser
 
+
+def _guess_root(argv: list, parser: argparse.ArgumentParser) -> str | None:
+    """Deterministically finds the `root` positional in `argv` WITHOUT
+    relying on argparse's parse_known_args -- which, given an unknown
+    flag whose value looks positional (`--env staging spec/`), binds
+    the FIRST available positional-looking token to `root` ("staging",
+    wrongly) instead of the intended one, since custom options aren't
+    registered yet at this point. That silently sends conftest
+    discovery to a nonexistent root, custom options never get declared,
+    and the real parse then fails outright.
+
+    Instead, walk argv once: for each token starting with '-', consult
+    `parser`'s already-registered actions to know whether it consumes a
+    following value (nargs=0 actions -- store_true/store_false/help/
+    version/BooleanOptionalAction -- don't; everything else does).
+    An UNKNOWN flag (not yet declared -- we don't know its arity before
+    collecting ctrlrunner_addoption) is assumed to consume one value,
+    matching the common case (`--env staging`) and the recommended
+    invocation order (root first, flags after) that sidesteps the
+    ambiguity entirely for any flag shape. `--flag=value` single-token
+    form is recognized and never consumes a second token. The first
+    remaining non-flag token is the root guess."""
+    nargs0_options: set = set()
+    for action in parser._actions:
+        if action.nargs == 0:
+            nargs0_options.update(action.option_strings)
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok.startswith("-") and tok != "-":
+            if "=" in tok:
+                i += 1
+                continue
+            i += 1 if tok in nargs0_options else 2
+            continue
+        return tok
+    return None
+
+
+def _parse_run_args():
+    """Two-phase parse enabling ctrlrunner_addoption: conftests must be
+    imported to learn the custom flags, but the root that locates
+    conftests is itself a CLI arg. Phase A (parse_known_args, no -h)
+    extracts --config/--project (unambiguous -- always an explicit
+    `--flag value` pair); root is found via _guess_root instead, since
+    it's the one token vulnerable to argparse's positional-run
+    ambiguity. Conftests are then imported and their
+    ctrlrunner_addoption declarations collected; phase B parses for
+    real with the declared flags materialized (typed, validated,
+    visible in --help) -- now unambiguous, since every flag actually
+    used is registered. Returns (args, shim)."""
+    from .config.addoption import AddoptionError, collect_declarations
+
+    base_parser = _build_run_parser(add_help=False)
+    args_a, _unknown = base_parser.parse_known_args()
+    config_a = load_config(args_a.config)
+    guessed_root = _guess_root(sys.argv[1:], base_parser)
+
+    def declaration_roots() -> list[str]:
+        roots = [guessed_root or config_a.get("root") or "tests"]
+        for name in _split_csv(args_a.project) or []:
+            # Best effort only -- an invalid [projects] config gets its
+            # proper fail-fast error later in _run_main, as today.
+            try:
+                project = load_projects(config_a).get(name)
+            except ValueError:
+                break
+            if project is not None:
+                roots.extend(project.tests_dir)
+        return roots
+
+    try:
+        shim = collect_declarations(declaration_roots())
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as e:
+        print(
+            f"Error: while importing conftest for option declarations: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    parser = _build_run_parser(add_help=True)
+    try:
+        shim.apply_to(parser)
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
     args = parser.parse_args()
+    return args, shim
+
+
+def _run_main(args, shim):
+    from .config.addoption import AddoptionError
+    from .core.options import set_options
+
     config = load_config(args.config)
 
     try:
@@ -632,6 +783,21 @@ def main():
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
+
+    # Seed the custom-options store NOW, before the --list/rerun
+    # branches below import test modules in THIS process -- so
+    # module-level get_option(...) in test files sees real values on
+    # discovery-only paths too (those imports use force_reload=True,
+    # re-executing modules already imported during declaration
+    # collection). Workers get the same dict via run_worker's args.
+    try:
+        base_options = shim.base_values(config.get("options", {}))
+    except AddoptionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    cli_option_values = shim.cli_values(args)
+    options = {**base_options, **cli_option_values}
+    set_options(options)
 
     root = args.root or config.get("root") or "tests"
     num_workers, worker_constraints, fully_parallel = _resolve_worker_settings(args, config)
@@ -1086,6 +1252,8 @@ def main():
                 case_id_prefixes=_split_csv(args.case_id_prefix),
                 console_reporters=per_project_console_reporters,
                 playwright_config=playwright_config,
+                base_options=base_options,
+                cli_option_values=cli_option_values,
                 tag_registry=tag_registry,
                 grouping_dimensions=grouping_dimensions,
                 fail_policy=fail_policy,
@@ -1141,6 +1309,7 @@ def main():
             grep_not=cli_grep_not,
             console_reporters=console_reporters,
             playwright_config=playwright_config,
+            options=options,
             tag_registry=tag_registry,
             grouping_dimensions=grouping_dimensions,
             fail_policy=fail_policy,

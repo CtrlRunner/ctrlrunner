@@ -7,7 +7,10 @@ conversion — decorators, markers, parametrize (including `indirect=`,
 which ctrlrunner supports natively — the decorator passes through
 verbatim and the target fixture gets a `request` parameter added if
 missing, even cross-file in `conftest.py`), test classes, runtime
-`pytest.skip/fail/xfail` calls, pytest-playwright fixtures, imports.
+`pytest.skip/fail/xfail` calls, pytest-playwright fixtures, imports,
+and `pytest_addoption`/`pytestconfig.getoption` (renamed to
+`ctrlrunner_addoption`/`get_option`, ctrlrunner's typed-CLI-flag
+equivalent — see README's "Custom options" section).
 Whatever has no ctrlrunner equivalent gets a
 `# TODO(ctrlrunner-migrate): ...` comment in place plus a summary report.
 
@@ -22,4 +25,4 @@ table and the post-migration checklist.
 
 ## Explicitly not included
 
-- **pytest hooks** — skipped by design; ctrlrunner's own event model is the only supported extension point.
+- **pytest hooks** (other than `pytest_addoption`, which IS converted — see above) — skipped by design; ctrlrunner's own event model is the only supported extension point.

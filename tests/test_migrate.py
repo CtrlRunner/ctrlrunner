@@ -718,6 +718,126 @@ class HookAndAsyncTests(MigrateTestCase):
         self.assertEqual(report.totals()["parametrize"], 0)
 
 
+class AddoptionMigrationTests(MigrateTestCase):
+    """pytest_addoption -> ctrlrunner_addoption (rename only, body
+    preserved -- the shim is signature-compatible), and
+    pytestconfig.getoption/request.config.getoption -> get_option()."""
+
+    def test_pytest_addoption_renamed_body_preserved(self):
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "def pytest_addoption(parser):\n"
+                    '    parser.addoption("--env", default="qa", '
+                    'choices=["qa", "staging"], help="target env")\n'
+                )
+            }
+        )
+        code = out["conftest.py"]
+        self.assertIn("def ctrlrunner_addoption(parser):", code)
+        self.assertIn('parser.addoption("--env", default="qa"', code)
+        self.assertNotIn("pytest_addoption", code)
+        self.assertEqual(report.totals()["addoption"], 1)
+        # no longer flagged by the generic pytest-hook TODO
+        self.assertFalse(any("pytest hook" in msg for f in report.files for _, msg in f.todos))
+
+    def test_pytestconfig_getoption_rewritten_and_param_dropped(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "def test_one(pytestconfig):\n"
+                    '    env = pytestconfig.getoption("--env")\n'
+                    "    assert env\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('get_option("--env")', code)
+        self.assertIn("from ctrlrunner import get_option, test", code)
+        self.assertIn("def test_one():", code)  # param dropped
+        self.assertNotIn("pytestconfig", code)
+
+    def test_request_config_getoption_rewritten_and_request_dropped(self):
+        _, out = self.migrate(
+            {
+                "test_a.py": (
+                    "def test_one(request):\n"
+                    '    value = request.config.getoption("persona", default="US")\n'
+                    "    assert value\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('get_option("persona", default="US")', code)
+        self.assertIn("def test_one():", code)  # request dropped -- its only use was rewritten
+
+    def test_pytestconfig_kept_with_todo_when_other_attrs_used(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "def test_one(pytestconfig):\n"
+                    '    env = pytestconfig.getoption("--env")\n'
+                    '    ini = pytestconfig.getini("markers")\n'
+                    "    assert env and ini\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn('get_option("--env")', code)  # getoption still rewritten
+        self.assertIn("def test_one(pytestconfig):", code)  # param KEPT
+        self.assertTrue(
+            any(
+                "pytestconfig" in msg and "getini" not in msg.split(":")[0]
+                for f in report.files
+                for _, msg in f.todos
+            )
+            or any("getini" in msg for f in report.files for _, msg in f.todos)
+        )
+
+    def test_getoption_with_skip_kwarg_left_with_todo(self):
+        report, out = self.migrate(
+            {
+                "test_a.py": (
+                    'def test_one(pytestconfig):\n    pytestconfig.getoption("--env", skip=True)\n'
+                )
+            }
+        )
+        code = out["test_a.py"]
+        self.assertIn("pytestconfig.getoption", code)  # left untouched
+        self.assertTrue(any("skip=" in msg for f in report.files for _, msg in f.todos))
+
+    def test_user_defined_pytestconfig_fixture_left_alone(self):
+        _, out = self.migrate(
+            {
+                "conftest.py": (
+                    "from ctrlrunner import fixture\n\n"
+                    "@fixture()\n"
+                    "def pytestconfig():\n"
+                    "    return object()\n"
+                ),
+                "test_a.py": (
+                    'def test_one(pytestconfig):\n    assert pytestconfig.getoption("x")\n'
+                ),
+            }
+        )
+        # the user's own fixture wins -- no rewrite, no param drop
+        self.assertIn("pytestconfig.getoption", out["test_a.py"])
+        self.assertIn("def test_one(pytestconfig):", out["test_a.py"])
+
+    def test_reapplying_migration_is_idempotent(self):
+        source = {
+            "conftest.py": (
+                'def pytest_addoption(parser):\n    parser.addoption("--env", default="qa")\n'
+            ),
+            "test_a.py": (
+                'def test_one(pytestconfig):\n    assert pytestconfig.getoption("--env")\n'
+            ),
+        }
+        _, out1 = self.migrate(dict(source))
+        _, out2 = self.migrate(dict(out1))
+        self.assertEqual(out2, {})
+
+
 class RecordPropertyMigrationTests(MigrateTestCase):
     """pytest's record_property/record_testsuite_property fixtures now
     have direct ctrlrunner equivalents (runtime imports, not fixtures):
@@ -1031,7 +1151,36 @@ class AddMarkerTests(MigrateTestCase):
         )
 
     def test_mixed_request_usage_keeps_the_parameter(self):
+        # request.config.getoption is now auto-converted to get_option()
+        # (see AddoptionMigrationTests), so it no longer demonstrates
+        # "unsupported request usage" -- request.node.getfixturevalue
+        # (genuinely no ctrlrunner equivalent) does.
         report, out = self.migrate(
+            {
+                "test_a.py": (
+                    "import pytest\n\n"
+                    "def test_one(request):\n"
+                    '    request.node.add_marker(pytest.mark.test_case_id("1"))\n'
+                    "    name = request.getfixturevalue('other')\n"
+                    "    assert name\n"
+                )
+            }
+        )
+        code = out["test_a.py"]
+        # promotion still happens (unrelated to the remaining
+        # request usage) -- the add_marker statement is gone
+        self.assertIn('@test(case_id="1")', code)
+        self.assertNotIn("record_property", code)
+        self.assertIn("def test_one(request):", code)  # still used -> kept
+        self.assertTrue(any("getfixturevalue" in msg for f in report.files for _, msg in f.todos))
+        self.assertFalse(any("--case-id" in msg for f in report.files for _, msg in f.todos))
+
+    def test_request_config_getoption_alongside_promotion_drops_request(self):
+        # Regression companion to the above: request.config.getoption is
+        # now converted, so when it's the ONLY remaining request use
+        # (after add_marker promotion removes the other one), request
+        # is dropped -- not kept with a TODO.
+        _, out = self.migrate(
             {
                 "test_a.py": (
                     "import pytest\n\n"
@@ -1043,13 +1192,9 @@ class AddMarkerTests(MigrateTestCase):
             }
         )
         code = out["test_a.py"]
-        # promotion still happens (unrelated to the remaining
-        # request.config usage) -- the add_marker statement is gone
         self.assertIn('@test(case_id="1")', code)
-        self.assertNotIn("record_property", code)
-        self.assertIn("def test_one(request):", code)  # still used -> kept
-        self.assertTrue(any("request.config" in msg for f in report.files for _, msg in f.todos))
-        self.assertFalse(any("--case-id" in msg for f in report.files for _, msg in f.todos))
+        self.assertIn("get_option('--env')", code)
+        self.assertIn("def test_one():", code)  # request dropped
 
     def test_add_marker_idempotent_second_run(self):
         _, out = self.migrate(

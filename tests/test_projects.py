@@ -115,6 +115,24 @@ class LoadProjectsTests(unittest.TestCase):
             load_projects({"projects": {"smoke": {"tests_dir": ["t"], "fully_parallel": "yes"}}})
         self.assertIn("smoke", str(ctx.exception))
 
+    def test_per_project_options_parsed(self):
+        projects = load_projects(
+            {
+                "projects": {
+                    "smoke": {"tests_dir": ["t"], "options": {"env": "staging"}},
+                    "bare": {"tests_dir": ["t"]},
+                }
+            }
+        )
+        self.assertEqual(projects["smoke"].options, {"env": "staging"})
+        self.assertEqual(projects["bare"].options, {})
+
+    def test_non_table_options_raises_with_project_name(self):
+        with self.assertRaises(ValueError) as ctx:
+            load_projects({"projects": {"smoke": {"tests_dir": ["t"], "options": "nope"}}})
+        self.assertIn("smoke", str(ctx.exception))
+        self.assertIn("options", str(ctx.exception))
+
 
 class ProjectWorkerPrecedenceTests(unittest.TestCase):
     """num_workers and fully_parallel per-project precedence, observed
@@ -133,7 +151,11 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
 
         def spy_init(self_orch, root, num_workers, timeout, **kwargs):
             captured.append(
-                {"num_workers": num_workers, "fully_parallel": kwargs.get("fully_parallel")}
+                {
+                    "num_workers": num_workers,
+                    "fully_parallel": kwargs.get("fully_parallel"),
+                    "options": kwargs.get("options"),
+                }
             )
             return real_init(self_orch, root, num_workers, timeout, **kwargs)
 
@@ -203,6 +225,26 @@ class ProjectWorkerPrecedenceTests(unittest.TestCase):
             )
         self.assertIs(captured[0]["fully_parallel"], False)  # explicit opt-out
         self.assertIs(captured[1]["fully_parallel"], True)
+
+    def test_options_merge_precedence_base_project_cli(self):
+        # per key: CLI > project's own options > base (defaults <- toml)
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            captured = self._run_two_projects(
+                tmp,
+                {"a": {"options": {"env": "project-a", "persona": "GEPM"}}},
+                {
+                    "base_num_workers": 1,
+                    "base_options": {"env": "base-env", "region": "us"},
+                    "cli_option_values": {"env": "cli-env"},
+                },
+            )
+        # project a: cli wins over project's own env; project's persona
+        # survives (no cli/base override); base's region passes through
+        self.assertEqual(
+            captured[0]["options"], {"env": "cli-env", "persona": "GEPM", "region": "us"}
+        )
+        # project b: no project-level options -- base + cli only
+        self.assertEqual(captured[1]["options"], {"env": "cli-env", "region": "us"})
 
 
 class SharedFailPolicyAcrossProjectsTests(unittest.TestCase):

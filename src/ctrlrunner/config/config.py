@@ -163,6 +163,11 @@ KNOWN_TABLES = frozenset(
         "log_redaction",
         "quarantine",
         "coverage",
+        # [ctrlrunner.options] -- user-defined custom option values
+        # (ctrlrunner_addoption defaults / undeclared free-form keys),
+        # read via config.get("options", {}) in cli.py. Any TOML types;
+        # no schema beyond declared choices= validation at parse time.
+        "options",
     }
 )
 

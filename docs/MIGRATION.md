@@ -65,6 +65,8 @@ both sides at once.
 | pytest-playwright `page` / `context` / `browser` | `from ctrlrunner.playwright.playwright_fixtures import ...` added |
 | `record_property` fixture param | param removed; `from ctrlrunner import record_property` added (calls keep working as-is) |
 | `record_testsuite_property` fixture param | param removed; calls renamed to `record_suite_property(...)`; `from ctrlrunner import record_suite_property` added |
+| `def pytest_addoption(parser):` | renamed to `def ctrlrunner_addoption(parser):`, body unchanged — ctrlrunner's parser shim accepts pytest's `parser.addoption(...)`/`parser.getgroup(...)` signatures (`parser.addini(...)` warns at runtime, pointing at `[ctrlrunner.options]`) |
+| `pytestconfig.getoption(x)` / `request.config.getoption(x)` | `get_option(x)` (same args, including `default=`); the `pytestconfig`/`request` parameter is dropped when `.getoption()` was its only use in the function |
 | `import pytest` / `from pytest import ...` | removed when nothing pytest-specific remains; kept + reported otherwise |
 
 ### pyproject.toml -> ctrlrunner.toml
@@ -95,18 +97,21 @@ line in the report:
   `math.isclose`, etc. The code is left untouched and the `pytest`
   import is kept so the file stays runnable while you convert.
 - Builtin fixtures with no ctrlrunner counterpart: `tmp_path`, `tmpdir`,
-  `monkeypatch`, `capsys`, `capfd`, `caplog`, `mocker`, `pytestconfig`,
+  `monkeypatch`, `capsys`, `capfd`, `caplog`, `mocker`,
   `cache`, ... — provide your own `@fixture` or inline the behavior.
   (`recwarn` has no direct equivalent either, but note ctrlrunner captures
   Python warnings per-test automatically into the report's `warnings`
-  field.)
+  field.) `pytestconfig` is auto-converted for `.getoption()` (see the
+  table above) — only OTHER attributes (`.getini()`, `.rootpath`,
+  `.invocation_params`, ...) leave the parameter in place with a TODO.
 - `request.*` beyond `request.param` (ctrlrunner's `FixtureRequest`
   carries only `.param`): `getfixturevalue`, `addfinalizer`,
-  `config`, `node`, ...
+  `node`, ... (`request.config.getoption(...)` is auto-converted, see above).
 - `unittest.TestCase`-style classes — `@test_class` supports plain
   classes only; the whole class is left untouched.
-- `pytest_*` hook functions in `conftest.py` — ctrlrunner is
-  deliberately hook-free; most collection/report hooks map to
+- `pytest_*` hook functions in `conftest.py` other than `pytest_addoption`
+  (which is auto-renamed to `ctrlrunner_addoption`, see above) —
+  ctrlrunner is deliberately hook-free; most collection/report hooks map to
   `@test(case_id=..., tags=..., properties=...)` metadata or to a CLI
   flag instead.
 - Async tests (`async def` / `@pytest.mark.asyncio`) — ctrlrunner is

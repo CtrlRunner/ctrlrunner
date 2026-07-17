@@ -572,6 +572,7 @@ def run_worker(
     serial_attempts_used: dict | None = None,
     strict_teardown: bool = True,
     full_trace: bool = False,
+    options: dict | None = None,
 ):
     # Put THIS process in its own new process group (pgid == its
     # own pid) before anything else -- in particular before any
@@ -594,6 +595,15 @@ def run_worker(
         from ..playwright import playwright_fixtures
 
         playwright_fixtures.configure(**playwright_config)
+
+    # Seed ctrlrunner_addoption values BEFORE the module-import loop
+    # below -- module-level get_option(...) in test/conftest files must
+    # see real values (this worker is a spawn'd fresh interpreter; the
+    # dict rode the pickled args tuple). Always called: None resets the
+    # store, so a stale value can never leak between configurations.
+    from ..core.options import set_options
+
+    set_options(options)
 
     # Coverage instrumentation MUST start before any of this worker's
     # assigned test modules are imported below -- coverage.py can only

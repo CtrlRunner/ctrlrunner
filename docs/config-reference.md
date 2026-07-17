@@ -28,11 +28,19 @@ artifact_mode = "files"
 
 # [ctrlrunner.workers]            # scoped worker budgets -- see "Parallelism & scheduling"
 # "tests/test_checkout.py" = 1
+
+# [ctrlrunner.options]            # ctrlrunner_addoption defaults -- see README's
+# env = "qa"                      # "Custom options" section. Any key works here,
+# persona = "US"                  # declared or not.
 ```
 
 Precedence: **CLI flag > `ctrlrunner.toml` > built-in default**. Running
 `python -m ctrlrunner` with no arguments at all uses the config file's
-`root`, or falls back to `"tests"`.
+`root`, or falls back to `"tests"`. `[ctrlrunner.options]` follows the
+same precedence for `ctrlrunner_addoption`-declared and free-form values
+alike — see README's "Custom options" section for the full picture
+(declaration, `get_option`, and the multi-project
+`[ctrlrunner.projects.<name>.options]` per-project override).
 
 Unknown `[ctrlrunner]` keys and mis-nested tables (a bare `[workers]`
 instead of `[ctrlrunner.workers]`) print a **warning** to stderr instead

@@ -93,6 +93,7 @@ class RunController:
         num_workers: int | str = "auto",
         default_timeout: float = 30.0,
         playwright_config: dict | None = None,
+        options: dict | None = None,
         tag_registry=None,
         grouping_dimensions=None,
         quarantine=None,
@@ -120,6 +121,9 @@ class RunController:
         # caller-owned dict.
         self.playwright_config = dict(playwright_config or {})
         self.playwright_config["trace_mode"] = "on"
+        # ctrlrunner_addoption values -- copy, don't hold the caller's
+        # dict (same discipline as playwright_config above).
+        self.options = dict(options or {})
         self.grouping_dimensions = grouping_dimensions or DEFAULT_DIMENSIONS
         self.quarantine = quarantine
         self.coverage_config = coverage_config
@@ -276,6 +280,7 @@ class RunController:
                     ],
                     cancel_event=cancel_event,
                     playwright_config=self.playwright_config,
+                    options=self.options,
                     tag_registry=self.tag_registry,
                     grouping_dimensions=self.grouping_dimensions,
                     quarantine=self.quarantine,

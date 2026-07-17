@@ -227,6 +227,68 @@ automatically, shallowest directory first — no explicit import needed in
 test files, same convenience as pytest's `conftest.py`, but it's a plain
 import list, not a plugin hook.
 
+### Custom options (`pytest_addoption` equivalent)
+
+A `conftest.py` at any level may declare its own typed CLI flags:
+
+```python
+# conftest.py
+def ctrlrunner_addoption(parser):
+    parser.addoption("--env", default="qa", choices=["qa", "staging", "prod"],
+                      help="target environment")
+    parser.addoption("--persona", default="US")
+```
+
+```
+ctrlrunner tests/ --env staging --persona GEPM
+ctrlrunner tests/ --help          # declared options show up here too
+```
+
+Read the resolved value anywhere — tests, fixtures, page objects, even
+test-file module level:
+
+```python
+from ctrlrunner import get_option
+
+env = get_option("env")            # "--env", "env", and "my-opt"/"--my-opt"
+                                    # all address the same key
+```
+
+`parser.addoption(...)` accepts the same signature as pytest's (type,
+default, choices, action, required, dest, ...); `parser.getgroup(...)`
+is a no-op proxy (declarations still land in one bucket); `parser.addini(...)`
+isn't supported — put the value in `[ctrlrunner.options]` instead.
+
+**Precedence**: CLI flag > `[ctrlrunner.options]` in `ctrlrunner.toml` >
+declared default.
+
+```toml
+[ctrlrunner.options]
+env = "staging"
+```
+
+Undeclared keys in `[ctrlrunner.options]` are allowed too — `get_option`
+reads them with no `ctrlrunner_addoption` declaration required, for
+teams that don't want typed flags at all.
+
+Multi-project runs can also set `[ctrlrunner.projects.<name>.options]`,
+merged per key as `CLI > project > base`.
+
+Two things worth knowing:
+- **conftest module level runs once, before options are seeded** (while
+  the CLI is still collecting declarations from every project). Read
+  options inside fixtures/tests/functions, not at conftest module
+  level — that caveat doesn't apply anywhere else (test-file module
+  level, fixtures, page objects all see real values, including on
+  `--list`/rerun runs, which re-import after seeding).
+- **Recommended invocation order is root first, flags after**
+  (`ctrlrunner tests/ --env staging`). Flags before root are also
+  supported for the common case (a flag that takes a value), but a
+  custom `store_true`/`store_false` flag placed *before* root can still
+  confuse root-detection, since its arity isn't known until after
+  conftest collection; putting root first sidesteps the ambiguity
+  entirely.
+
 ## Timeout & hard-kill model
 
 ```

@@ -469,6 +469,51 @@ class IndirectParametrizeEndToEndTests(unittest.TestCase):
             self.assertTrue(reporter.results[0].test_id.endswith("[flag-b]"))
 
 
+class CustomOptionsEndToEndTests(unittest.TestCase):
+    """The options dict passed to Orchestrator reaches get_option() in
+    a spawned worker, both at module level and inside a fixture --
+    mirrors the playwright_config plumbing this feature clones."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_options_reach_module_level_and_fixture_in_worker(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_options.py").write_text(
+                "from ctrlrunner import fixture, get_option, test\n\n"
+                "MODULE_ENV = get_option('env')\n\n"
+                "@fixture()\n"
+                "def env_fixture():\n"
+                "    return get_option('env')\n\n"
+                "@test(timeout=10)\n"
+                "def test_module_level(env_fixture):\n"
+                "    assert MODULE_ENV == 'staging'\n"
+                "    assert env_fixture == 'staging'\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0, options={"env": "staging"})
+            reporter = orch.run()
+
+        self.assertEqual(len(reporter.results), 1)
+        self.assertEqual(reporter.results[0].outcome, "passed")
+
+    def test_no_options_means_get_option_returns_default(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_options.py").write_text(
+                "from ctrlrunner import get_option, test\n\n"
+                "@test(timeout=10)\n"
+                "def test_default():\n"
+                "    assert get_option('env', 'fallback') == 'fallback'\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+
+
 class AlwaysCaptureOrderingRegressionTests(unittest.TestCase):
     """Regression test: always_capture=True must fire BEFORE fixture
     teardown closes the underlying resource (e.g. a Playwright context),

@@ -34,6 +34,18 @@ accepts the same `"auto"`/`"N%"` spellings as the base setting, and a
 project can set its own `fully_parallel` to override the base value in
 either direction.
 
+`ctrlrunner_addoption` custom options follow the same shape, per key:
+**CLI flag > `[ctrlrunner.projects.<name>.options]` > base
+`[ctrlrunner.options]` > declared default**:
+
+```toml
+[ctrlrunner.options]
+env = "qa"                        # base default for every project
+
+[ctrlrunner.projects.smoke.options]
+env = "staging"                   # smoke overrides the base for itself
+```
+
 Each named project runs its own tests independently, even if their
 `tests_dir` overlap; combined results merge into one report. **`test_id`
 only gets a `[project]` prefix, and JUnit only wraps in `<testsuites>`,

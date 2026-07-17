@@ -1528,5 +1528,123 @@ class HtmlReportTimelineFieldsTests(unittest.TestCase):
         self.assertEqual(data["tests"][0]["workerId"], 1)
 
 
+class AddoptionCliIntegrationTests(unittest.TestCase):
+    """ctrlrunner_addoption end to end: declaration in conftest.py,
+    --help visibility, precedence, error cases, and the flag-before-root
+    ordering that used to mis-bind root via argparse's positional-run
+    ambiguity."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+        from ctrlrunner.core.options import set_options
+
+        set_options(None)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
+            main()
+
+    def _make_suite(self, tmp):
+        root = Path(tmp) / "tests"
+        root.mkdir()
+        (root / "conftest.py").write_text(
+            "def ctrlrunner_addoption(parser):\n"
+            '    parser.addoption("--env", default="qa", '
+            'choices=["qa", "staging", "prod"], help="target env")\n'
+        )
+        (root / "test_env.py").write_text(
+            "from ctrlrunner import get_option, test\n\n"
+            "@test()\n"
+            "def test_records_env():\n"
+            "    from ctrlrunner import record_property\n"
+            '    record_property("resolved_env", get_option("env"))\n\n'
+            "MODULE_LEVEL_ENV = get_option('env')\n\n"
+            "@test()\n"
+            "def test_module_level_env():\n"
+            "    assert MODULE_LEVEL_ENV is not None\n"
+        )
+        return root
+
+    def _resolved_env(self):
+        data = json.loads(Path("reports/html-report/results.json").read_text())
+        by_id = {t["id"]: t for t in data["tests"]}
+        return by_id["tests.test_env::test_records_env"]["properties"]["resolved_env"]
+
+    def test_declared_option_reaches_worker_and_module_level(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--env", "staging", "--reporter", "json"])
+            self.assertEqual(self._resolved_env(), "staging")
+
+    def test_default_used_when_flag_omitted(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--reporter", "json"])
+            self.assertEqual(self._resolved_env(), "qa")
+
+    def test_toml_value_used_when_no_cli_flag(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            Path("ctrlrunner.toml").write_text('[ctrlrunner.options]\nenv = "prod"\n')
+            self._run_cli(["--reporter", "json"])
+            self.assertEqual(self._resolved_env(), "prod")
+
+    def test_cli_flag_overrides_toml_value(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            Path("ctrlrunner.toml").write_text('[ctrlrunner.options]\nenv = "prod"\n')
+            self._run_cli(["--env", "staging", "--reporter", "json"])
+            self.assertEqual(self._resolved_env(), "staging")
+
+    def test_flag_before_root_still_resolves_correctly(self):
+        # Regression: argparse's parse_known_args binds the FIRST
+        # available positional-looking token to `root` when an unknown
+        # flag's value looks positional -- _guess_root must sidestep
+        # this so `--env staging tests/` doesn't mis-locate conftest.py.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--env", "staging", "tests", "--reporter", "json"])
+            self.assertEqual(self._resolved_env(), "staging")
+
+    def test_help_lists_declared_option(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                self._run_cli(["tests", "--help"])
+            self.assertIn("--env", stdout.getvalue())
+            self.assertIn("custom options", stdout.getvalue())
+
+    def test_undeclared_flag_errors(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self._run_cli(["tests", "--not-a-real-flag"])
+            self.assertIn("unrecognized", stderr.getvalue())
+
+    def test_list_mode_module_level_sees_cli_value(self):
+        # --list imports test modules in the MAIN process -- the options
+        # store must be seeded before that import, not just for workers.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--env", "staging", "--list", "text"])
+            from ctrlrunner.core.options import get_option
+
+            self.assertEqual(get_option("env"), "staging")
+
+
 if __name__ == "__main__":
     unittest.main()

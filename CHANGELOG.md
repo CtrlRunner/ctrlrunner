@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Custom CLI options (`pytest_addoption` equivalent)**: a `conftest.py`
+  may declare `def ctrlrunner_addoption(parser):` using pytest's
+  `parser.addoption(...)`/`parser.getgroup(...)` signature — declared
+  flags are typed, validated, and appear in `--help`
+  (`ctrlrunner tests/ --env staging --persona GEPM`). Read the resolved
+  value anywhere (tests, fixtures, page objects, even test-file module
+  level) via `from ctrlrunner import get_option`. Precedence: CLI flag >
+  `[ctrlrunner.options]` in `ctrlrunner.toml` > declared default;
+  undeclared toml keys pass through with no declaration required.
+  Multi-project runs support a per-project
+  `[ctrlrunner.projects.<name>.options]` override, merged per key as
+  CLI > project > base. See README's "Custom options" section.
+- The migration tool now converts `pytest_addoption` (renamed to
+  `ctrlrunner_addoption`, body preserved) and
+  `pytestconfig.getoption(...)`/`request.config.getoption(...)` (rewritten
+  to `get_option(...)`), dropping the now-unused `pytestconfig`/`request`
+  parameter when `.getoption()` was its only use.
+
 - **Per-test indirect fixture parametrization**: `@parametrize(...)`
   now accepts pytest's `indirect=` argument — `True` (all names) or a
   list of names. An indirect name's per-combination value is delivered

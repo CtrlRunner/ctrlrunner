@@ -65,12 +65,17 @@ CTRLRUNNER_NAMES = (
     "fail",
     "slow",
     "record_property",
+    "get_option",
 )
 
 # Default pytest marker whose string argument maps onto @test(case_id=...).
 DEFAULT_CASE_ID_MARKER = "test_case_id"
 
-# pytest builtin fixtures with no ctrlrunner equivalent.
+# pytest builtin fixtures with no ctrlrunner equivalent. pytestconfig
+# is NOT in this set -- it has dedicated handling in _plan_signature:
+# .getoption() calls are rewritten to get_option() (leave_Call), the
+# param is dropped when nothing else uses it, and only OTHER attribute
+# uses (getini, rootpath, ...) fall back to a TODO.
 UNSUPPORTED_FIXTURES = {
     "tmp_path",
     "tmpdir",
@@ -83,7 +88,6 @@ UNSUPPORTED_FIXTURES = {
     "capfdbinary",
     "caplog",
     "recwarn",
-    "pytestconfig",
     "cache",
     "doctest_namespace",
     "mocker",
@@ -562,12 +566,23 @@ class MigrationTransformer(cst.CSTTransformer):
         frame = self._fn_stack.pop()
         name = updated_node.name.value
 
+        if name == "pytest_addoption":
+            # The one pytest hook with a direct ctrlrunner equivalent:
+            # rename only -- the body is preserved as-is, since
+            # ctrlrunner's OptionParser shim accepts pytest's
+            # parser.addoption(...)/parser.getgroup(...) signatures
+            # (parser.addini warns at runtime, pointing at
+            # [ctrlrunner.options]).
+            self.report.add("addoption")
+            return updated_node.with_changes(name=cst.Name("ctrlrunner_addoption"))
+
         if name.startswith("pytest_"):
             msg = f"pytest hook '{name}' -- no ctrlrunner equivalent"
             self._todo(
                 original_node,
                 f"pytest hook '{name}' has no ctrlrunner equivalent "
-                f"(ctrlrunner is deliberately hook-free; see docs)",
+                f"(ctrlrunner is deliberately hook-free; only pytest_addoption "
+                f"is auto-converted, to ctrlrunner_addoption)",
             )
             if _has_todo(updated_node.leading_lines, msg):
                 return updated_node
@@ -969,6 +984,21 @@ class MigrationTransformer(cst.CSTTransformer):
                 # in leave_Call.
                 plan.remove_params.add(pname)
                 self.needed_imports.add(PROPERTY_FIXTURES[pname])
+            elif pname == "pytestconfig" and not self.index.fixture_defined(pname):
+                # leave_Call already rewrote every .getoption() call to
+                # get_option() (children are visited before this runs),
+                # so any pytestconfig reference still in the body is a
+                # genuinely unconvertible use (getini, rootpath, ...).
+                if m.findall(updated_node.body, m.Name("pytestconfig")):
+                    plan.todos.append(
+                        "pytestconfig: .getoption() calls were rewritten to "
+                        "get_option(), but other attributes (getini/rootpath/"
+                        "invocation_params/...) have no ctrlrunner equivalent "
+                        "-- the parameter was kept; convert the remaining "
+                        "uses manually"
+                    )
+                else:
+                    plan.remove_params.add(pname)
             elif pname in UNSUPPORTED_FIXTURES:
                 plan.todos.append(
                     f"builtin fixture '{pname}' has no ctrlrunner "
@@ -1112,6 +1142,32 @@ class MigrationTransformer(cst.CSTTransformer):
             and not self.index.fixture_defined("record_testsuite_property")
         ):
             return updated_node.with_changes(func=cst.Name("record_suite_property"))
+
+        # pytestconfig.getoption(x) / request.config.getoption(x) ->
+        # get_option(x). Args pass through unchanged: the option-name
+        # literal may keep its "--env" spelling (get_option normalizes
+        # at runtime), and default= is the same kwarg. Runs before
+        # _plan_signature (bottom-up), so the pytestconfig param-drop
+        # check there sees the already-rewritten body. Skipped when the
+        # user defined their OWN pytestconfig fixture.
+        dotted = _dotted(func)
+        if dotted in ("pytestconfig.getoption", "request.config.getoption") and not (
+            dotted.startswith("pytestconfig") and self.index.fixture_defined("pytestconfig")
+        ):
+            if any(a.keyword is not None and a.keyword.value == "skip" for a in updated_node.args):
+                # getoption(..., skip=True) skips the test when the
+                # option is unset -- no get_option equivalent; needs a
+                # manual skip(...) call.
+                self._todo(
+                    original_node,
+                    f"{dotted}(..., skip=...) -- get_option has no skip= "
+                    f"behavior; rewrite as get_option(...) + an explicit "
+                    f"skip(...) when the value is None",
+                )
+                return updated_node
+            self.needed_imports.add("get_option")
+            self.report.add("runtime_calls")
+            return updated_node.with_changes(func=cst.Name("get_option"))
         return updated_node
 
     def leave_SimpleStatementLine(self, original_node, updated_node):

@@ -311,6 +311,7 @@ class Orchestrator:
         console_reporters=None,
         cancel_event=None,
         playwright_config=None,
+        options=None,
         logs_mode: str = "off",
         tag_registry: TagRegistry | None = None,
         event_subscribers=None,
@@ -382,6 +383,10 @@ class Orchestrator:
         # still works exactly as before when it supplies its own.
         self.cancel_event = cancel_event if cancel_event is not None else threading.Event()
         self.playwright_config = playwright_config
+        # ctrlrunner_addoption values (CLI > [ctrlrunner.options] >
+        # declared default, merged by the CLI) -- passed to every worker
+        # so get_option(...) works there, including at module level.
+        self.options = options
         self.logs_mode = logs_mode
         self.tag_registry = tag_registry
         self.grouping_dimensions = grouping_dimensions or DEFAULT_DIMENSIONS
@@ -969,6 +974,7 @@ class Orchestrator:
                 serial_attempts_used,
                 self.strict_teardown,
                 self.full_trace,
+                self.options,
             ),
         )
         proc.start()

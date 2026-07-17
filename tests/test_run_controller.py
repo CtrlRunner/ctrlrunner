@@ -197,6 +197,16 @@ class RunControllerTests(unittest.TestCase):
         rc = self._make()
         self.assertEqual(rc.playwright_config["trace_mode"], "on")
 
+    def test_options_default_to_empty_dict(self):
+        rc = self._make()
+        self.assertEqual(rc.options, {})
+
+    def test_options_are_copied_not_referenced(self):
+        source = {"env": "staging"}
+        rc = RunController("examples", num_workers=2, default_timeout=30.0, options=source)
+        source["env"] = "mutated"
+        self.assertEqual(rc.options, {"env": "staging"})
+
     def test_set_num_workers_updates_num_workers(self):
         rc = self._make()
         rc.set_num_workers(5)

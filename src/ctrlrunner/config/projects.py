@@ -32,6 +32,10 @@ class ProjectConfig:
     num_workers: int | str | None = None
     # tri-state: None = inherit the base fully_parallel setting.
     fully_parallel: bool | None = None
+    # [ctrlrunner.projects.<name>.options] -- per-project custom option
+    # values, merged over the base [ctrlrunner.options] (and under any
+    # explicitly-typed CLI flags) for this project's workers.
+    options: dict = field(default_factory=dict)
 
 
 def load_projects(config: dict) -> dict[str, ProjectConfig]:
@@ -71,6 +75,12 @@ def load_projects(config: dict) -> dict[str, ProjectConfig]:
             raise ValueError(
                 f"[ctrlrunner.projects.{name}] timeout: expected a positive number, got {timeout!r}"
             )
+        options = entry.get("options", {})
+        if not isinstance(options, dict):
+            raise ValueError(
+                f"[ctrlrunner.projects.{name}] options: expected a table "
+                f"([ctrlrunner.projects.{name}.options]), got {options!r}"
+            )
         projects[name] = ProjectConfig(
             name=name,
             tests_dir=list(tests_dir),
@@ -78,6 +88,7 @@ def load_projects(config: dict) -> dict[str, ProjectConfig]:
             timeout=timeout,
             num_workers=num_workers,
             fully_parallel=fully_parallel,
+            options=dict(options),
         )
     return projects
 
@@ -120,6 +131,8 @@ def run_projects(
     import_timeout=None,
     order="declared",
     seed=None,
+    base_options=None,
+    cli_option_values=None,
 ):
     """Runs each named project as its own Orchestrator.run() within this
     process, merging every project's results into one combined
@@ -133,6 +146,14 @@ def run_projects(
     value. `tags`: an explicit CLI --tag overrides a project's own tags
     filter entirely (CLI stays highest precedence); otherwise the
     project's tags filter applies.
+
+    Custom options (ctrlrunner_addoption) merge per KEY with the same
+    precedence shape: an explicitly-typed CLI flag (cli_option_values)
+    > the project's own [ctrlrunner.projects.<name>.options] >
+    base_options (declared defaults <- [ctrlrunner.options]). The
+    merged dict is what this project's workers see via get_option();
+    the MAIN process keeps the global base+CLI merge (seeded in
+    cli.py), since it isn't scoped to any one project.
 
     `fail_policy`, if given, is the SAME FailPolicyState instance passed
     to every project's Orchestrator -- --max-failures/--max-timeouts
@@ -214,6 +235,11 @@ def run_projects(
         effective_fully_parallel = (
             project.fully_parallel if project.fully_parallel is not None else base_fully_parallel
         )
+        effective_options = {
+            **(base_options or {}),
+            **project.options,
+            **(cli_option_values or {}),
+        }
 
         root = project.tests_dir[0]
         extra_roots = project.tests_dir[1:]
@@ -232,6 +258,7 @@ def run_projects(
             console_reporters=console_reporters,
             cancel_event=cancel_event,
             playwright_config=playwright_config,
+            options=effective_options,
             tag_registry=tag_registry,
             event_subscribers=event_subscribers,
             grouping_dimensions=grouping_dimensions,
