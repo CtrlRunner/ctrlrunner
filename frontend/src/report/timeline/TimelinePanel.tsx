@@ -37,8 +37,8 @@ export function TimelinePanel({ report }: { report: ReportData }) {
         </div>
         {model.isEmpty ? (
           <div className="timeline-empty-state">
-            Timeline data isn't available for this report — rerun with a newer ctrlrunner build to see
-            worker activity over time.
+            Timeline data isn't available for this report — rerun with a newer ctrlrunner build to
+            see worker activity over time.
           </div>
         ) : (
           <GanttChart model={model} onSelectTest={onSelectTest} />
