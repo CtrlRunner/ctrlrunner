@@ -11,9 +11,13 @@ def _user_code_that_raises():
     raise ValueError("user-level boom")
 
 
+def _raise_key_error():
+    raise KeyError("original cause")
+
+
 def _user_code_chained():
     try:
-        raise KeyError("original cause")
+        _raise_key_error()
     except KeyError as e:
         raise RuntimeError("wrapper") from e
 
@@ -109,6 +113,23 @@ class TbFilterTests(unittest.TestCase):
         text = self._formatted_through_di(_user_code_that_raises)
         self.assertIn("user-level boom", text)
         self.assertNotIn("boom_fixture", text)
+
+    def test_tb_style_short_trims_every_link_of_a_chained_exception(self):
+        tb_format.set_tb_style("short")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_chained)
+        # both the RuntimeError link and its KeyError __cause__ link must
+        # each be trimmed to a single frame -- not just the outermost link.
+        # _raise_key_error's own frame is two calls deep (boom_fixture ->
+        # _user_code_chained -> _raise_key_error) specifically so that an
+        # untrimmed __cause__ link is *observable*: if only the top-level
+        # exception were trimmed (chain-walk turned into a no-op), the
+        # KeyError link would keep its full 2-frame stack and the total
+        # frame count below would be 3, not 2.
+        self.assertIn("KeyError", text)
+        self.assertIn("RuntimeError: wrapper", text)
+        self.assertNotIn("boom_fixture", text)
+        self.assertEqual(text.count('File "'), 2)
 
     def test_tb_style_line_is_a_single_line_with_file_and_message(self):
         tb_format.set_tb_style("line")
