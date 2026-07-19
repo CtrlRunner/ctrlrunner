@@ -962,6 +962,9 @@ class Phase3HookTests(unittest.TestCase):
 
 
 class CaptureSuppressionTests(unittest.TestCase):
+    def setUp(self):
+        registry.reset()
+
     def test_passed_test_output_does_not_leak_and_failed_test_output_is_attached(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp) / "suite"
@@ -3746,6 +3749,7 @@ class QueueDrainTests(unittest.TestCase):
                 None,
                 None,
                 time.time(),
+                None,
             )
         )
         time.sleep(0.1)  # let the feeder thread flush it into the pipe
@@ -4755,6 +4759,7 @@ class FlakyFlagTests(unittest.TestCase):
             None,
             None,
             time.time(),
+            None,
         )
 
     def test_passed_after_retry_is_flagged_flaky(self):

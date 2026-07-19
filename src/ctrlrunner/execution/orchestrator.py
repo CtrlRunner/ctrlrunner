@@ -429,6 +429,7 @@ class Orchestrator:
         junit_infra_errors: bool = False,
         strict_teardown: bool = True,
         full_trace: bool = False,
+        no_capture: bool = False,
         import_timeout: float = IMPORT_PHASE_TIMEOUT,
         order: str = "declared",
         seed: int | None = None,
@@ -456,6 +457,10 @@ class Orchestrator:
         # True disables display-filtering of ctrlrunner-internal
         # traceback frames (--full-trace).
         self.full_trace = full_trace
+        # True disables output buffering entirely (-s / --capture=no):
+        # test stdout/stderr/logging is tee'd live to the real stream
+        # again, same as before this feature existed.
+        self.no_capture = no_capture
         # The suite-import watchdog budget --
         # IMPORT_PHASE_TIMEOUT is only the default; heavy-deps suites on
         # cold-AV-scanned CI can legitimately need more.
@@ -1147,6 +1152,7 @@ class Orchestrator:
                 self.full_trace,
                 self.options,
                 self.raw_config,
+                self.no_capture,
             ),
         )
         proc.start()
@@ -1252,6 +1258,7 @@ class Orchestrator:
                 logs,
                 captured_warnings,
                 started_at,
+                console_captured,
             ) = msg
             item = self.items_by_id.get(test_id)
             merged_properties = {**(item.properties if item else {}), **extra_props}
@@ -1306,6 +1313,7 @@ class Orchestrator:
                 warnings=captured_warnings,
                 flaky=flaky,
                 started_at=started_at,
+                console_captured=console_captured,
             )
             self._test_started_at.pop(test_id, None)
             for cr in self.console_reporters:
