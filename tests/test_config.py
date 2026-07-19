@@ -159,6 +159,16 @@ class ConfigValidationTests(unittest.TestCase):
         cfg, warns = self._load("[ctrlrunner]\nimport_timeout = 120.0\n")
         self.assertEqual(cfg, {"import_timeout": 120.0})
 
+    def test_tb_is_a_known_key(self):
+        # Regression guard: `tb = "short"` (Task 12: sets the traceback
+        # style, read via config.get("tb") in cli.py and genuinely honored
+        # end-to-end) must not trigger the "unknown key ... is ignored
+        # (typo?)" warning -- tb was missed when KNOWN_KEYS was extended
+        # for this feature's sibling keys (full_trace, no_capture).
+        cfg, warns = self._load('[ctrlrunner]\ntb = "short"\n')
+        self.assertEqual(cfg, {"tb": "short"})
+        self.assertEqual(warns, [])
+
     def test_options_table_is_known_and_produces_no_warning(self):
         cfg, warns = self._load(
             '[ctrlrunner]\n[ctrlrunner.options]\nenv = "staging"\npersona = "US"\n'

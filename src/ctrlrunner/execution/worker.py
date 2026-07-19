@@ -350,7 +350,7 @@ def _execute_test(
     no_capture: bool = False,
 ):
     """Runs one test -- fixture resolution, the per-test retry loop,
-    artifact/log capture -- and RETURNS its 13-field "finished" tuple
+    artifact/log capture -- and RETURNS its 16-field "finished" tuple
     instead of putting it on the queue. Individual tests put it
     immediately; serial groups buffer non-final group attempts so a
     re-run test never emits two "finished" messages ("started" IS still

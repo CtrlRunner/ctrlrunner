@@ -92,6 +92,7 @@ it; it just sets defaults so CI/dev don't need to repeat the same flags.
     # junit_infra_errors = false    # true: timeout-kill/crash render as <error>, not <failure>
     # strict_teardown = true        # false: broken teardown -> teardown_failed property, not failure
     # full_trace = false            # true: keep ctrlrunner-internal frames in failure tracebacks
+    # tb = "auto"                   # traceback style: auto/long/short/line/native/no
 
 Unknown [ctrlrunner] keys and mis-nested top-level tables (a bare
 [workers] instead of [ctrlrunner.workers]) produce a stderr warning --
@@ -149,6 +150,7 @@ KNOWN_KEYS = frozenset(
         "strict_teardown",
         "full_trace",
         "no_capture",
+        "tb",
         "junit_infra_errors",
     }
 )
