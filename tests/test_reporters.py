@@ -550,6 +550,31 @@ class VerbosityTests(unittest.TestCase):
             sys.stdout = old_stdout
         self.assertEqual(buf.getvalue(), "")
 
+    def test_dots_reporter_verbose_prints_a_line_per_test_including_passes(self):
+        reporter = DotsReporter(verbosity="verbose")
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            reporter.on_test_end(Result("t::test_a", "passed", None, 0.1))
+            reporter.on_test_end(Result("t::test_b", "failed", "boom", 0.1))
+        finally:
+            sys.stdout = old_stdout
+        out = buf.getvalue()
+        self.assertIn("PASSED t::test_a", out)
+        self.assertIn("FAILED t::test_b", out)
+
+    def test_dots_reporter_quiet_prints_nothing_per_test(self):
+        reporter = DotsReporter(verbosity="quiet")
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            reporter.on_test_end(Result("t::test_a", "failed", "boom", 0.1))
+        finally:
+            sys.stdout = old_stdout
+        self.assertEqual(buf.getvalue(), "")
+
     def test_quiet_summary_omits_error_text_and_by_file_table(self):
         from ctrlrunner.reporting.reporters import _summary_lines
 
