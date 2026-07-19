@@ -597,5 +597,117 @@ class VerbosityTests(unittest.TestCase):
         self.assertEqual(reporters[0].verbosity, "verbose")
 
 
+class ReportCharsTests(unittest.TestCase):
+    def test_default_omitted_matches_todays_output(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "failed", "boom", 0.1)]
+        default = _summary_lines(results, 1.0)
+        explicit_f = _summary_lines(results, 1.0, report_chars="f")
+        self.assertEqual(default, explicit_f)
+
+    def test_f_char_required_for_error_text_under_quiet(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "failed", "boom", 0.1)]
+        quiet_no_r = _summary_lines(results, 1.0, verbosity="quiet")
+        quiet_with_f = _summary_lines(results, 1.0, verbosity="quiet", report_chars="f")
+        self.assertNotIn("boom", "\n".join(quiet_no_r))
+        self.assertIn("boom", "\n".join(quiet_with_f))
+
+    def test_s_char_lists_skipped_tests(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "skipped", "not ready", 0.1)]
+        lines = _summary_lines(results, 1.0, report_chars="s")
+        joined = "\n".join(lines)
+        self.assertIn("test_a", joined)
+        self.assertIn("not ready", joined)
+
+    def test_no_s_section_without_the_char(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "skipped", "not ready", 0.1)]
+        lines = _summary_lines(results, 1.0, report_chars="f")
+        self.assertNotIn("not ready", "\n".join(lines))
+
+    def test_x_char_lists_expected_failures(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "expected_failure", "known issue", 0.1)]
+        lines = _summary_lines(results, 1.0, report_chars="x")
+        self.assertIn("known issue", "\n".join(lines))
+
+    def test_p_char_lists_passed_test_ids(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "passed", None, 0.1)]
+        lines = _summary_lines(results, 1.0, report_chars="p")
+        self.assertIn("test_a", "\n".join(lines))
+
+    def test_w_char_lists_warnings(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [
+            Result(
+                "t::test_a",
+                "passed",
+                None,
+                0.1,
+                warnings=[{"category": "UserWarning", "message": "be careful"}],
+            )
+        ]
+        lines = _summary_lines(results, 1.0, report_chars="w")
+        joined = "\n".join(lines)
+        self.assertIn("UserWarning", joined)
+        self.assertIn("be careful", joined)
+
+    def test_a_expands_to_all_except_passed(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [
+            Result("t::test_f", "failed", "boom", 0.1),
+            Result("t::test_s", "skipped", "why", 0.1),
+        ]
+        lines = _summary_lines(results, 1.0, report_chars="a")
+        joined = "\n".join(lines)
+        self.assertIn("boom", joined)
+        self.assertIn("why", joined)
+
+    def test_capital_a_includes_passed(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_p", "passed", None, 0.1)]
+        lines = _summary_lines(results, 1.0, report_chars="A")
+        self.assertIn("test_p", "\n".join(lines))
+
+    def test_build_reporters_threads_report_chars(self):
+        reporters = build_reporters(["line"], report_chars="fs")
+        self.assertEqual(reporters[0].report_chars, "fs")
+
+    def test_dots_reporter_on_run_end_threads_report_chars(self):
+        # DotsReporter.on_run_end and LineReporter.on_run_end are two
+        # structurally-parallel call sites that both forward
+        # self.report_chars into _summary_lines() -- the brief's tests
+        # above only exercise _summary_lines() directly plus
+        # build_reporters()'s attribute threading onto "line", so
+        # neither on_run_end call site actually proves the constructor
+        # arg makes it into the printed summary. Cover both here.
+        results = [Result("t::test_a", "skipped", "not ready", 0.1)]
+        reporter = DotsReporter(report_chars="s")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            reporter.on_run_end(results, 1.0)
+        self.assertIn("not ready", buf.getvalue())
+
+    def test_line_reporter_on_run_end_threads_report_chars(self):
+        results = [Result("t::test_a", "skipped", "not ready", 0.1)]
+        reporter = LineReporter(report_chars="s")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            reporter.on_run_end(results, 1.0)
+        self.assertIn("not ready", buf.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
