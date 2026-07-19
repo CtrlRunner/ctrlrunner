@@ -84,6 +84,11 @@ class Result:
     # "finished" IPC message) -- None for synthetic results that never
     # actually started (cancelled/not_run/worker-crash-before-start).
     started_at: float | None = None
+    # Captured stdout/stderr for a FAILED test's last attempt, always
+    # populated regardless of --logs (unlike `logs` above, which is
+    # --logs-gated and feeds JUnit/HTML/JSON) -- console-only, read by
+    # reporters.py's _summary_lines(), never serialized to JUnit/HTML/JSON.
+    console_captured: str | None = None
 
 
 class JUnitReporter:
@@ -151,6 +156,7 @@ class JUnitReporter:
         warnings=None,
         flaky: bool = False,
         started_at: float | None = None,
+        console_captured: str | None = None,
     ):
         result = Result(
             test_id=test_id,
@@ -177,6 +183,7 @@ class JUnitReporter:
             warnings=warnings,
             flaky=flaky,
             started_at=started_at,
+            console_captured=console_captured,
         )
         self.results.append(result)
         return result

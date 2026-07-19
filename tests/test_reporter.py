@@ -619,5 +619,19 @@ class JunitInfraErrorsTests(unittest.TestCase):
         self.assertIsNone(cases["test_killed"].find("failure"))
 
 
+class ConsoleCapturedFieldTests(unittest.TestCase):
+    def test_defaults_to_none(self):
+        reporter = JUnitReporter()
+        result = reporter.add_result("t::test_a", "failed", "boom", 0.1)
+        self.assertIsNone(result.console_captured)
+
+    def test_add_result_threads_console_captured_onto_the_result(self):
+        reporter = JUnitReporter()
+        result = reporter.add_result(
+            "t::test_a", "failed", "boom", 0.1, console_captured="stdout: hi"
+        )
+        self.assertEqual(result.console_captured, "stdout: hi")
+
+
 if __name__ == "__main__":
     unittest.main()
