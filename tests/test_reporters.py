@@ -519,5 +519,58 @@ class CustomReporterLoaderTests(unittest.TestCase):
             build_reporters(["definitely-not-a-reporter"])
 
 
+class VerbosityTests(unittest.TestCase):
+    def test_line_reporter_verbose_prints_a_line_per_test_including_passes(self):
+        reporter = LineReporter(verbosity="verbose")
+        reporter.on_run_start(2)
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            reporter.on_test_start("t::test_a")
+            reporter.on_test_end(Result("t::test_a", "passed", None, 0.1))
+            reporter.on_test_start("t::test_b")
+            reporter.on_test_end(Result("t::test_b", "failed", "boom", 0.1))
+        finally:
+            sys.stdout = old_stdout
+        out = buf.getvalue()
+        self.assertIn("PASSED t::test_a", out)
+        self.assertIn("FAILED t::test_b", out)
+
+    def test_line_reporter_quiet_prints_nothing_per_test(self):
+        reporter = LineReporter(verbosity="quiet")
+        reporter.on_run_start(1)
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            reporter.on_test_start("t::test_a")
+            reporter.on_test_end(Result("t::test_a", "failed", "boom", 0.1))
+        finally:
+            sys.stdout = old_stdout
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_quiet_summary_omits_error_text_and_by_file_table(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [
+            Result("a.py::test_x", "failed", "boom", 0.1, groups={"file": "a.py"}),
+            Result("b.py::test_y", "passed", None, 0.1, groups={"file": "b.py"}),
+        ]
+        lines = _summary_lines(results, 1.0, verbosity="quiet")
+        joined = "\n".join(lines)
+        self.assertIn("test_x", joined)
+        self.assertNotIn("boom", joined)
+        self.assertNotIn("By file", joined)
+
+    def test_invalid_verbosity_raises(self):
+        with self.assertRaises(ValueError):
+            LineReporter(verbosity="loud")
+
+    def test_build_reporters_threads_verbosity(self):
+        reporters = build_reporters(["line"], verbosity="verbose")
+        self.assertEqual(reporters[0].verbosity, "verbose")
+
+
 if __name__ == "__main__":
     unittest.main()

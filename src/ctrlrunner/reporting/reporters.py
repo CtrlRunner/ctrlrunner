@@ -54,6 +54,13 @@ def _custom_status_symbol(result: Result):
 
 
 class ConsoleReporter:
+    def __init__(self, verbosity: str = "normal"):
+        if verbosity not in ("normal", "verbose", "quiet"):
+            raise ValueError(
+                f"verbosity must be 'normal', 'verbose', or 'quiet', got {verbosity!r}"
+            )
+        self.verbosity = verbosity
+
     def on_run_start(self, total: int):
         pass
 
@@ -67,7 +74,7 @@ class ConsoleReporter:
         pass
 
 
-def _summary_lines(results, duration):
+def _summary_lines(results, duration, verbosity="normal"):
     passed = sum(1 for r in results if r.outcome == "passed")
     failed = sum(1 for r in results if r.outcome == "failed")
     skipped = sum(
@@ -96,10 +103,14 @@ def _summary_lines(results, duration):
         if r.outcome == "failed":
             suffix = f"  [{r.case_id}]" if r.case_id else ""
             lines.append(f"  \u2717 {r.test_id}{suffix}")
-            if r.error:
-                lines.extend(f"      {line}" for line in r.error.splitlines())
-            if r.console_captured:
-                lines.extend(f"      {line}" for line in r.console_captured.splitlines())
+            if verbosity != "quiet":
+                if r.error:
+                    lines.extend(f"      {line}" for line in r.error.splitlines())
+                if r.console_captured:
+                    lines.extend(f"      {line}" for line in r.console_captured.splitlines())
+
+    if verbosity == "quiet":
+        return lines
 
     by_file: dict[str, list] = {}
     for r in results:
@@ -125,6 +136,17 @@ def _summary_lines(results, duration):
     return lines
 
 
+_OUTCOME_WORDS = {
+    "passed": "PASSED",
+    "failed": "FAILED",
+    "skipped": "SKIPPED",
+    "fixme": "FIXME",
+    "expected_failure": "XFAIL",
+    "cancelled": "CANCELLED",
+    "not_run": "NOT_RUN",
+    "quarantined_failure": "QUARANTINED",
+}
+
 _SYMBOLS = {
     "passed": ".",
     "failed": "F",
@@ -139,24 +161,36 @@ _SYMBOLS = {
 
 class DotsReporter(ConsoleReporter):
     """One character per test: '.' pass, 'F' fail, 's' skip, 'f' fixme,
-    'x' expected failure (matches the common xfail convention)."""
+    'x' expected failure (matches the common xfail convention). verbose
+    prints a full outcome line per test instead; quiet prints nothing
+    per test."""
 
     def on_test_end(self, result: Result):
+        if self.verbosity == "quiet":
+            return
+        if self.verbosity == "verbose":
+            word = _OUTCOME_WORDS.get(result.outcome, result.outcome.upper())
+            print(f"{word} {result.test_id}")
+            return
         symbol = _custom_status_symbol(result) or _SYMBOLS.get(result.outcome, "?")
         sys.stdout.write(symbol)
         sys.stdout.flush()
 
     def on_run_end(self, results, duration):
-        sys.stdout.write("\n")
-        for line in _summary_lines(results, duration):
+        if self.verbosity != "quiet":
+            sys.stdout.write("\n")
+        for line in _summary_lines(results, duration, verbosity=self.verbosity):
             print(line)
 
 
 class LineReporter(ConsoleReporter):
     """Overwrites a single progress line as tests run, printing failures
-    as they happen below it -- same idea as Playwright TS's 'line'."""
+    as they happen below it -- same idea as Playwright TS's 'line'.
+    verbose prints a full persisted outcome line per test instead of the
+    overwritten progress line; quiet prints nothing per test."""
 
-    def __init__(self):
+    def __init__(self, verbosity: str = "normal"):
+        super().__init__(verbosity)
         self._total = 0
         self._seen = set()
 
@@ -178,6 +212,8 @@ class LineReporter(ConsoleReporter):
         self._total = total
 
     def on_test_start(self, test_id: str):
+        if self.verbosity in ("quiet", "verbose"):
+            return
         # A retried test sends multiple "started" events for the same
         # test_id; count unique tests, not attempts, so the fraction
         # never overshoots the total.
@@ -187,13 +223,20 @@ class LineReporter(ConsoleReporter):
         sys.stdout.flush()
 
     def on_test_end(self, result: Result):
+        if self.verbosity == "quiet":
+            return
+        if self.verbosity == "verbose":
+            word = _OUTCOME_WORDS.get(result.outcome, result.outcome.upper())
+            print(f"{word} {result.test_id}")
+            return
         if result.outcome == "failed":
             sys.stdout.write("\n")
             print(f"  \u2717 {result.test_id}")
 
     def on_run_end(self, results, duration):
-        sys.stdout.write("\n")
-        for line in _summary_lines(results, duration):
+        if self.verbosity != "quiet":
+            sys.stdout.write("\n")
+        for line in _summary_lines(results, duration, verbosity=self.verbosity):
             print(line)
 
 
@@ -271,7 +314,11 @@ class JsonReporter(ConsoleReporter):
             raise
 
 
-REPORTER_REGISTRY = {"line": LineReporter, "dots": DotsReporter, "json": JsonReporter}
+REPORTER_REGISTRY: dict[str, type[ConsoleReporter]] = {
+    "line": LineReporter,
+    "dots": DotsReporter,
+    "json": JsonReporter,
+}
 
 
 def _load_custom_reporter(spec: str):
@@ -308,7 +355,9 @@ def _load_custom_reporter(spec: str):
         ) from e
 
 
-def build_reporters(names: list[str], json_output: str = "results.json") -> list[ConsoleReporter]:
+def build_reporters(
+    names: list[str], json_output: str = "results.json", verbosity: str = "normal"
+) -> list[ConsoleReporter]:
     reporters = []
     for name in names:
         if ":" in name:
@@ -323,5 +372,5 @@ def build_reporters(names: list[str], json_output: str = "results.json") -> list
         if name == "json":
             reporters.append(JsonReporter(json_output))
         else:
-            reporters.append(cls())
+            reporters.append(cls(verbosity=verbosity))
     return reporters
