@@ -149,6 +149,31 @@ Do not wrap test bodies in `try/except` to take screenshots manually —
 this bypasses the runner's artifact bookkeeping (JUnit properties, JSON
 reporter) and duplicates logic that already exists per-fixture.
 
+## Session & test hooks (`pytest_configure`/`pytest_runtest_*` equivalents)
+
+For real setup/teardown work around a run (starting shared infra) or
+per-test instrumentation — not for taking screenshots, that's fixtures
+above — a `conftest.py` may define any of (pytest-shaped signatures;
+`item`/`report`/`session`/`config` are shim objects carrying the common
+pytest attribute surface):
+
+```python
+def ctrlrunner_configure(config): ...            # once, main process, before the run
+def ctrlrunner_sessionfinish(session, exitstatus): ...  # once, after
+def ctrlrunner_runtest_logstart(nodeid, location): ...  # per attempt, in-worker
+def ctrlrunner_runtest_setup(item): ...          # item.get_closest_marker(tag) works;
+                                                 # skip()/fixme()/fail() here control
+                                                 # the test's outcome
+def ctrlrunner_runtest_teardown(item, nextitem): ...
+def ctrlrunner_runtest_logreport(report): ...    # report.outcome/.failed/.longrepr
+```
+
+Full contract (object attributes, exception handling, `--list`
+behavior, ordering) in [docs/hooks.md](docs/hooks.md). Don't reach for
+autouse fixtures to fake `ctrlrunner_runtest_setup`/`teardown` or a
+custom `--reporter` class to fake `ctrlrunner_sessionfinish` — use the
+matching hook directly.
+
 ## Steps
 
 Use `with step("...")` (from `ctrlrunner`) to break a test into named,

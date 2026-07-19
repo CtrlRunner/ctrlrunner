@@ -556,6 +556,725 @@ class AlwaysCaptureOrderingRegressionTests(unittest.TestCase):
             self.assertTrue(reporter.results[0].artifacts[0].endswith("resource.txt"))
 
 
+class CollectionHooksTests(unittest.TestCase):
+    """ctrlrunner_itemcollected / ctrlrunner_collection_modifyitems /
+    ctrlrunner_collection_finish / ctrlrunner_deselected /
+    ctrlrunner_ignore_collect -- pytest's collection-phase hooks, fired
+    in the main process around select_tests()."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_modifyitems_reorders_and_removes_and_adds_markers(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def _write(line):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_itemcollected(item):\n"
+                "    _write(f'collected:{item.name}')\n\n"
+                "def ctrlrunner_collection_modifyitems(items):\n"
+                "    items.reverse()\n"
+                "    items[:] = [i for i in items if i.name != 'test_dropped']\n"
+                "    for i in items:\n"
+                "        i.add_marker('touched')\n\n"
+                "def ctrlrunner_collection_finish(session):\n"
+                "    _write(f'finish:{session.testscollected}')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_one():\n    pass\n\n"
+                "@test()\ndef test_dropped():\n    pass\n\n"
+                "@test()\ndef test_two():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        executed = [r.test_id.split("::")[-1] for r in reporter.results]
+        self.assertEqual(executed, ["test_two", "test_one"])  # reversed, dropped removed
+        self.assertTrue(all("touched" in r.tags for r in reporter.results))
+        self.assertEqual(
+            [line for line in lines if line.startswith("collected:")],
+            ["collected:test_one", "collected:test_dropped", "collected:test_two"],
+        )
+        self.assertIn("finish:3", lines)
+
+    def test_deselected_fires_with_filtered_out_items(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_deselected(items):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        for i in items:\n"
+                "            f.write(f'deselected:{i.name}\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test(tags={'smoke'})\ndef test_kept():\n    pass\n\n"
+                "@test()\ndef test_filtered():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0, tags=["smoke"])
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(len(reporter.results), 1)
+        self.assertEqual(lines, ["deselected:test_filtered"])
+
+    def test_ignore_collect_excludes_a_file_before_import(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_ignore_collect(collection_path, config):\n"
+                "    if collection_path.name == 'test_skipme.py':\n"
+                "        return True\n"
+                "    return None\n"
+            )
+            (root / "test_kept.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            (root / "test_skipme.py").write_text("raise RuntimeError('must never be imported')\n")
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(len(reporter.results), 1)
+        self.assertEqual(reporter.results[0].outcome, "passed")
+
+
+class CallPhaseHooksTests(unittest.TestCase):
+    """ctrlrunner_runtest_call / ctrlrunner_runtest_makereport /
+    ctrlrunner_exception_interact / ctrlrunner_runtest_logfinish --
+    Phase 2 of the pytest hook parity plan."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_runtest_call_fires_before_test_body_and_its_exception_fails_the_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_runtest_call(item):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(f'call:{item.nodeid}\\n')\n"
+                "    raise RuntimeError('boom from runtest_call')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_a():\n"
+                "    raise AssertionError('should never execute')\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        result = reporter.results[0]
+        self.assertEqual(result.outcome, "failed")
+        self.assertIn("boom from runtest_call", result.error)
+        self.assertNotIn("should never execute", result.error)  # test body never ran
+        self.assertEqual(lines, [f"call:{result.test_id}"])
+
+    def test_makereport_return_value_replaces_the_report_logreport_receives(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_runtest_makereport(item, call):\n"
+                "    item.rep_call = 'custom-marker'\n"  # classic pytest pattern
+                "    call.report_overridden = True\n"
+                "    return call\n\n"  # anything truthy-non-None overrides
+                "def ctrlrunner_runtest_logreport(report):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(f'logreport-saw-override:{getattr(report, \"report_overridden\", False)}\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertEqual(lines, ["logreport-saw-override:True"])
+
+    def test_exception_interact_fires_on_failure_with_live_exception_object(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_exception_interact(node, call, report):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(\n"
+                "            f'interact:{node.nodeid}:{type(call.excinfo.value).__name__}:'\n"
+                "            f'{call.excinfo.value.args[0]}\\n'\n"
+                "        )\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_a():\n    raise ValueError('specific failure text')\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        result = reporter.results[0]
+        self.assertEqual(result.outcome, "failed")
+        self.assertEqual(lines, [f"interact:{result.test_id}:ValueError:specific failure text"])
+
+    def test_exception_interact_does_not_fire_for_a_passing_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_exception_interact(node, call, report):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write('should never fire\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertFalse(log_path.exists())
+
+    def test_logfinish_fires_after_logreport_with_the_same_location(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def _write(line):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_runtest_logreport(report):\n"
+                "    _write(f'logreport:{report.nodeid}')\n\n"
+                "def ctrlrunner_runtest_logfinish(nodeid, location):\n"
+                "    _write(f'logfinish:{nodeid}')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        test_id = reporter.results[0].test_id
+        self.assertEqual(lines, [f"logreport:{test_id}", f"logfinish:{test_id}"])
+
+
+class Phase3HookTests(unittest.TestCase):
+    """ctrlrunner_warning_recorded / ctrlrunner_assertrepr_compare /
+    ctrlrunner_make_parametrize_id / ctrlrunner_fixture_setup /
+    ctrlrunner_fixture_post_finalizer / ctrlrunner_generate_tests --
+    Phase 3 of the pytest hook parity plan."""
+
+    def setUp(self):
+        registry.reset()
+
+    def test_warning_recorded_fires_for_each_captured_warning(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_warning_recorded(warning_message, when, nodeid, location):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(f'{when}:{nodeid}:{warning_message}\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "import warnings\n"
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_a():\n"
+                "    warnings.warn('be careful', UserWarning)\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertEqual(len(lines), 1)
+        self.assertIn("runtest", lines[0])
+        self.assertIn("be careful", lines[0])
+
+    def test_warning_message_is_the_real_warningmessage_object_with_category(self):
+        # pytest's hookspec passes the full warnings.WarningMessage
+        # instance (.category/.filename/.lineno/.message), not just the
+        # bare warning -- a migrated hook reading warning_message.category
+        # must not break.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_warning_recorded(warning_message, when, nodeid, location):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(warning_message.category.__name__ + '\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "import warnings\n"
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_a():\n"
+                "    warnings.warn('be careful', UserWarning)\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertEqual(lines, ["UserWarning"])
+
+    def test_assertrepr_compare_augments_assertion_failure_message(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_assertrepr_compare(config, op, left, right):\n"
+                "    if op == '==' and isinstance(left, str) and isinstance(right, str):\n"
+                "        return [f'custom string diff: {left!r} != {right!r}']\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    assert 'foo' == 'bar'\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "failed")
+        self.assertIn("custom string diff: 'foo' != 'bar'", reporter.results[0].error)
+
+    def test_make_parametrize_id_used_for_the_test_id_suffix(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_make_parametrize_id(config, val, argname):\n"
+                "    if argname == 'n':\n"
+                "        return f'custom{val}'\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test, parametrize\n\n"
+                "@test()\n@parametrize('n', [1, 2])\n"
+                "def test_a(n):\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        ids = sorted(r.test_id for r in reporter.results)
+        self.assertTrue(any("custom1" in i for i in ids))
+        self.assertTrue(any("custom2" in i for i in ids))
+
+    def test_fixture_setup_and_post_finalizer_fire_around_a_fixture(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def _write(line):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_fixture_setup(fixturedef, request):\n"
+                "    _write(f'setup:{fixturedef.argname}:{fixturedef.scope}')\n\n"
+                "def ctrlrunner_fixture_post_finalizer(fixturedef, request):\n"
+                "    _write(f'finalizer:{fixturedef.argname}')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import fixture, test\n\n"
+                "@fixture()\ndef resource():\n    yield object()\n\n"
+                "@test()\ndef test_a(resource):\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertIn("setup:resource:function", lines)
+        self.assertIn("finalizer:resource", lines)
+        self.assertLess(lines.index("setup:resource:function"), lines.index("finalizer:resource"))
+
+    def test_session_shouldstop_set_from_a_hook_cancels_the_rest_of_the_run(self):
+        # One worker so tests run strictly in sequence -- shouldstop set
+        # during test_a's teardown must cancel test_b/test_c before they
+        # get a chance to run (they end up "not_run"), the same
+        # observable shape as a fail-policy cancel.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_runtest_teardown(item):\n"
+                "    if item.name == 'test_a':\n"
+                "        item.session.shouldstop = 'stopping after test_a'\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_a():\n    pass\n\n"
+                "@test()\ndef test_b():\n    pass\n\n"
+                "@test()\ndef test_c():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(len(reporter.results), 3)
+        by_name = {r.test_id.split("::")[-1]: r.outcome for r in reporter.results}
+        self.assertEqual(by_name["test_a"], "passed")
+        self.assertEqual(by_name["test_b"], "not_run")
+        self.assertEqual(by_name["test_c"], "not_run")
+
+    def test_generate_tests_dynamically_parametrizes_a_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_generate_tests(metafunc):\n"
+                "    if 'env' in metafunc.fixturenames:\n"
+                "        metafunc.parametrize('env', ['qa', 'staging'])\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a(env):\n    assert env\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(len(reporter.results), 2)
+        self.assertTrue(all(r.outcome == "passed" for r in reporter.results))
+        suffixes = sorted(r.test_id.split("[")[-1].rstrip("]") for r in reporter.results)
+        self.assertEqual(suffixes, ["qa", "staging"])
+
+
+class RuntestHooksTests(unittest.TestCase):
+    """ctrlrunner_runtest_logstart/setup/teardown/logreport: conftest-
+    discovered per-test hooks, fired once per attempt inside the
+    worker process that runs the test, with pytest-shaped arguments
+    (item / report objects -- see core/hookcompat.py) so migrated
+    pytest hook bodies keep working."""
+
+    def setUp(self):
+        registry.reset()
+
+    def _write_conftest(self, root, log_path, extra_setup="", extra_teardown=""):
+        (root / "conftest.py").write_text(
+            f"LOG = {str(log_path)!r}\n\n"
+            "def _write(line):\n"
+            "    with open(LOG, 'a') as f:\n"
+            "        f.write(line + '\\n')\n\n"
+            "def ctrlrunner_runtest_logstart(nodeid, location):\n"
+            "    _write(f'logstart:{nodeid}')\n\n"
+            "def ctrlrunner_runtest_setup(item):\n"
+            "    _write(f'setup:{item.nodeid}:{item.attempt}')\n"
+            f"    {extra_setup}\n\n"
+            "def ctrlrunner_runtest_teardown(item, nextitem):\n"
+            "    _write(f'teardown:{item.nodeid}:{item.attempt}')\n"
+            f"    {extra_teardown}\n\n"
+            "def ctrlrunner_runtest_logreport(report):\n"
+            "    _write(f'logreport:{report.nodeid}:{report.attempt}:{report.outcome}')\n"
+        )
+
+    def test_all_four_hooks_fire_in_order_for_a_passing_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            self._write_conftest(root, log_path)
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertEqual(
+            lines,
+            [
+                "logstart:suite.test_demo::test_a",
+                "setup:suite.test_demo::test_a:1",
+                "teardown:suite.test_demo::test_a:1",
+                "logreport:suite.test_demo::test_a:1:passed",
+            ],
+        )
+
+    def test_hooks_fire_once_per_attempt_for_a_retried_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            self._write_conftest(root, log_path)
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "attempts = {'n': 0}\n\n"
+                "@test(retries=1)\n"
+                "def test_flaky():\n"
+                "    attempts['n'] += 1\n"
+                "    assert attempts['n'] >= 2\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        self.assertEqual(
+            [line for line in lines if line.startswith("logreport")],
+            [
+                "logreport:suite.test_demo::test_flaky:1:failed",
+                "logreport:suite.test_demo::test_flaky:2:passed",
+            ],
+        )
+
+    def test_broken_setup_hook_does_not_fail_the_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            self._write_conftest(root, log_path, extra_setup="raise RuntimeError('setup boom')")
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        warning_messages = " ".join(w["message"] for w in (reporter.results[0].warnings or []))
+        self.assertIn("setup boom", warning_messages)
+
+    def test_broken_teardown_hook_does_not_fail_the_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            self._write_conftest(
+                root, log_path, extra_teardown="raise RuntimeError('teardown boom')"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "passed")
+        warning_messages = " ".join(w["message"] for w in (reporter.results[0].warnings or []))
+        self.assertIn("teardown boom", warning_messages)
+
+    def test_skip_from_setup_hook_via_marker_skips_the_test(self):
+        # The pytest pattern that motivated the compat layer:
+        #   if item.get_closest_marker("mac_only"): pytest.skip(...)
+        # written with ctrlrunner's skip() -- must control the outcome,
+        # not be swallowed by broken-hook isolation.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "from ctrlrunner import skip\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    if item.get_closest_marker('mac_only'):\n"
+                "        skip(True, 'this test only runs on macOS')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test(tags={'mac_only'})\n"
+                "def test_tagged():\n"
+                "    assert False, 'must never run'\n\n"
+                "@test()\n"
+                "def test_untagged():\n"
+                "    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        by_id = {r.test_id: r for r in reporter.results}
+        self.assertEqual(by_id["suite.test_demo::test_tagged"].outcome, "skipped")
+        self.assertIn("macOS", by_id["suite.test_demo::test_tagged"].error)
+        self.assertEqual(by_id["suite.test_demo::test_untagged"].outcome, "passed")
+
+    def test_fixme_from_setup_hook_reports_fixme(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "from ctrlrunner import fixme\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    fixme(True, 'JIRA-1: known broken environment')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "fixme")
+        self.assertIn("JIRA-1", reporter.results[0].error)
+
+    def test_fail_from_setup_hook_marks_expected_failure(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "from ctrlrunner import fail\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    fail(True, 'JIRA-2: expected broken', strict=True)\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    assert False\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        self.assertEqual(reporter.results[0].outcome, "expected_failure")
+
+    def test_full_pytest_surface_in_hooks_without_warnings(self):
+        # A hook body leaning on the wider pytest object surface --
+        # item.session/.config/.module/.cls/.funcargs, report.sections,
+        # config.pluginmanager -- must work (or degrade silently) with
+        # ZERO warnings on the result: the compat layer's contract.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def _write(line):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    _write(f'timeout={item.config.getini(\"timeout\")}')\n"
+                "    _write(f'module={item.module.__name__}')\n"
+                "    _write(f'cls={item.cls}')\n"
+                "    _write(f'xdist={item.session.config.pluginmanager.hasplugin(\"xdist\")}')\n"
+                "    _write(f'collected={item.session.testscollected}')\n\n"
+                "def ctrlrunner_runtest_teardown(item, nextitem):\n"
+                "    _write(f'funcargs={sorted(item.funcargs.keys())}')\n\n"
+                "def ctrlrunner_runtest_logreport(report):\n"
+                "    _write(f'duration_is_number={isinstance(report.duration, float)}')\n"
+                "    _write(f'sections={report.sections}')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import fixture, test\n\n"
+                "@fixture()\n"
+                "def resource():\n"
+                "    return object()\n\n"
+                "@test()\n"
+                "def test_a(resource):\n"
+                "    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0, raw_config={"timeout": 30})
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        result = reporter.results[0]
+        self.assertEqual(result.outcome, "passed")
+        self.assertFalse(result.warnings)  # the whole point: silence
+        self.assertIn("timeout=30", lines)
+        self.assertIn("module=suite.test_demo", lines)
+        self.assertIn("cls=None", lines)
+        self.assertIn("xdist=False", lines)
+        self.assertIn("collected=1", lines)
+        self.assertIn("funcargs=['resource']", lines)
+        self.assertIn("duration_is_number=True", lines)
+        self.assertIn("sections=[]", lines)
+
+    def test_unported_pytest_attribute_fails_the_test_with_recommendation(self):
+        # Fail-loudly policy: a hook touching pytest-only machinery
+        # (item.parent -- the collection tree) fails the test with the
+        # CompatibilityError recommendation in the error text, instead
+        # of degrading to a warning or a silent placeholder.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_runtest_setup(item):\n    if item.parent:\n        pass\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        result = reporter.results[0]
+        self.assertEqual(result.outcome, "failed")
+        self.assertIn("Item.parent", result.error)
+        self.assertIn("collection tree", result.error)
+        self.assertIn("item.module", result.error)
+
+    def test_teardown_nextitem_is_the_next_test_in_the_worker_batch(self):
+        # pytest(-xdist) semantics: nextitem is the next item in THIS
+        # worker's queue, or None for the last one -- a real Item shim,
+        # not a permanent None.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def ctrlrunner_runtest_teardown(item, nextitem):\n"
+                "    nxt = nextitem.name if nextitem else None\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(f'{item.name}->{nxt}\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_first():\n    pass\n\n"
+                "@test()\ndef test_second():\n    pass\n\n"
+                "@test()\ndef test_third():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(len(reporter.results), 3)
+        self.assertEqual(
+            lines,
+            [
+                "test_first->test_second",
+                "test_second->test_third",
+                "test_third->None",
+            ],
+        )
+
+    def test_teardown_hook_fires_even_for_a_skipped_test(self):
+        # pytest calls pytest_runtest_teardown for skipped items too.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n"
+                "from ctrlrunner import skip\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    skip(True, 'always skipped')\n\n"
+                "def ctrlrunner_runtest_teardown(item, nextitem):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(f'teardown:{item.nodeid}\\n')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(reporter.results[0].outcome, "skipped")
+        self.assertEqual(lines, ["teardown:suite.test_demo::test_a"])
+
+
 class WallClockParallelismTests(unittest.TestCase):
     """The assertion class the suite lacked (and why sequential batch
     execution went unnoticed for a while): every functional

@@ -133,6 +133,7 @@ def run_projects(
     seed=None,
     base_options=None,
     cli_option_values=None,
+    raw_config=None,
 ):
     """Runs each named project as its own Orchestrator.run() within this
     process, merging every project's results into one combined
@@ -280,6 +281,7 @@ def run_projects(
             import_timeout=import_timeout if import_timeout is not None else IMPORT_PHASE_TIMEOUT,
             order=order,
             seed=seed,
+            raw_config=raw_config,
         )
         project_reporter = orch.run()
         combined_reporter.results.extend(project_reporter.results)

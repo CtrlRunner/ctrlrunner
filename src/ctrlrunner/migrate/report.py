@@ -30,6 +30,7 @@ CATEGORY_LABELS = {
     "params": "pytest.param(id=/marks=) -> param(...)",
     "runtime_calls": "pytest.skip()/fail()/xfail()/getoption() calls rewritten",
     "addoption": "pytest_addoption -> ctrlrunner_addoption",
+    "hooks": "pytest hooks -> ctrlrunner hooks (configure/sessionfinish/runtest_*)",
     "test_classes": "test classes -> @test_class",
     "indirect": "indirect parametrize -> @parametrize(..., indirect=...)",
     "playwright": "pytest-playwright fixtures -> ctrlrunner.playwright.playwright_fixtures",

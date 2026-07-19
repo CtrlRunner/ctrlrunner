@@ -351,10 +351,10 @@ def parametrize(
                     # fallback mirrors _stable_param_str's contract).
                     idx = len(combined)
                     base_part = base.id or "-".join(
-                        _stable_param_str(v, idx) for v in base.values.values()
+                        _stable_param_str(v, idx, argname=k) for k, v in base.values.items()
                     )
                     entry_part = entry_id or "-".join(
-                        _stable_param_str(v, idx) for v in combo.values()
+                        _stable_param_str(v, idx, argname=k) for k, v in combo.items()
                     )
                     merged_id = "-".join(p for p in (base_part, entry_part) if p)
 
@@ -430,7 +430,70 @@ def _cartesian(mapping: dict[str, list[Any]]) -> list[dict[str, Any]]:
     return result
 
 
-def _stable_param_str(value: Any, index: int) -> str:
+# ctrlrunner_make_parametrize_id -- registered incrementally as
+# conftests are discovered (worker.py's per-worker loop for real runs,
+# orchestrator.py's discover_and_import for --list), so it's active
+# before any LATER-imported test module's @parametrize decoration runs
+# in that same process. Firstresult: the first hook returning non-None
+# wins, matching pytest_make_parametrize_id.
+_make_parametrize_id_hooks: list = []
+_make_parametrize_id_config = None
+
+
+def set_make_parametrize_id_hooks(hooks, config) -> None:
+    global _make_parametrize_id_hooks, _make_parametrize_id_config
+    _make_parametrize_id_hooks = list(hooks)
+    _make_parametrize_id_config = config
+
+
+# ctrlrunner_generate_tests -- registered incrementally, same reasoning
+# and lifecycle as _make_parametrize_id_hooks above (conftests always
+# import before test modules, so this is active before any test()
+# decorator that needs it runs in this process).
+_generate_tests_hooks: list = []
+_generate_tests_config = None
+
+
+def set_generate_tests_hooks(hooks, config) -> None:
+    global _generate_tests_hooks, _generate_tests_config
+    _generate_tests_hooks = list(hooks)
+    _generate_tests_config = config
+
+
+def _apply_generate_tests_hooks(func, sig_params) -> None:
+    """Consults every ctrlrunner_generate_tests hook via a Metafunc,
+    then replays each buffered metafunc.parametrize(...) call through
+    the real parametrize() decorator function (below) -- setting
+    func._param_sets exactly as a static @parametrize would, so test()'s
+    own cartesian-product/id/tag logic (already running when this is
+    called) picks it up with zero special-casing. A broken hook is
+    skipped, never breaks registration -- consistent with every other
+    hook that can run during module import."""
+    from .hookcompat import Metafunc, bind_hook_args, sort_hooks
+
+    metafunc = Metafunc(func, sig_params, _generate_tests_config, module=inspect.getmodule(func))
+    for hook in sort_hooks(_generate_tests_hooks):
+        try:
+            hook(**bind_hook_args(hook, {"metafunc": metafunc}))
+        except Exception:
+            continue
+    for argnames, argvalues, indirect, ids in metafunc._calls:
+        if ids:
+            names_list = (
+                list(argnames)
+                if isinstance(argnames, (tuple, list))
+                else [n.strip() for n in argnames.split(",")]
+            )
+            argvalues = [
+                v
+                if isinstance(v, param)
+                else (param(v, id=str(i)) if len(names_list) == 1 else param(*v, id=str(i)))
+                for v, i in zip(argvalues, ids, strict=False)
+            ]
+        parametrize(argnames, argvalues, indirect=indirect)(func)
+
+
+def _stable_param_str(value: Any, index: int, argname: str | None = None) -> str:
     """Renders one parametrize value for the test id suffix. Plain str/
     int/bool/etc values render via str(value) as before -- human
     readable and already stable. But a plain object with no __str__/
@@ -444,7 +507,22 @@ def _stable_param_str(value: Any, index: int) -> str:
     where `index` is this value's parametrize-combination's position
     among all combinations produced for the @test call -- simple and
     stable across runs (position in a fixed, code-defined list, not a
-    memory address)."""
+    memory address).
+
+    ctrlrunner_make_parametrize_id(config, val, argname) is consulted
+    first when an argname is known (callers that don't have one -- rare
+    internal fallback paths -- skip straight to the default logic)."""
+    if _make_parametrize_id_hooks and argname is not None:
+        from .hookcompat import bind_hook_args, sort_hooks
+
+        available = {"config": _make_parametrize_id_config, "val": value, "argname": argname}
+        for hook in sort_hooks(_make_parametrize_id_hooks):
+            try:
+                result = hook(**bind_hook_args(hook, available))
+            except Exception:
+                continue
+            if result is not None:
+                return str(result)
     cls = type(value)
     if cls.__str__ is object.__str__ and cls.__repr__ is object.__repr__:
         return f"{cls.__name__}{index}"
@@ -559,6 +637,17 @@ def test(
         else:
             call_target = func
 
+        # ctrlrunner_generate_tests: only consulted when no STATIC
+        # @parametrize already set _param_sets -- mixing dynamic
+        # generate_tests with a static @parametrize on the same test is
+        # out of scope (pytest allows layering both; ctrlrunner doesn't
+        # today). Each buffered metafunc.parametrize(...) call is fed
+        # through the real parametrize() decorator function below, so
+        # the rest of this function's cartesian-product/id/tag logic
+        # runs completely unmodified -- no reimplementation.
+        if getattr(func, "_param_sets", None) is None and _generate_tests_hooks:
+            _apply_generate_tests_hooks(func, sig_params)
+
         explicit_param_sets = getattr(func, "_param_sets", None) or [_ParamSet()]
         base_properties = properties or {}
         base_tags = tags or set()
@@ -653,11 +742,14 @@ def test(
                 # across different combos must not render identically).
                 if explicit_pset.id is not None:
                     parts = [explicit_pset.id] + [
-                        _stable_param_str(v, combo_index) for v in fixture_pset.values()
+                        _stable_param_str(v, combo_index, argname=k)
+                        for k, v in fixture_pset.items()
                     ]
                     suffix = "-".join(parts)
                 else:
-                    suffix = "-".join(_stable_param_str(v, combo_index) for v in combined.values())
+                    suffix = "-".join(
+                        _stable_param_str(v, combo_index, argname=k) for k, v in combined.items()
+                    )
                 combo_index += 1
                 test_id = f"{func.__module__}::{func.__name__}[{suffix}]"
                 # A per-entry param(case_id=...) overrides the decorator's

@@ -49,6 +49,7 @@ import libcst as cst
 import libcst.matchers as m
 from libcst.metadata import CodeRange, PositionProvider
 
+from ..core.hookcompat import PYTEST_HOOK_EQUIVALENTS, hook_name_recommendation
 from .report import FileReport
 from .scanner import ProjectIndex
 
@@ -135,6 +136,20 @@ MANUAL_PYTEST_ATTRS = {
 }
 
 _SCOPE_MAP = {"function": None, "module": "module", "session": "session"}
+
+# pytest_X hooks with a pytest-compatible ctrlrunner equivalent
+# (core/hookcompat.py hands the renamed hook shim objects -- Item /
+# TestReport / Session / Config -- carrying the commonly-used pytest
+# attribute surface), so the def is auto-renamed with the body kept
+# as-is, plus a caveat TODO to verify attribute usage. See
+# leave_FunctionDef. Derived from hookcompat's single source of truth;
+# pytest_addoption is handled separately above this map's use (no
+# caveat needed -- the OptionParser shim is fully signature-compatible).
+_HOOK_RENAMES = {
+    pytest_name: ctrlrunner_name
+    for pytest_name, ctrlrunner_name in PYTEST_HOOK_EQUIVALENTS.items()
+    if pytest_name != "pytest_addoption"
+}
 
 
 def _code(node: cst.CSTNode) -> str:
@@ -387,6 +402,22 @@ class MigrationTransformer(cst.CSTTransformer):
     def _todo(self, node, msg: str):
         self.report.todo(self._line(node), msg)
 
+    def _without_hookimpl(self, node: cst.FunctionDef) -> list:
+        """Decorators minus any @pytest.hookimpl(...) -- ctrlrunner hooks
+        are matched by function name in conftest.py, never registered,
+        so the decorator has no meaning after the rename (and dropping
+        it lets the pytest import be removed when nothing else uses it)."""
+        kept = []
+        for dec in node.decorators:
+            expr = dec.decorator
+            if isinstance(expr, cst.Call):
+                expr = expr.func
+            dotted = _dotted(expr) or ""
+            if dotted == "hookimpl" or dotted.endswith(".hookimpl"):
+                continue
+            kept.append(dec)
+        return kept
+
     def _decorator_canonical(self, dec: cst.Decorator) -> str | None:
         expr = dec.decorator
         if isinstance(expr, cst.Call):
@@ -567,23 +598,53 @@ class MigrationTransformer(cst.CSTTransformer):
         name = updated_node.name.value
 
         if name == "pytest_addoption":
-            # The one pytest hook with a direct ctrlrunner equivalent:
-            # rename only -- the body is preserved as-is, since
-            # ctrlrunner's OptionParser shim accepts pytest's
-            # parser.addoption(...)/parser.getgroup(...) signatures
-            # (parser.addini warns at runtime, pointing at
-            # [ctrlrunner.options]).
+            # Direct ctrlrunner equivalent: rename only -- the body is
+            # preserved as-is, since ctrlrunner's OptionParser shim
+            # accepts pytest's parser.addoption(...)/parser.getgroup(...)
+            # signatures (parser.addini warns at runtime, pointing at
+            # [ctrlrunner.options]). No caveat TODO needed.
             self.report.add("addoption")
-            return updated_node.with_changes(name=cst.Name("ctrlrunner_addoption"))
+            return updated_node.with_changes(
+                name=cst.Name("ctrlrunner_addoption"),
+                decorators=self._without_hookimpl(updated_node),
+            )
+
+        if name in _HOOK_RENAMES:
+            # pytest-compatible equivalents: the renamed hook receives
+            # shim objects (Item/TestReport/Session/Config, see
+            # core/hookcompat.py) carrying the commonly-used attribute
+            # surface, so the body is kept as-is -- with a caveat TODO,
+            # since the shims are a deliberate subset of pytest's
+            # objects, not an emulation.
+            ctrlrunner_name = _HOOK_RENAMES[name]
+            self.report.add("hooks")
+            # Message deliberately avoids the standalone word "pytest":
+            # fix_imports' usage scan (\bpytest\b over non-import code,
+            # comments included) would otherwise match this very comment
+            # and keep a now-unused `import pytest` alive.
+            msg = (
+                f"{ctrlrunner_name} -- body kept as-is; ctrlrunner passes "
+                f"compatible shim objects covering the common attribute "
+                f"surface (item.get_closest_marker, report.outcome, "
+                f"session.results, config.getoption); verify any other "
+                f"attribute use against docs/hooks.md"
+            )
+            self._todo(original_node, msg)
+            renamed = updated_node.with_changes(
+                name=cst.Name(ctrlrunner_name),
+                decorators=self._without_hookimpl(updated_node),
+            )
+            if _has_todo(renamed.leading_lines, msg):
+                return renamed
+            return renamed.with_changes(leading_lines=[*renamed.leading_lines, _todo_line(msg)])
 
         if name.startswith("pytest_"):
-            msg = f"pytest hook '{name}' -- no ctrlrunner equivalent"
-            self._todo(
-                original_node,
-                f"pytest hook '{name}' has no ctrlrunner equivalent "
-                f"(ctrlrunner is deliberately hook-free; only pytest_addoption "
-                f"is auto-converted, to ctrlrunner_addoption)",
-            )
+            # Per-hook guidance from hookcompat's recommendations table:
+            # "planned (Phase N, ctrlrunner_x) -- today do Y" for hooks
+            # on the parity roadmap, or the architectural alternative
+            # for hooks with no possible equivalent.
+            msg = f"pytest hook '{name}': {hook_name_recommendation(name)}"
+            self._todo(original_node, msg)
             if _has_todo(updated_node.leading_lines, msg):
                 return updated_node
             return updated_node.with_changes(

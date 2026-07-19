@@ -1646,5 +1646,390 @@ class AddoptionCliIntegrationTests(unittest.TestCase):
             self.assertEqual(get_option("env"), "staging")
 
 
+class ConfigureSessionfinishCliIntegrationTests(unittest.TestCase):
+    """ctrlrunner_configure/ctrlrunner_sessionfinish end to end: fire
+    once each around the whole run, in the main process, regardless of
+    --list (never) or a real run (always, exactly once)."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+            main()
+        return ctx.exception.code
+
+    def _make_suite(self, tmp, configure_body="pass", sessionfinish_body="pass"):
+        root = Path(tmp) / "tests"
+        root.mkdir()
+        (root / "conftest.py").write_text(
+            "def ctrlrunner_configure(config):\n"
+            "    with open('log.txt', 'a') as f:\n"
+            "        f.write(f'configure:{sorted(config.keys())}\\n')\n"
+            f"    {configure_body}\n\n"
+            "def ctrlrunner_sessionfinish(session, exitstatus):\n"
+            "    with open('log.txt', 'a') as f:\n"
+            "        f.write(f'sessionfinish:{len(session.results)}:{exitstatus}\\n')\n"
+            f"    {sessionfinish_body}\n"
+        )
+        (root / "test_demo.py").write_text(
+            "from ctrlrunner import test\n\n"
+            "@test()\n"
+            "def test_a():\n"
+            "    with open('log.txt', 'a') as f:\n"
+            "        f.write('test_a\\n')\n"
+        )
+        return root
+
+    def _log_lines(self):
+        path = Path("log.txt")
+        if not path.exists():
+            return []
+        return path.read_text().splitlines()
+
+    def test_configure_and_sessionfinish_fire_once_around_the_run(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--reporter", "json"])
+            lines = self._log_lines()
+
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[0].startswith("configure:"))
+        self.assertEqual(lines[1], "test_a")
+        self.assertEqual(lines[2], "sessionfinish:1:0")
+
+    def test_configure_exception_aborts_before_any_test_runs(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp, configure_body="raise RuntimeError('boom')")
+            os.chdir(tmp)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = self._run_cli(["--reporter", "json"])
+            self.assertNotEqual(code, 0)
+            self.assertIn("boom", stderr.getvalue())
+            self.assertNotIn("test_a", self._log_lines())
+            self.assertFalse(Path("reports/html-report/results.json").exists())
+
+    def test_sessionfinish_exception_does_not_change_exit_code(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp, sessionfinish_body="raise RuntimeError('boom')")
+            os.chdir(tmp)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = self._run_cli(["--reporter", "json"])
+            self.assertEqual(code, 0)
+            self.assertIn("boom", stderr.getvalue())
+
+    def test_list_triggers_neither_hook(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            self._run_cli(["--list", "text"])
+            self.assertEqual(self._log_lines(), [])
+
+    def test_multi_project_run_fires_configure_and_sessionfinish_once_total(self):
+        # Not once per project -- both branches of _run_main's
+        # requested_projects/else split converge on one shared
+        # invocation site, so a single conftest.py's hooks fire exactly
+        # once for the whole multi-project run, not once per Orchestrator.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            (Path(tmp) / "tests_a").mkdir()
+            (Path(tmp) / "tests_b").mkdir()
+            (Path(tmp) / "tests_a" / "conftest.py").write_text(
+                "def ctrlrunner_configure(config):\n"
+                "    with open('log.txt', 'a') as f:\n"
+                "        f.write('configure\\n')\n\n"
+                "def ctrlrunner_sessionfinish(session, exitstatus):\n"
+                "    with open('log.txt', 'a') as f:\n"
+                "        f.write(f'sessionfinish:{session.testscollected}\\n')\n"
+            )
+            (Path(tmp) / "tests_a" / "test_a.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    pass\n"
+            )
+            (Path(tmp) / "tests_b" / "test_b.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    pass\n"
+            )
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner.projects.a]\ntests_dir = ["tests_a"]\n\n'
+                '[ctrlrunner.projects.b]\ntests_dir = ["tests_b"]\n'
+            )
+            os.chdir(tmp)
+            self._run_cli(["--project", "a,b", "--reporter", "json"])
+            lines = self._log_lines()
+
+        self.assertEqual(lines, ["configure", "sessionfinish:2"])
+
+    def test_addinivalue_line_registers_tag_before_strict_validation(self):
+        # pytest_configure's classic config.addinivalue_line("markers",...)
+        # use-case, for real: the hook runs BEFORE load_tag_registry, so
+        # the registered marker passes --strict-tags validation that
+        # would otherwise fail the run.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "tests"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_configure(config):\n"
+                '    config.addinivalue_line("markers", "hooked_tag: registered at runtime")\n'
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test(tags={'hooked_tag'})\n"
+                "def test_a():\n"
+                "    pass\n"
+            )
+            Path(tmp, "ctrlrunner.toml").write_text(
+                '[ctrlrunner]\nregistered_tags = ["smoke"]\nstrict_tags = true\n'
+            )
+            os.chdir(tmp)
+            code = self._run_cli(["tests", "--reporter", "json"])
+            data = json.loads(Path("reports/html-report/results.json").read_text())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(data["stats"]["passed"], 1)
+
+    def test_configure_runs_shallowest_conftest_first(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "tests"
+            (root / "sub").mkdir(parents=True)
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_configure(config):\n"
+                "    with open('log.txt', 'a') as f:\n"
+                "        f.write('root\\n')\n"
+            )
+            (root / "sub" / "conftest.py").write_text(
+                "def ctrlrunner_configure(config):\n"
+                "    with open('log.txt', 'a') as f:\n"
+                "        f.write('sub\\n')\n"
+            )
+            (root / "sub" / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            os.chdir(tmp)
+            self._run_cli(["tests/sub", "--reporter", "json"])
+            lines = self._log_lines()
+
+        self.assertEqual(lines[:2], ["root", "sub"])
+
+
+class ReportTeststatusCliTests(unittest.TestCase):
+    """ctrlrunner_report_teststatus -- consulted by DotsReporter for a
+    custom per-test symbol."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
+            main()
+
+    def test_custom_symbol_used_in_dots_output(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "tests"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def ctrlrunner_report_teststatus(report, config):\n"
+                "    if report.passed:\n"
+                "        return ('passed', '@', 'PASSED')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            os.chdir(tmp)
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                self._run_cli(["tests", "--reporter", "dots"])
+
+        self.assertIn("@", stdout.getvalue())
+
+
+class MainProcessLifecycleHooksTests(unittest.TestCase):
+    """The full main-process hook sequence around a run: configure ->
+    sessionstart -> report_header -> (tests) -> terminal_summary ->
+    sessionfinish -> unconfigure."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
+            main()
+
+    def test_all_main_process_hooks_fire_in_order(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "tests"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "def _write(line):\n"
+                "    with open('log.txt', 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_configure(config):\n"
+                "    _write('configure')\n\n"
+                "def ctrlrunner_sessionstart(session):\n"
+                "    _write(f'sessionstart:{session.testscollected}')\n\n"
+                "def ctrlrunner_report_header(config):\n"
+                "    _write('report_header')\n"
+                "    return ['env: smoke-lab', 'build: 42']\n\n"
+                "def ctrlrunner_terminal_summary(terminalreporter, exitstatus):\n"
+                "    _write(f'terminal_summary:{exitstatus}')\n"
+                "    terminalreporter.section('my summary')\n"
+                "    terminalreporter.write_line(\n"
+                "        f\"passed={len(terminalreporter.stats.get('passed', []))}\"\n"
+                "    )\n\n"
+                "def ctrlrunner_sessionfinish(session, exitstatus):\n"
+                "    _write(f'sessionfinish:{session.testscollected}')\n\n"
+                "def ctrlrunner_unconfigure(config):\n"
+                "    _write('unconfigure')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            os.chdir(tmp)
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                self._run_cli(["tests", "--reporter", "json"])
+            lines = Path("log.txt").read_text().splitlines()
+
+        self.assertEqual(
+            lines,
+            [
+                "configure",
+                "sessionstart:0",  # before collection -- nothing collected yet
+                "report_header",
+                "terminal_summary:0",
+                "sessionfinish:1",
+                "unconfigure",
+            ],
+        )
+        printed = stdout.getvalue()
+        self.assertIn("env: smoke-lab", printed)
+        self.assertIn("build: 42", printed)
+        self.assertIn("my summary", printed)
+        self.assertIn("passed=1", printed)
+
+
+class UnknownHookCliTests(unittest.TestCase):
+    """Startup abort for unsupported hook names in conftest.py, and the
+    allow_unknown_hooks escape hatch."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+            main()
+        return ctx.exception.code
+
+    def _make_suite(self, tmp):
+        root = Path(tmp) / "tests"
+        root.mkdir()
+        (root / "conftest.py").write_text("def pytest_collection_modifyitems(items):\n    pass\n")
+        (root / "test_demo.py").write_text(
+            "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+        )
+
+    def test_unsupported_hook_aborts_startup_with_recommendation(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = self._run_cli(["tests", "--reporter", "json"])
+        self.assertEqual(code, 2)
+        self.assertIn("pytest_collection_modifyitems", stderr.getvalue())
+        # A supported-after-rename hook points at the migrate tool.
+        self.assertIn("ctrlrunner_collection_modifyitems", stderr.getvalue())
+        self.assertIn("migrate", stderr.getvalue())
+
+    def test_allow_unknown_hooks_lets_the_run_proceed_with_warning(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            Path(tmp, "ctrlrunner.toml").write_text("[ctrlrunner]\nallow_unknown_hooks = true\n")
+            os.chdir(tmp)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = self._run_cli(["tests", "--reporter", "json"])
+            data = json.loads(Path("reports/html-report/results.json").read_text())
+        self.assertEqual(code, 0)
+        self.assertEqual(data["stats"]["passed"], 1)
+        self.assertIn("pytest_collection_modifyitems", stderr.getvalue())
+
+
+class AllSixHooksEndToEndTests(unittest.TestCase):
+    """One conftest.py defining all six pytest-analogue hooks, one real
+    CLI invocation, full expected sequence -- the permanent regression
+    guard for the whole feature working together, not just each hook
+    in isolation."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
+            main()
+
+    def test_all_six_hooks_fire_in_the_right_order_for_one_passing_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "tests"
+            root.mkdir()
+            log_path = Path(tmp) / "log.txt"
+            (root / "conftest.py").write_text(
+                f"LOG = {str(log_path)!r}\n\n"
+                "def _write(line):\n"
+                "    with open(LOG, 'a') as f:\n"
+                "        f.write(line + '\\n')\n\n"
+                "def ctrlrunner_configure(config):\n"
+                "    _write('configure')\n\n"
+                "def ctrlrunner_sessionfinish(session, exitstatus):\n"
+                "    _write(f'sessionfinish:{session.testscollected}:{exitstatus}')\n\n"
+                "def ctrlrunner_runtest_logstart(nodeid, location):\n"
+                "    _write('logstart:1')\n\n"
+                "def ctrlrunner_runtest_setup(item):\n"
+                "    _write(f'setup:{item.attempt}')\n\n"
+                "def ctrlrunner_runtest_teardown(item, nextitem):\n"
+                "    _write(f'teardown:{item.attempt}')\n\n"
+                "def ctrlrunner_runtest_logreport(report):\n"
+                "    _write(f'logreport:{report.attempt}:{report.outcome}')\n"
+            )
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            os.chdir(tmp)
+            self._run_cli(["tests", "--reporter", "json"])
+            lines = log_path.read_text().splitlines()
+
+        self.assertEqual(
+            lines,
+            [
+                "configure",
+                "logstart:1",
+                "setup:1",
+                "teardown:1",
+                "logreport:1:passed",
+                "sessionfinish:1:0",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

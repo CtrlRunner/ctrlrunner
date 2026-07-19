@@ -44,6 +44,20 @@ _MAX_DIFF_LEN = 10_000
 _SAFE_SUBSCRIPT_TYPES = (dict, list, tuple, str)
 _SAFE_KEY_TYPES = (int, float, str, bool, type(None))
 
+# ctrlrunner_assertrepr_compare hooks -- set once per worker by
+# worker.py's conftest discovery pass (same per-process-global
+# convention as worker.py's own _hook_config/_hook_session). Kept here
+# rather than imported from worker.py to avoid a core/ -> execution/
+# circular import; worker.py imports THIS module already.
+_assertrepr_compare_hooks: list = []
+_assertrepr_compare_config = None
+
+
+def set_assertrepr_compare_hooks(hooks, config) -> None:
+    global _assertrepr_compare_hooks, _assertrepr_compare_config
+    _assertrepr_compare_hooks = list(hooks)
+    _assertrepr_compare_config = config
+
 
 class _SafeRepr(reprlib.Repr):
     """reprlib.Repr's own repr_dict formats a dict by iterating its keys
@@ -175,6 +189,32 @@ def _build(exc: AssertionError) -> dict | None:
                 diff, truncated = _diff(left_val, right_val)
                 details["diff"] = diff
                 details["truncated"] = truncated
+            # pytest_assertrepr_compare(config, op, left, right) -- the
+            # RAW resolved values (left_val/right_val), not their repr
+            # strings, matching pytest's own contract. A broken hook is
+            # swallowed silently, no warning: this module's own
+            # pre-existing invariant ("never raises, a bug here must
+            # never change a test's outcome") is stricter than the rest
+            # of the compat layer and predates it -- kept consistent.
+            if _assertrepr_compare_hooks:
+                from .hookcompat import bind_hook_args, sort_hooks
+
+                lines: list = []
+                available = {
+                    "config": _assertrepr_compare_config,
+                    "op": op_symbol,
+                    "left": left_val,
+                    "right": right_val,
+                }
+                for hook in sort_hooks(_assertrepr_compare_hooks):
+                    try:
+                        result = hook(**bind_hook_args(hook, available))
+                    except Exception:
+                        continue
+                    if result:
+                        lines.extend(result if isinstance(result, list) else [str(result)])
+                if lines:
+                    details["assertrepr_compare"] = lines
 
     return details
 

@@ -21,6 +21,19 @@ The shim accepts pytest's `parser.addoption(...)` signature, which is
 argparse-compatible -- migrated pytest_addoption bodies work unchanged
 after the function is renamed to ctrlrunner_addoption (the migration
 tool does that rename automatically).
+
+The same conftest import pass also collects two sibling hooks, the
+pytest_configure/pytest_sessionfinish equivalents -- plain functions,
+not declarations, so collect_declarations() just gathers the callables
+here; cli.py invokes them once each around the run with pytest-shaped
+arguments (core/hookcompat.py's Config/Session shims -- docs/hooks.md
+has the full contract):
+
+    def ctrlrunner_configure(config):
+        ...  # once, main process, before the run; config.getoption() works
+
+    def ctrlrunner_sessionfinish(session, exitstatus):
+        ...  # once, main process, after the run; session.results/.duration
 """
 
 import argparse
@@ -33,6 +46,21 @@ class AddoptionError(ValueError):
     """A bad ctrlrunner_addoption declaration (duplicate flag, name
     colliding with a built-in ctrlrunner flag, invalid toml value for a
     declared choices= option, ...)."""
+
+
+# The conftest hooks that run in the MAIN process, collected by
+# collect_declarations() and invoked from cli.py around the run. The
+# per-test ctrlrunner_runtest_* hooks are worker-side (worker.py); the
+# collection-phase hooks are orchestrator-side (orchestrator.py).
+MAIN_PROCESS_HOOKS = (
+    "ctrlrunner_configure",
+    "ctrlrunner_sessionstart",
+    "ctrlrunner_sessionfinish",
+    "ctrlrunner_unconfigure",
+    "ctrlrunner_report_header",
+    "ctrlrunner_terminal_summary",
+    "ctrlrunner_report_teststatus",
+)
 
 
 @dataclass
@@ -58,6 +86,19 @@ class OptionParser:
         self._declarations: list[_Declaration] = []
         self._by_name: dict[str, str] = {}  # option string -> declaring conftest path
         self._source = "<unknown>"
+        # The main-process conftest hooks -- collected in the same
+        # conftest import pass as ctrlrunner_addoption (see
+        # collect_declarations below), in conftest discovery order
+        # (shallowest-first). Not declarations, just plain callables.
+        self.hooks: dict[str, list] = {name: [] for name in MAIN_PROCESS_HOOKS}
+
+    @property
+    def configure_hooks(self) -> list:
+        return self.hooks["ctrlrunner_configure"]
+
+    @property
+    def sessionfinish_hooks(self) -> list:
+        return self.hooks["ctrlrunner_sessionfinish"]
 
     # ---- declaration API (what conftest code calls) -------------------
 
@@ -179,7 +220,7 @@ class OptionParser:
         return {**self.base_values(config_options), **self.cli_values(args)}
 
 
-def collect_declarations(roots: list[str]) -> OptionParser:
+def collect_declarations(roots: list[str], allow_unknown_hooks: bool = False) -> OptionParser:
     """Imports every conftest.py that applies to `roots` (ancestor walk
     to a .git boundary plus descendants -- the exact same discovery and
     sys.path setup the run itself performs later, via discover_conftests)
@@ -213,8 +254,51 @@ def collect_declarations(roots: list[str]) -> OptionParser:
                 continue
             seen.add(rp)
             key = import_module_by_path(p, _dotted_module_name(root_path, p))
-            hook = getattr(sys.modules[key], "ctrlrunner_addoption", None)
+            module = sys.modules[key]
+            hook = getattr(module, "ctrlrunner_addoption", None)
             if hook is not None:
+                from ..core.hookcompat import _PluginManager, bind_hook_args
+
                 shim._source = str(p)
-                hook(shim)
+                # pytest's pytest_addoption(parser, pluginmanager) shape:
+                # name-based binding keeps plain (parser) impls working.
+                hook(**bind_hook_args(hook, {"parser": shim, "pluginmanager": _PluginManager()}))
+            for hook_name in MAIN_PROCESS_HOOKS:
+                fn = getattr(module, hook_name, None)
+                if fn is not None:
+                    shim.hooks[hook_name].append(fn)
+            _check_unknown_hooks(module, p, allow_unknown_hooks)
     return shim
+
+
+def _check_unknown_hooks(module, path, allow_unknown_hooks: bool) -> None:
+    """Fail-loudly policy: a conftest function named like a hook
+    ctrlrunner doesn't dispatch (any pytest_* name, or a ctrlrunner_*
+    name outside the supported set) would otherwise be silently
+    ignored -- the worst failure mode for migrated pytest projects.
+    Abort with the per-hook recommendation; allow_unknown_hooks=true in
+    ctrlrunner.toml downgrades to a stderr warning (for conftests
+    serving both runners mid-migration)."""
+    from ..core.hookcompat import SUPPORTED_HOOKS, hook_name_recommendation
+
+    # Only functions DEFINED here count -- `from helpers import
+    # pytest_x`-style re-exports still count, but imported modules'
+    # attributes don't appear in vars(module) unless bound by name.
+    offenders = [
+        name
+        for name, value in vars(module).items()
+        if callable(value)
+        and (name.startswith("pytest_") or name.startswith("ctrlrunner_"))
+        and name not in SUPPORTED_HOOKS
+    ]
+    if not offenders:
+        return
+    lines = [f"  {name}: {hook_name_recommendation(name)}" for name in sorted(offenders)]
+    message = f"{path}: unsupported hook function(s) in conftest.py:\n" + "\n".join(lines)
+    if allow_unknown_hooks:
+        print(f"Warning: {message}", file=sys.stderr)
+        return
+    raise AddoptionError(
+        f"{message}\n(set allow_unknown_hooks = true in ctrlrunner.toml to "
+        f"downgrade this to a warning during migration)"
+    )

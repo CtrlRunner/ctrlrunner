@@ -1,7 +1,9 @@
 import argparse
+import tempfile
 import unittest
+from pathlib import Path
 
-from ctrlrunner.config.addoption import AddoptionError, OptionParser
+from ctrlrunner.config.addoption import AddoptionError, OptionParser, collect_declarations
 from ctrlrunner.core.options import get_option, get_options, set_options
 
 
@@ -199,6 +201,118 @@ class OptionParserShimTests(unittest.TestCase):
         help_text = parser.format_help()
         self.assertIn("target env", help_text)
         self.assertIn("[default: qa]", help_text)
+
+
+class UnknownHookDetectionTests(unittest.TestCase):
+    """Fail-loudly policy at startup: a conftest defining a pytest_* or
+    ctrlrunner_* hook ctrlrunner doesn't support aborts collection with
+    a per-hook recommendation, instead of being silently ignored.
+    allow_unknown_hooks=True (ctrlrunner.toml escape hatch, for shared
+    pytest+ctrlrunner conftests mid-migration) downgrades to a
+    warning."""
+
+    def _conftest(self, tmp, body):
+        root = Path(tmp) / "suite"
+        root.mkdir()
+        (root / "conftest.py").write_text(body)
+        return root
+
+    def test_refused_pytest_hook_aborts_with_recommendation(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = self._conftest(tmp, "def pytest_enter_pdb(config, pdb):\n    pass\n")
+            with self.assertRaises(AddoptionError) as ctx:
+                collect_declarations([str(root)])
+        message = str(ctx.exception)
+        self.assertIn("pytest_enter_pdb", message)
+        self.assertIn("breakpoint()", message)
+
+    def test_unrenamed_supported_pytest_hook_aborts_pointing_at_migrate(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = self._conftest(tmp, "def pytest_runtest_setup(item):\n    pass\n")
+            with self.assertRaises(AddoptionError) as ctx:
+                collect_declarations([str(root)])
+        message = str(ctx.exception)
+        self.assertIn("ctrlrunner_runtest_setup", message)
+        self.assertIn("migrate", message)
+
+    def test_unknown_ctrlrunner_hook_aborts_listing_supported_names(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = self._conftest(tmp, "def ctrlrunner_runtest_setupp(item):\n    pass\n")
+            with self.assertRaises(AddoptionError) as ctx:
+                collect_declarations([str(root)])
+        message = str(ctx.exception)
+        self.assertIn("ctrlrunner_runtest_setupp", message)
+        self.assertIn("ctrlrunner_runtest_setup", message)  # the supported list
+
+    def test_allow_unknown_hooks_downgrades_to_warning(self):
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = self._conftest(tmp, "def pytest_enter_pdb(config, pdb):\n    pass\n")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                shim = collect_declarations([str(root)], allow_unknown_hooks=True)
+        self.assertIsNotNone(shim)
+        self.assertIn("pytest_enter_pdb", stderr.getvalue())
+
+    def test_supported_hooks_and_plain_helpers_pass_clean(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = self._conftest(
+                tmp,
+                "def ctrlrunner_configure(config):\n    pass\n\n"
+                "def ctrlrunner_runtest_logreport(report):\n    pass\n\n"
+                "def my_helper():\n    pass\n",
+            )
+            shim = collect_declarations([str(root)])
+        self.assertEqual(len(shim.configure_hooks), 1)
+
+
+class ConfigureSessionfinishCollectionTests(unittest.TestCase):
+    """collect_declarations() also collects ctrlrunner_configure and
+    ctrlrunner_sessionfinish from conftest.py, in the same discovery
+    pass as ctrlrunner_addoption -- no extra conftest import."""
+
+    def test_collects_configure_and_sessionfinish_hooks(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text(
+                "calls = []\n\n"
+                "def ctrlrunner_configure(config):\n"
+                "    calls.append(('configure', config))\n\n"
+                "def ctrlrunner_sessionfinish(results, duration, exitstatus):\n"
+                "    calls.append(('sessionfinish', results, duration, exitstatus))\n"
+            )
+            shim = collect_declarations([str(root)])
+
+        self.assertEqual(len(shim.configure_hooks), 1)
+        self.assertEqual(len(shim.sessionfinish_hooks), 1)
+
+    def test_conftest_without_hooks_collects_nothing(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "conftest.py").write_text("x = 1\n")
+            shim = collect_declarations([str(root)])
+
+        self.assertEqual(shim.configure_hooks, [])
+        self.assertEqual(shim.sessionfinish_hooks, [])
+
+    def test_hooks_collected_shallowest_conftest_first(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            (root / "sub").mkdir(parents=True)
+            (root / "conftest.py").write_text("def ctrlrunner_configure(config):\n    pass\n")
+            (root / "sub" / "conftest.py").write_text(
+                "def ctrlrunner_configure(config):\n    pass\n"
+            )
+            shim = collect_declarations([str(root)])
+
+        self.assertEqual(len(shim.configure_hooks), 2)
+        root_hook_module = shim.configure_hooks[0].__module__
+        sub_hook_module = shim.configure_hooks[1].__module__
+        self.assertNotEqual(root_hook_module, sub_hook_module)
 
 
 if __name__ == "__main__":

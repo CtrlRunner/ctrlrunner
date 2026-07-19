@@ -5,6 +5,15 @@ multiprocessing.Queue -- this is what lets the parent detect a hang
 (no "started" message progressing past its deadline) and hard-kill via
 the Job Object, instead of relying on an in-process signal/thread that
 can itself get stuck.
+
+Also where the eight per-test pytest_runtest_*/exception_interact
+equivalents live -- ctrlrunner_runtest_logstart/setup/call/makereport/
+exception_interact/teardown/logreport/logfinish, conftest-discovered
+once per worker (see run_worker's import loop) and invoked from
+_execute_test at the matching points in the attempt lifecycle. Unlike
+ctrlrunner_configure/ctrlrunner_sessionfinish (config/addoption.py,
+invoked from cli.py -- once, main process, around the whole run), these
+fire once per test ATTEMPT, inside whichever worker process runs it.
 """
 
 import contextlib
@@ -19,13 +28,96 @@ import warnings as warnings_module
 from contextlib import ExitStack, nullcontext
 from pathlib import Path
 
-from ..core import annotations, assert_introspect, context_info, log_capture, tb_format
+from ..core import (
+    annotations,
+    assert_introspect,
+    context_info,
+    di,
+    hookcompat,
+    log_capture,
+    tb_format,
+)
 from ..core import steps as steps_module
 from ..core.di import FixtureResolver
 from ..core.registry import get_fixtures, get_tests
 from ..core.steps import step
 
 ARTIFACTS_ROOT = Path("ctrlrunner-artifacts")
+
+# ctrlrunner_runtest_logstart/setup/teardown/logreport -- the
+# pytest_runtest_* equivalents. Collected once in run_worker() (this
+# worker's own conftest import pass, right alongside ctrlrunner_addoption
+# module-level get_option seeding) and read directly by _execute_test()
+# below -- same per-process-global convention core/options.py's
+# _options and playwright_fixtures.py's _config already use, so no
+# extra parameter threading through _execute_test/_run_serial_group's
+# two call sites.
+_runtest_logstart_hooks: list = []
+_runtest_setup_hooks: list = []
+_runtest_teardown_hooks: list = []
+_runtest_logreport_hooks: list = []
+_runtest_call_hooks: list = []
+_runtest_makereport_hooks: list = []
+_runtest_exception_interact_hooks: list = []
+_runtest_logfinish_hooks: list = []
+_warning_recorded_hooks: list = []
+_assertrepr_compare_hooks: list = []
+_fixture_setup_hooks: list = []
+_fixture_post_finalizer_hooks: list = []
+
+_ALL_RUNTEST_HOOK_LISTS = (
+    ("ctrlrunner_runtest_logstart", "_runtest_logstart_hooks"),
+    ("ctrlrunner_runtest_setup", "_runtest_setup_hooks"),
+    ("ctrlrunner_runtest_call", "_runtest_call_hooks"),
+    ("ctrlrunner_runtest_makereport", "_runtest_makereport_hooks"),
+    ("ctrlrunner_exception_interact", "_runtest_exception_interact_hooks"),
+    ("ctrlrunner_runtest_teardown", "_runtest_teardown_hooks"),
+    ("ctrlrunner_runtest_logreport", "_runtest_logreport_hooks"),
+    ("ctrlrunner_runtest_logfinish", "_runtest_logfinish_hooks"),
+    ("ctrlrunner_warning_recorded", "_warning_recorded_hooks"),
+    ("ctrlrunner_assertrepr_compare", "_assertrepr_compare_hooks"),
+    ("ctrlrunner_fixture_setup", "_fixture_setup_hooks"),
+    ("ctrlrunner_fixture_post_finalizer", "_fixture_post_finalizer_hooks"),
+)
+
+# The pytest-shaped config/session backing item.config/item.session in
+# per-test hooks -- built once per worker in run_worker() from the raw
+# ctrlrunner.toml dict that rode the spawn args. Same per-process-global
+# convention as core/options.py's _options.
+_hook_config = hookcompat.Config({})
+_hook_session = hookcompat.Session(config=_hook_config)
+
+
+def _call_runtest_hooks(hooks, available: dict, propagate=()):
+    """Calls each per-test hook with the pluggy-style NAMED subset of
+    `available` it declares (see hookcompat.bind_hook_args), isolating
+    unexpected exceptions so a broken hook can never affect the test
+    it's observing -- same 'never silent, never fatal' rule
+    capture_artifacts() follows for a broken on_failure callback. Two
+    kinds ALWAYS escape: `propagate` lists per-call-site types (the
+    setup hook passes SkipTest/FixmeTest so skip()/fixme() from a hook
+    controls the outcome), and CompatibilityError -- a hook touching
+    unported pytest machinery (or declaring an unknown parameter name)
+    must fail the test loudly, with the recommendation in the failure
+    text, not degrade to a warning. @hookimpl(tryfirst=/trylast=)
+    ordering is honored via hookcompat.sort_hooks."""
+    for hook in hookcompat.sort_hooks(hooks):
+        try:
+            hook(**hookcompat.bind_hook_args(hook, available))
+        except propagate:
+            raise
+        except hookcompat.CompatibilityError as exc:
+            # Returned, not raised: three of the four call sites sit
+            # outside the outcome handlers, where a raise would crash
+            # the whole worker instead of failing THIS test.
+            return exc
+        except Exception as exc:
+            warnings_module.warn(
+                f"{hook.__name__} raised {type(exc).__name__}: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+    return None
 
 
 def module_name_for_path(path) -> str:
@@ -254,6 +346,7 @@ def _execute_test(
     cov,
     coverage_config,
     strict_teardown: bool = True,
+    next_item=None,
 ):
     """Runs one test -- fixture resolution, the per-test retry loop,
     artifact/log capture -- and RETURNS its 13-field "finished" tuple
@@ -316,11 +409,40 @@ def _execute_test(
         # watchdog deadline, so a retried test gets its full timeout again
         # on each attempt rather than sharing one deadline across all of them.
         result_queue.put(("started", worker_id, test_id, attempt_start))
+        # The pytest-shaped per-test object (item.get_closest_marker,
+        # .nodeid, .tags, .module, .cls, .config, .session, ...) built
+        # fresh per attempt so .attempt is always current. See
+        # core/hookcompat.py.
+        hook_item = hookcompat.Item(
+            test_id,
+            attempt,
+            tags=item.tags,
+            properties=item.properties,
+            func=item.func,
+            cls_name=item.class_name,
+            config=_hook_config,
+            session=_hook_session,
+        )
+        # A CompatibilityError from any hook fails THIS test loudly,
+        # with the recommendation in the failure text -- deferred into
+        # the try block below where failure handling lives.
+        pending_compat_error = _call_runtest_hooks(
+            _runtest_logstart_hooks, {"nodeid": test_id, "location": hook_item.location}
+        )
 
         function_stack = ExitStack()
         outcome, error, artifacts, assert_details = "passed", None, [], None
         resolved_all = {}
         capture_done = False
+        # The "call" phase timing/exception for ctrlrunner_runtest_makereport
+        # /exception_interact's CallInfo -- defaults cover a test that
+        # skips before ever reaching the call hooks/test body (call_start
+        # == call_stop, no exception). Only AssertionError/generic
+        # Exception populate call_excinfo: skip()/fixme() aren't
+        # "failures" in the screenshot-on-failure sense these two hooks
+        # exist for.
+        call_start = call_stop = time.time()
+        call_excinfo = None
         annotations.begin_test(result_queue, worker_id, test_id)
         # param(xfail=...) rides the existing runtime fail() pipeline --
         # re-applied per attempt because begin_test() above resets it.
@@ -341,13 +463,37 @@ def _execute_test(
             warnings_module.simplefilter("always")
             try:
                 try:
+                    if pending_compat_error is not None:
+                        raise pending_compat_error
                     # param(skip=...) skips before fixtures are resolved.
                     if item.skip_marker:
                         raise annotations.SkipTest(item.skip_marker.get("description"))
+                    # skip()/fixme() raised by a setup hook must control
+                    # the test's outcome exactly as from the test body --
+                    # the SkipTest/FixmeTest handlers below catch them.
+                    # (fail() needs no propagation: it sets state, not
+                    # an exception.)
+                    setup_compat_error = _call_runtest_hooks(
+                        _runtest_setup_hooks,
+                        {"item": hook_item},
+                        propagate=(annotations.SkipTest, annotations.FixmeTest),
+                    )
+                    if setup_compat_error is not None:
+                        raise setup_compat_error
                     values, resolved_all = resolver.resolve(
                         names_to_resolve, function_stack, item.fixture_param_overrides
                     )
+                    # pytest's item.funcargs -- live resolved fixtures,
+                    # visible to the teardown hook (still open there).
+                    hook_item.funcargs = resolved_all
                     kwargs = {k: v for k, v in values.items() if k in item.params}
+                    call_start = time.time()
+                    # Notification hook (matches pytest_runtest_call): an
+                    # exception here fails the test exactly like one from
+                    # the test body itself -- no isolation, unlike the
+                    # other per-test hooks.
+                    for call_hook in _runtest_call_hooks:
+                        call_hook(**hookcompat.bind_hook_args(call_hook, {"item": hook_item}))
                     with step("test body"):
                         item.func(**kwargs)
                 except annotations.SkipTest as e:
@@ -360,11 +506,21 @@ def _execute_test(
                 # is intentional: the data is still correct and useful,
                 # we just don't gate its capture on the eventual outcome.
                 except AssertionError as e:
+                    call_excinfo = hookcompat.ExceptionInfo(e)
                     assert_details = assert_introspect.build_assert_details(e)
                     outcome, error, artifacts, capture_done = _finish_failure(
                         tb_format.format_filtered_exc(), test_id, attempt, resolved_all, fixtures
                     )
-                except Exception:
+                    # ctrlrunner_assertrepr_compare's extra explanation
+                    # lines (pytest_assertrepr_compare), appended to the
+                    # failure text -- assert_details already carries them
+                    # if a hook returned any.
+                    if assert_details and assert_details.get("assertrepr_compare"):
+                        error = "{}\n\n{}".format(
+                            error, "\n".join(assert_details["assertrepr_compare"])
+                        )
+                except Exception as e:
+                    call_excinfo = hookcompat.ExceptionInfo(e)
                     outcome, error, artifacts, capture_done = _finish_failure(
                         tb_format.format_filtered_exc(), test_id, attempt, resolved_all, fixtures
                     )
@@ -376,6 +532,7 @@ def _execute_test(
                             f"Unexpected pass while marked fail(): {expected['description'] or ''}"
                         )
                         # strict=False -> stays "passed"; flagged via property below
+                call_stop = time.time()
 
                 # Fixtures with always_capture=True (e.g. "save a trace for
                 # every test") still get their artifact even when the test
@@ -393,6 +550,32 @@ def _execute_test(
                         only_always=True,
                         outcome=outcome,
                     )
+                # Teardown hooks fire for EVERY outcome (pytest calls
+                # pytest_runtest_teardown even for skipped items), and
+                # before function_stack.close() so live fixture state is
+                # still reachable. `nextitem` carries pytest(-xdist)
+                # semantics: the next test in THIS worker's batch, None
+                # for the last one; trim_args lets a hook declare just
+                # (item).
+                next_hook_item = None
+                if next_item is not None:
+                    next_hook_item = hookcompat.Item(
+                        next_item.id,
+                        1,  # hasn't run yet -- its first attempt is upcoming
+                        tags=next_item.tags,
+                        properties=next_item.properties,
+                        func=next_item.func,
+                        cls_name=next_item.class_name,
+                        config=_hook_config,
+                        session=_hook_session,
+                    )
+                teardown_compat_error = _call_runtest_hooks(
+                    _runtest_teardown_hooks, {"item": hook_item, "nextitem": next_hook_item}
+                )
+                if teardown_compat_error is not None:
+                    compat_text = f"CompatibilityError in teardown hook: {teardown_compat_error}"
+                    outcome = "failed"
+                    error = f"{error}\n\n{compat_text}" if error else compat_text
             finally:
                 function_stack.close()
 
@@ -409,6 +592,99 @@ def _execute_test(
             elif outcome == "failed":
                 error = f"{error or ''}\n\nAdditionally, fixture teardown failed:\n\n{td_text}"
 
+        report_sections = []
+        if captured:
+            if captured.get("stdout"):
+                report_sections.append(("Captured stdout call", captured["stdout"]))
+            if captured.get("stderr"):
+                report_sections.append(("Captured stderr call", captured["stderr"]))
+        # item.add_report_section(when, key, content) -- pytest's own
+        # "Captured {key} {when}" title convention.
+        for when, key, content in hook_item._report_sections:
+            report_sections.append((f"Captured {key} {when}", content))
+
+        report = hookcompat.TestReport(
+            test_id,
+            attempt,
+            outcome,
+            error,
+            duration=time.time() - attempt_start,
+            location=hook_item.location,
+            sections=report_sections,
+            user_properties=list(item.properties.items()),
+            keywords=hook_item.keywords,
+        )
+
+        # ctrlrunner_runtest_makereport: fires once ctrlrunner's single
+        # consolidated report for this attempt is ready (not per-phase,
+        # like pytest's three calls -- see docs/hooks.md's documented
+        # delta). A hook that returns a truthy, non-None value REPLACES
+        # the report exception_interact/logreport receive -- the classic
+        # `item.rep_call = report` pattern works too, since Item is a
+        # plain mutable object a hook body can freely attach to.
+        call_info = hookcompat.CallInfo(
+            "call", call_excinfo, start=call_start, stop=call_stop, duration=call_stop - call_start
+        )
+        for makereport_hook in hookcompat.sort_hooks(_runtest_makereport_hooks):
+            try:
+                override = hookcompat.run_makereport_hook(
+                    makereport_hook, {"item": hook_item, "call": call_info}, report
+                )
+            except hookcompat.CompatibilityError as exc:
+                override = None
+                compat_text = f"CompatibilityError in makereport hook: {exc}"
+                outcome = "failed"
+                error = f"{error}\n\n{compat_text}" if error else compat_text
+            except Exception as exc:
+                override = None
+                warnings_module.warn(
+                    f"{makereport_hook.__name__} raised {type(exc).__name__}: {exc}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            if override is not None:
+                report = override
+
+        # ctrlrunner_exception_interact: pytest's screenshot/DOM-dump
+        # hook, fired only for an actual failure -- live excinfo via
+        # call_info.excinfo (None if the failure came from teardown
+        # only, not the call phase itself).
+        if outcome == "failed":
+            interact_compat_error = _call_runtest_hooks(
+                _runtest_exception_interact_hooks,
+                {"node": hook_item, "call": call_info, "report": report},
+            )
+            if interact_compat_error is not None:
+                compat_text = (
+                    f"CompatibilityError in exception_interact hook: {interact_compat_error}"
+                )
+                error = f"{error}\n\n{compat_text}" if error else compat_text
+
+        logreport_compat_error = _call_runtest_hooks(_runtest_logreport_hooks, {"report": report})
+        if logreport_compat_error is not None:
+            compat_text = f"CompatibilityError in logreport hook: {logreport_compat_error}"
+            outcome = "failed"
+            error = f"{error}\n\n{compat_text}" if error else compat_text
+
+        logfinish_compat_error = _call_runtest_hooks(
+            _runtest_logfinish_hooks, {"nodeid": test_id, "location": hook_item.location}
+        )
+        if logfinish_compat_error is not None:
+            compat_text = f"CompatibilityError in logfinish hook: {logfinish_compat_error}"
+            outcome = "failed"
+            error = f"{error}\n\n{compat_text}" if error else compat_text
+
+        # session.shouldstop/.shouldfail: real and settable (see
+        # hookcompat.Session) -- any per-test hook this attempt ran
+        # could have set one. Checked once per attempt (pytest checks
+        # between items in its runtestloop; ctrlrunner has no
+        # setup/call/teardown split to distinguish the two, so both
+        # request the same cancellation). Sending this more than once
+        # is harmless -- the orchestrator's cancel path is idempotent.
+        _stop_reason = _hook_session.shouldstop or _hook_session.shouldfail
+        if _stop_reason:
+            result_queue.put(("shouldstop_requested", worker_id, str(_stop_reason)))
+
         for w in wlist[: max(0, 100 - len(all_warnings))]:
             all_warnings.append(
                 {
@@ -418,6 +694,24 @@ def _execute_test(
                     "filename": w.filename,
                     "lineno": w.lineno,
                 }
+            )
+            # pytest_warning_recorded's `when` is one of
+            # "config"/"collect"/"runtest" -- ctrlrunner only ever
+            # captures warnings during test execution, so this is
+            # always "runtest" (documented delta: config/collect-phase
+            # warnings aren't captured at all today).
+            # warning_message is the full warnings.WarningMessage (w
+            # itself), matching pytest's real hookspec -- .category/
+            # .filename/.lineno/.message are all real, not just w.message
+            # (the bare warning instance).
+            _call_runtest_hooks(
+                _warning_recorded_hooks,
+                {
+                    "warning_message": w,
+                    "when": "runtest",
+                    "nodeid": test_id,
+                    "location": (w.filename, w.lineno, test_id.split("::")[-1]),
+                },
             )
 
         if captured is not None:
@@ -483,6 +777,7 @@ def _run_serial_group(
     cov,
     coverage_config,
     strict_teardown: bool = True,
+    next_item_after_group=None,
 ):
     """Runs a @test_class(serial=True) group: members in definition
     order; a failure restarts the WHOLE group from its first test while
@@ -543,6 +838,14 @@ def _run_serial_group(
                     )
                 )
                 continue
+            # nextitem within a serial group: the next member in
+            # definition order; the last member's nextitem is whatever
+            # follows the whole group in this worker's batch.
+            member_pos = member_ids.index(tid)
+            if member_pos + 1 < len(member_ids):
+                member_next = tests_by_id[member_ids[member_pos + 1]]
+            else:
+                member_next = next_item_after_group
             msg = _execute_test(
                 tests_by_id[tid],
                 tid,
@@ -554,6 +857,7 @@ def _run_serial_group(
                 cov,
                 coverage_config,
                 strict_teardown,
+                next_item=member_next,
             )
             # members report the GROUP attempt number (a member that
             # passed on group attempt 2 reports attempts=2 even though
@@ -585,6 +889,7 @@ def run_worker(
     strict_teardown: bool = True,
     full_trace: bool = False,
     options: dict | None = None,
+    raw_config: dict | None = None,
 ):
     # Put THIS process in its own new process group (pgid == its
     # own pid) before anything else -- in particular before any
@@ -637,8 +942,48 @@ def run_worker(
         )
         cov.start()
 
+    global _hook_config, _hook_session
+    for _, list_name in _ALL_RUNTEST_HOOK_LISTS:
+        globals()[list_name] = []
+    _hook_config = hookcompat.Config(raw_config)
+    _hook_session = hookcompat.Session(config=_hook_config)
+    make_parametrize_id_hooks: list = []
+    generate_tests_hooks: list = []
     for path, dotted_name in modules:
-        import_module_by_path(path, dotted_name)
+        key = import_module_by_path(path, dotted_name)
+        if path.name != "conftest.py":
+            continue
+        module = sys.modules[key]
+        for hook_name, list_name in _ALL_RUNTEST_HOOK_LISTS:
+            hook = getattr(module, hook_name, None)
+            if hook is not None:
+                globals()[list_name].append(hook)
+        # Registered incrementally (conftests are always imported before
+        # test modules -- see discover_and_import) so each is active
+        # before any LATER test file's @parametrize/@test decoration
+        # runs in this worker.
+        hook = getattr(module, "ctrlrunner_make_parametrize_id", None)
+        if hook is not None:
+            make_parametrize_id_hooks.append(hook)
+            from ..core.registry import set_make_parametrize_id_hooks
+
+            set_make_parametrize_id_hooks(make_parametrize_id_hooks, _hook_config)
+        hook = getattr(module, "ctrlrunner_generate_tests", None)
+        if hook is not None:
+            generate_tests_hooks.append(hook)
+            from ..core.registry import set_generate_tests_hooks
+
+            set_generate_tests_hooks(generate_tests_hooks, _hook_config)
+
+    # Best-effort session.testscollected for per-test hooks: every test
+    # this worker's imported modules registered (the full run total lives
+    # in the orchestrator; a worker only ever sees its own imports).
+    _hook_session.testscollected = len(get_tests())
+    # assert_introspect.py lives in core/, which worker.py (execution/)
+    # already imports -- registering the hooks THERE (rather than the
+    # reverse) avoids a circular import.
+    assert_introspect.set_assertrepr_compare_hooks(_assertrepr_compare_hooks, _hook_config)
+    di.set_fixture_hooks(_fixture_setup_hooks, _fixture_post_finalizer_hooks, _hook_config)
 
     # Signal "imports are done, real test execution starts now" --
     # the orchestrator holds off starting the first test's own timeout
@@ -660,6 +1005,7 @@ def run_worker(
         test_id = test_ids[index]
         item = tests_by_id[test_id]
         if item.serial_group is None:
+            next_id = test_ids[index + 1] if index + 1 < len(test_ids) else None
             result_queue.put(
                 _execute_test(
                     item,
@@ -672,6 +1018,7 @@ def run_worker(
                     cov,
                     coverage_config,
                     strict_teardown,
+                    next_item=tests_by_id.get(next_id) if next_id else None,
                 )
             )
             index += 1
@@ -693,6 +1040,7 @@ def run_worker(
             cov,
             coverage_config,
             strict_teardown,
+            next_item_after_group=tests_by_id.get(test_ids[end]) if end < len(test_ids) else None,
         )
         index = end
 

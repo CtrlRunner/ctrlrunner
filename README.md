@@ -224,8 +224,12 @@ def test_audit_widget(entity_id, label):
 
 Any `conftest.py` under the test root is discovered and imported
 automatically, shallowest directory first — no explicit import needed in
-test files, same convenience as pytest's `conftest.py`, but it's a plain
-import list, not a plugin hook.
+test files, same convenience as pytest's `conftest.py`. Beyond fixtures
+and plain module-level code, a small set of magic-named functions are
+recognized as hooks — `ctrlrunner_addoption` below, and the six
+`ctrlrunner_configure`/`ctrlrunner_sessionfinish`/`ctrlrunner_runtest_*`
+hooks documented in [docs/hooks.md](docs/hooks.md) — everything else in
+a conftest.py is just a plain import, not dispatched anywhere.
 
 ### Custom options (`pytest_addoption` equivalent)
 
@@ -319,7 +323,8 @@ Everything past the core API lives in `docs/`:
 - [Named projects, HTML report, coverage & UI Mode](docs/html-report-and-ui.md) — `--project`, grouping, the self-contained HTML report, code coverage, and the live UI Mode app.
 - [Config file, tags & test metadata reference](docs/config-reference.md) — full `ctrlrunner.toml` reference, the registered tag registry, `@test_class`, and runtime `skip`/`fail`/`fixme`/`slow` annotations.
 - [Tracing, artifacts & assertion details](docs/tracing-and-artifacts.md) — artifacts on failure, `step()`, built-in Playwright fixtures, `auto_step`, rich assertion failures, log capture.
-- [Event model](docs/event-model.md) — the stable interface for reporter/hook/plugin authors.
+- [Session & test hooks](docs/hooks.md) — the six `pytest_configure`/`pytest_sessionfinish`/`pytest_runtest_*` equivalents: `ctrlrunner_configure`, `ctrlrunner_sessionfinish`, `ctrlrunner_runtest_logstart`/`setup`/`teardown`/`logreport`.
+- [Event model](docs/event-model.md) — the stable interface for reporter/hook/plugin authors observing (not driving) a run.
 - [Migrating from pytest](docs/migrating-from-pytest.md) — the `ctrlrunner.migrate` conversion tool.
 - [Developing ctrlrunner](docs/development.md) — running the test suite, dev tooling, project layout.
 - [Security model](docs/SECURITY.md) and [pytest migration checklist](docs/MIGRATION.md).

@@ -66,6 +66,7 @@ both sides at once.
 | `record_property` fixture param | param removed; `from ctrlrunner import record_property` added (calls keep working as-is) |
 | `record_testsuite_property` fixture param | param removed; calls renamed to `record_suite_property(...)`; `from ctrlrunner import record_suite_property` added |
 | `def pytest_addoption(parser):` | renamed to `def ctrlrunner_addoption(parser):`, body unchanged — ctrlrunner's parser shim accepts pytest's `parser.addoption(...)`/`parser.getgroup(...)` signatures (`parser.addini(...)` warns at runtime, pointing at `[ctrlrunner.options]`) |
+| `def pytest_configure(config):` / `pytest_sessionfinish` / `pytest_runtest_setup` / `pytest_runtest_teardown` / `pytest_runtest_logstart` / `pytest_runtest_logreport` | renamed to the `ctrlrunner_*` equivalent, body kept as-is, `@pytest.hookimpl` decorators stripped + caveat TODO — the renamed hook receives pytest-shaped shim objects (`item.get_closest_marker`, `report.outcome`, `session.results`, `config.getoption`, see [hooks.md](hooks.md)) covering the common attribute surface; verify any other attribute use |
 | `pytestconfig.getoption(x)` / `request.config.getoption(x)` | `get_option(x)` (same args, including `default=`); the `pytestconfig`/`request` parameter is dropped when `.getoption()` was its only use in the function |
 | `import pytest` / `from pytest import ...` | removed when nothing pytest-specific remains; kept + reported otherwise |
 
@@ -109,11 +110,12 @@ line in the report:
   `node`, ... (`request.config.getoption(...)` is auto-converted, see above).
 - `unittest.TestCase`-style classes — `@test_class` supports plain
   classes only; the whole class is left untouched.
-- `pytest_*` hook functions in `conftest.py` other than `pytest_addoption`
-  (which is auto-renamed to `ctrlrunner_addoption`, see above) —
-  ctrlrunner is deliberately hook-free; most collection/report hooks map to
-  `@test(case_id=..., tags=..., properties=...)` metadata or to a CLI
-  flag instead.
+- Any `pytest_*` hook function in `conftest.py` beyond the seven
+  auto-renamed above (`pytest_addoption`, `pytest_configure`,
+  `pytest_sessionfinish`, `pytest_runtest_setup`/`teardown`/`logstart`/
+  `logreport`) — ctrlrunner has no equivalent; most collection/report
+  hooks map to `@test(case_id=..., tags=..., properties=...)` metadata
+  or to a CLI flag instead.
 - Async tests (`async def` / `@pytest.mark.asyncio`) — ctrlrunner is
   sync-only; wrap the body with `asyncio.run()`.
 - `xfail(raises=...)`, string `skipif` conditions (old pytest style),

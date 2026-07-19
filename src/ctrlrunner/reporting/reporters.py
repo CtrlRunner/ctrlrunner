@@ -16,6 +16,42 @@ import tempfile
 from .events import result_to_public_dict
 from .reporter import Result, result_sort_key
 
+# ctrlrunner_report_teststatus -- set once by cli.py before the run
+# starts (main-process hook, collected the same way as
+# ctrlrunner_configure -- see config/addoption.py's MAIN_PROCESS_HOOKS).
+_report_teststatus_hooks: list = []
+_report_teststatus_config = None
+
+
+def set_report_teststatus_hooks(hooks, config) -> None:
+    global _report_teststatus_hooks, _report_teststatus_config
+    _report_teststatus_hooks = list(hooks)
+    _report_teststatus_config = config
+
+
+def _custom_status_symbol(result: Result):
+    """Consults ctrlrunner_report_teststatus for a custom dots/line
+    symbol -- pytest's (category, shortletter, verbose_word) return
+    shape; only the shortletter is used here (Dots/Line are single-
+    character reporters). None if no hook is registered, none answers,
+    or a hook raises (a broken status hook must never break reporting)."""
+    if not _report_teststatus_hooks:
+        return None
+    from ..core.hookcompat import TestReport, bind_hook_args, sort_hooks
+
+    report = TestReport(
+        result.test_id, result.attempts or 1, result.outcome, result.error, duration=result.duration
+    )
+    available = {"report": report, "config": _report_teststatus_config}
+    for hook in sort_hooks(_report_teststatus_hooks):
+        try:
+            status = hook(**bind_hook_args(hook, available))
+        except Exception:
+            continue
+        if status and len(status) >= 2 and status[1]:
+            return status[1]
+    return None
+
 
 class ConsoleReporter:
     def on_run_start(self, total: int):
@@ -104,7 +140,8 @@ class DotsReporter(ConsoleReporter):
     'x' expected failure (matches the common xfail convention)."""
 
     def on_test_end(self, result: Result):
-        sys.stdout.write(_SYMBOLS.get(result.outcome, "?"))
+        symbol = _custom_status_symbol(result) or _SYMBOLS.get(result.outcome, "?")
+        sys.stdout.write(symbol)
         sys.stdout.flush()
 
     def on_run_end(self, results, duration):

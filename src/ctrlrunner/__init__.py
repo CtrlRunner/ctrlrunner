@@ -2,6 +2,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .core.annotations import fail, fixme, record_suite_property, skip, slow
 from .core.context_info import record_property
+from .core.hookcompat import ExitCode, hookimpl
 from .core.options import get_option, get_options
 from .core.registry import fixture, param, parametrize, test, test_class
 from .core.steps import step
@@ -29,4 +30,6 @@ __all__ = [
     "record_suite_property",
     "get_option",
     "get_options",
+    "ExitCode",
+    "hookimpl",
 ]

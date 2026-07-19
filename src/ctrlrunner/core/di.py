@@ -13,14 +13,42 @@ session-scoped fixtures (e.g. one browser instance per worker, reused
 across the tests assigned to it).
 """
 
+import contextlib
 import inspect
 import traceback
 from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import Any
 
+from . import hookcompat
 from .registry import get_fixtures
 from .steps import step
+
+# ctrlrunner_fixture_setup/ctrlrunner_fixture_post_finalizer -- set once
+# per worker by worker.py's conftest discovery pass (same per-process-
+# global convention as worker.py's own _hook_config/_hook_session).
+_fixture_setup_hooks: list = []
+_fixture_post_finalizer_hooks: list = []
+_fixture_hook_config = None
+
+
+def set_fixture_hooks(setup_hooks, post_finalizer_hooks, config) -> None:
+    global _fixture_setup_hooks, _fixture_post_finalizer_hooks, _fixture_hook_config
+    _fixture_setup_hooks = list(setup_hooks)
+    _fixture_post_finalizer_hooks = list(post_finalizer_hooks)
+    _fixture_hook_config = config
+
+
+def _call_fixture_hooks(hooks, name: str, scope: str, cached_result=None) -> None:
+    if not hooks:
+        return
+    fixturedef = hookcompat.FixtureDef(name, scope, cached_result=cached_result)
+    request = hookcompat.FixtureRequest(name, scope, _fixture_hook_config)
+    available = {"fixturedef": fixturedef, "request": request}
+    # a broken fixture hook must never affect fixture resolution itself
+    for hook in hookcompat.sort_hooks(hooks):
+        with contextlib.suppress(Exception):
+            hook(**hookcompat.bind_hook_args(hook, available))
 
 
 @dataclass
@@ -149,6 +177,11 @@ class FixtureResolver:
         if fx.wants_request:
             dep_values["request"] = FixtureRequest(param=chosen_value)
 
+        # ctrlrunner_fixture_setup: notification just before the fixture
+        # function runs (not firstresult/override, unlike pytest's own
+        # default impl -- ctrlrunner's fixture body is always the real
+        # setup code, a hook only observes).
+        _call_fixture_hooks(_fixture_setup_hooks, name, fx.scope)
         # Fixture setup timing rides the same step tree `with step(...)` already
         # builds for test authors -- no new data model, no new report
         # shape, it just shows up as more (clearly-labeled) nodes in the
@@ -182,6 +215,7 @@ class FixtureResolver:
         # inside the step's own try/except, not left to propagate into
         # step()'s exception handling, which would otherwise record it
         # as a failed step (StopIteration is a plain Exception subclass).
+        cached_result = self._session_cache.get(name, self._module_cache.get(name))
         with step(f"fixture:{name}:teardown") as s:
             try:
                 next(gen)
@@ -194,6 +228,14 @@ class FixtureResolver:
                 # for the worker to surface on the owning test's result.
                 s.error = f"{type(exc).__name__}: {exc}"
                 self.teardown_errors.append((name, traceback.format_exc()))
+        # ctrlrunner_fixture_post_finalizer: fires after teardown, cached
+        # value (if this fixture was module/session-scoped and cached)
+        # still reachable via fixturedef.cached_result -- function-scoped
+        # fixtures were never cached, so this is None for those.
+        fx = get_fixtures().get(name)
+        _call_fixture_hooks(
+            _fixture_post_finalizer_hooks, name, fx.scope if fx else "function", cached_result
+        )
 
     def drain_teardown_errors(self) -> list[tuple[str, str]]:
         errors, self.teardown_errors = self.teardown_errors, []

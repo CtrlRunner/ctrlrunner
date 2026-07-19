@@ -1,6 +1,13 @@
-# Event model (for reporter/hook/plugin authors)
+# Event model (for reporter/plugin authors)
 
 [← Back to README](../README.md)
+
+This page covers *observing* a run. To actually do something around it
+(start/stop shared infrastructure, per-test instrumentation) see
+[hooks.md](hooks.md)'s `ctrlrunner_configure`/`ctrlrunner_sessionfinish`/
+`ctrlrunner_runtest_*` instead -- `ConsoleReporter.on_run_start(total: int)`
+below only ever receives a test count, not the config, because reporting
+and driving a run are deliberately different jobs here.
 
 Two independent, stable interfaces observe a run -- neither depends on
 or breaks the other:

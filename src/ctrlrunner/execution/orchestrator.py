@@ -14,6 +14,7 @@ from ..config.tag_registry import (
     format_unregistered_tags_warning,
     validate_tags,
 )
+from ..core import hookcompat
 from ..core.registry import get_tests
 from ..core.selection import select_tests
 from ..reporting.collection_summary import format_collection_summary
@@ -178,7 +179,77 @@ def _dotted_module_name(root_path: Path, path: Path) -> str:
     return ".".join(rel.parts)
 
 
-def discover_and_import(root: str, force_reload: bool = False) -> list:
+# Collection-phase conftest hooks (docs/hooks.md), discovered while
+# importing conftests in discover_and_import(_multi) below and consumed
+# by Orchestrator.run() (and, for ignore_collect, by the discovery
+# functions themselves). Module-level per-process state, same convention
+# as worker.py's _runtest_*_hooks; reset at the start of each discovery
+# pass so multi-project force_reload runs never see stale hooks.
+_COLLECTION_HOOK_NAMES = (
+    "ctrlrunner_ignore_collect",
+    "ctrlrunner_itemcollected",
+    "ctrlrunner_collection_modifyitems",
+    "ctrlrunner_collection_finish",
+    "ctrlrunner_deselected",
+)
+_conftest_hooks: dict = {}
+_make_parametrize_id_hooks: list = []
+_generate_tests_hooks: list = []
+
+
+def _register_conftest_hooks(module_key: str, raw_config: dict | None = None) -> None:
+    module = sys.modules[module_key]
+    for name in _COLLECTION_HOOK_NAMES:
+        fn = getattr(module, name, None)
+        if fn is not None:
+            _conftest_hooks.setdefault(name, []).append(fn)
+    # Registered incrementally, same reasoning as worker.py's own copy
+    # of this pattern: conftests import before test modules (see
+    # discover_and_import below), so each is active before any LATER
+    # test file's @parametrize/@test decoration runs in THIS process --
+    # which matters here specifically, since the ids Orchestrator.run()
+    # selects/schedules by come from THIS (main-process) import, not
+    # the worker's later re-import of the same files.
+    fn = getattr(module, "ctrlrunner_make_parametrize_id", None)
+    if fn is not None:
+        from ..core.registry import set_make_parametrize_id_hooks
+
+        _make_parametrize_id_hooks.append(fn)
+        set_make_parametrize_id_hooks(_make_parametrize_id_hooks, hookcompat.Config(raw_config))
+    fn = getattr(module, "ctrlrunner_generate_tests", None)
+    if fn is not None:
+        from ..core.registry import set_generate_tests_hooks
+
+        _generate_tests_hooks.append(fn)
+        set_generate_tests_hooks(_generate_tests_hooks, hookcompat.Config(raw_config))
+
+
+def _apply_ignore_collect(module_paths: list, raw_config: dict | None) -> list:
+    """ctrlrunner_ignore_collect(collection_path, config) -- pytest's
+    firstresult semantics: the first hook returning non-None decides;
+    True excludes the file from collection entirely (its module is
+    never imported)."""
+    hooks = _conftest_hooks.get("ctrlrunner_ignore_collect")
+    if not hooks:
+        return module_paths
+    config = hookcompat.Config(raw_config)
+    kept = []
+    for p in module_paths:
+        available = {"collection_path": p, "config": config}
+        ignored = False
+        for hook in hooks:
+            result = hook(**hookcompat.bind_hook_args(hook, available))
+            if result is not None:
+                ignored = bool(result)
+                break
+        if not ignored:
+            kept.append(p)
+    return kept
+
+
+def discover_and_import(
+    root: str, force_reload: bool = False, raw_config: dict | None = None
+) -> list:
     """Runs conftest + test module discovery and imports everything --
     the shared first step of a real run (Orchestrator.run()) and any
     discovery-only action (--list, UI Mode's RunController). Importing
@@ -200,14 +271,24 @@ def discover_and_import(root: str, force_reload: bool = False) -> list:
     dotted sys.modules key, so project B's force_reload could reload
     project A's module."""
     root_path = Path(root).resolve()
-    paths = discover_conftests(root) + discover_modules(root)
-    entries = [(p, _dotted_module_name(root_path, p)) for p in paths]
-    for p, dotted in entries:
+    _conftest_hooks.clear()
+    _make_parametrize_id_hooks.clear()
+    _generate_tests_hooks.clear()
+    conftest_entries = [(p, _dotted_module_name(root_path, p)) for p in discover_conftests(root)]
+    for p, dotted in conftest_entries:
+        _register_conftest_hooks(
+            import_module_by_path(p, dotted, force_reload=force_reload), raw_config
+        )
+    module_paths = _apply_ignore_collect(discover_modules(root), raw_config)
+    module_entries = [(p, _dotted_module_name(root_path, p)) for p in module_paths]
+    for p, dotted in module_entries:
         import_module_by_path(p, dotted, force_reload=force_reload)
-    return entries
+    return conftest_entries + module_entries
 
 
-def discover_and_import_multi(roots: list[str], force_reload: bool = False) -> list:
+def discover_and_import_multi(
+    roots: list[str], force_reload: bool = False, raw_config: dict | None = None
+) -> list:
     """Same as discover_and_import, but merges discovery across several
     root directories (a project's tests_dir can list more than one),
     de-duplicating modules reachable from more than one root. Dedup is
@@ -216,11 +297,27 @@ def discover_and_import_multi(roots: list[str], force_reload: bool = False) -> l
     happen to produce the same relative dotted name (the same class
     of collision) must never be treated as "the same module already
     seen" and silently dropped."""
+    _conftest_hooks.clear()
+    _make_parametrize_id_hooks.clear()
+    _generate_tests_hooks.clear()
     seen = set()
     all_entries = []
     for root in roots:
         root_path = Path(root).resolve()
-        for p in discover_conftests(root) + discover_modules(root):
+        # Conftests first (registering collection hooks), then modules
+        # filtered through ignore_collect -- same two-phase order as
+        # discover_and_import.
+        for p in discover_conftests(root):
+            resolved = p.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            dotted = _dotted_module_name(root_path, p)
+            all_entries.append((p, dotted))
+            _register_conftest_hooks(
+                import_module_by_path(p, dotted, force_reload=force_reload), raw_config
+            )
+        for p in _apply_ignore_collect(discover_modules(root), raw_config):
             resolved = p.resolve()
             if resolved in seen:
                 continue
@@ -335,12 +432,18 @@ class Orchestrator:
         import_timeout: float = IMPORT_PHASE_TIMEOUT,
         order: str = "declared",
         seed: int | None = None,
+        raw_config: dict | None = None,
     ):
         self.root = root
         self.extra_roots = extra_roots or []
         self.force_reload = force_reload
         self.num_workers = num_workers
         self.default_timeout = default_timeout
+        # The resolved ctrlrunner.toml dict, threaded into each worker
+        # (it rides the spawn args tuple, so it must stay picklable) --
+        # backs the pytest-shaped item.config/item.session objects the
+        # per-test conftest hooks receive (core/hookcompat.py).
+        self.raw_config = raw_config or {}
         # Scoped worker budgets ([ctrlrunner.workers] specs) and the
         # fully_parallel default (False = file-grouped scheduling:
         # a file's tests run in definition order in one worker).
@@ -382,6 +485,10 @@ class Orchestrator:
         # every call site needing a None-check. UI Mode's Cancel button
         # still works exactly as before when it supplies its own.
         self.cancel_event = cancel_event if cancel_event is not None else threading.Event()
+        # First-reason-wins, mirrors fail_policy.cancel_reason -- set
+        # when a conftest hook requests session.shouldstop/.shouldfail
+        # (see _handle_message's "shouldstop_requested" branch).
+        self._shouldstop_reason: str | None = None
         self.playwright_config = playwright_config
         # ctrlrunner_addoption values (CLI > [ctrlrunner.options] >
         # declared default, merged by the CLI) -- passed to every worker
@@ -557,6 +664,65 @@ class Orchestrator:
             self._safe_console_call(cr.on_test_start, test_id)
         self._emit("test_start", {"id": test_id})
 
+    def _fire_collection_hooks(self, all_tests, selected):
+        """ctrlrunner_itemcollected / ctrlrunner_deselected /
+        ctrlrunner_collection_modifyitems / ctrlrunner_collection_finish
+        -- pytest's collection-phase hooks, fired in the main process
+        around select_tests(). modifyitems receives Item shims and may
+        reorder/remove entries (mapped back to the real TestItems by
+        nodeid) and add_marker() tags (written through). Hook errors
+        propagate -- collection-phase misconfiguration aborts the run
+        loudly, same policy as ctrlrunner_configure."""
+        hooks = _conftest_hooks
+        if not any(hooks.get(name) for name in _COLLECTION_HOOK_NAMES[1:]):
+            return selected
+        config = hookcompat.Config(self.raw_config)
+        session = hookcompat.Session(config=config, testscollected=len(all_tests))
+
+        def shim(t):
+            return hookcompat.Item(
+                t.id,
+                0,  # collection phase -- nothing has run yet
+                tags=t.tags,
+                properties=t.properties,
+                func=t.func,
+                cls_name=t.class_name,
+                config=config,
+                session=session,
+            )
+
+        for fn in hooks.get("ctrlrunner_itemcollected", []):
+            for t in all_tests:
+                fn(**hookcompat.bind_hook_args(fn, {"item": shim(t)}))
+
+        deselected_hooks = hooks.get("ctrlrunner_deselected", [])
+        if deselected_hooks:
+            selected_ids = {t.id for t in selected}
+            removed = [shim(t) for t in all_tests if t.id not in selected_ids]
+            if removed:
+                for fn in deselected_hooks:
+                    fn(**hookcompat.bind_hook_args(fn, {"items": removed}))
+
+        modify_hooks = hooks.get("ctrlrunner_collection_modifyitems", [])
+        if modify_hooks:
+            by_id = {t.id: t for t in selected}
+            shims = [shim(t) for t in selected]
+            available = {"session": session, "config": config, "items": shims}
+            for fn in modify_hooks:
+                fn(**hookcompat.bind_hook_args(fn, available))
+            reordered = []
+            for s in shims:
+                t = by_id.get(s.nodeid)
+                if t is None:
+                    continue  # a hook appended an unknown entry -- nothing to run
+                t.tags |= s.tags  # add_marker() write-through
+                reordered.append(t)
+            selected = reordered
+
+        for fn in hooks.get("ctrlrunner_collection_finish", []):
+            fn(**hookcompat.bind_hook_args(fn, {"session": session}))
+        return selected
+
     @staticmethod
     def _result_payload(result) -> dict:
         # The `test_end` payload IS the JSON reporter's per-test
@@ -568,10 +734,14 @@ class Orchestrator:
     def run(self):
         if self.extra_roots:
             modules = discover_and_import_multi(
-                [self.root] + self.extra_roots, force_reload=self.force_reload
+                [self.root] + self.extra_roots,
+                force_reload=self.force_reload,
+                raw_config=self.raw_config,
             )
         else:
-            modules = discover_and_import(self.root, force_reload=self.force_reload)
+            modules = discover_and_import(
+                self.root, force_reload=self.force_reload, raw_config=self.raw_config
+            )
         all_tests = get_tests()
 
         if self.tag_registry is not None:
@@ -583,6 +753,7 @@ class Orchestrator:
                 print(f"Warning: {message}", file=sys.stderr)
 
         tests = select_tests(all_tests, **self.selection_filters)
+        tests = self._fire_collection_hooks(all_tests, tests)
         self.items_by_id = {t.id: t for t in tests}
         self.groups_by_id = {
             t.id: compute_groups(t, self.grouping_dimensions, self.root) for t in tests
@@ -975,6 +1146,7 @@ class Orchestrator:
                 self.strict_teardown,
                 self.full_trace,
                 self.options,
+                self.raw_config,
             ),
         )
         proc.start()
@@ -1043,6 +1215,17 @@ class Orchestrator:
             # (the xdist failure mode this API is measured against).
             _, _wid, key, value = msg
             self.reporter.suite_properties[key] = value
+        elif kind == "shouldstop_requested":
+            # A conftest hook set session.shouldstop/.shouldfail (see
+            # core/hookcompat.py's Session) -- reuses the exact same
+            # cancel_event/hard-kill path fail-policy thresholds and
+            # UI Mode's Cancel button already use, no new kill
+            # mechanism. First reason wins, same as fail_policy's own
+            # cancel_reason -- see _report_cancelled.
+            _, _wid, reason = msg
+            if self._shouldstop_reason is None and not self.cancel_event.is_set():
+                self._shouldstop_reason = reason
+            self.cancel_event.set()
         elif kind == "session_teardown_failed":
             # A module/session-scoped fixture's teardown ran
             # after (or between) tests, so its failure can't be pinned
@@ -1186,18 +1369,22 @@ class Orchestrator:
 
     def _report_cancelled(self, test_ids):
         # A policy-triggered stop (--max-failures/--max-timeouts/
-        # --stop-on-worker-crash) reuses this exact same path but reports
-        # a distinct outcome ('not_run') and message from a plain
-        # external cancel ('cancelled', e.g. UI Mode's Stop button) --
-        # so a CI dashboard can tell "we stopped ourselves on purpose"
-        # apart from "someone hit Stop."
+        # --stop-on-worker-crash, or a conftest hook setting
+        # session.shouldstop/.shouldfail) reuses this exact same path
+        # but reports a distinct outcome ('not_run') and message from a
+        # plain external cancel ('cancelled', e.g. UI Mode's Stop
+        # button) -- so a CI dashboard can tell "we stopped ourselves
+        # on purpose" apart from "someone hit Stop."
         cancel_reason = self.fail_policy.cancel_reason if self.fail_policy is not None else None
-        outcome = "not_run" if cancel_reason else "cancelled"
-        message = (
-            f"Run stopped: {cancel_reason} threshold reached"
-            if cancel_reason
-            else "Run was cancelled"
-        )
+        if cancel_reason:
+            outcome = "not_run"
+            message = f"Run stopped: {cancel_reason} threshold reached"
+        elif self._shouldstop_reason:
+            outcome = "not_run"
+            message = f"Run stopped: {self._shouldstop_reason}"
+        else:
+            outcome = "cancelled"
+            message = "Run was cancelled"
         for test_id in test_ids:
             item = self.items_by_id.get(test_id)
             # Most of these tests never received a real "started"

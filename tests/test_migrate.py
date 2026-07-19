@@ -687,10 +687,22 @@ class DryRunWriteAndIdempotencyTests(MigrateTestCase):
 
 class HookAndAsyncTests(MigrateTestCase):
     def test_pytest_hook_reported(self):
+        # pytest_collectstart has no ctrlrunner equivalent (collector
+        # tree) -- the generic unconvertible-hook TODO path.
         report, _ = self.migrate(
-            {"conftest.py": ("def pytest_collection_modifyitems(items):\n    pass\n")}
+            {"conftest.py": ("def pytest_collectstart(collector):\n    pass\n")}
         )
         self.assertTrue(any("pytest hook" in msg for f in report.files for _, msg in f.todos))
+
+    def test_unconvertible_hook_todo_carries_specific_recommendation(self):
+        # The TODO must carry the per-hook recommendation from
+        # hookcompat.HOOK_RECOMMENDATIONS, not a generic "no equivalent".
+        report, out = self.migrate(
+            {"conftest.py": ("def pytest_enter_pdb(config, pdb):\n    pass\n")}
+        )
+        todos = [msg for f in report.files for _, msg in f.todos]
+        self.assertTrue(any("breakpoint()" in msg for msg in todos))
+        self.assertIn("breakpoint()", out["conftest.py"])
 
     def test_async_test_left_with_todo(self):
         report, out = self.migrate({"test_a.py": ("async def test_one():\n    assert True\n")})
@@ -832,6 +844,201 @@ class AddoptionMigrationTests(MigrateTestCase):
             "test_a.py": (
                 'def test_one(pytestconfig):\n    assert pytestconfig.getoption("--env")\n'
             ),
+        }
+        _, out1 = self.migrate(dict(source))
+        _, out2 = self.migrate(dict(out1))
+        self.assertEqual(out2, {})
+
+
+class SessionAndRuntestHookMigrationTests(MigrateTestCase):
+    """The six pytest hooks with pytest-compatible ctrlrunner
+    equivalents (core/hookcompat.py shims: Item/TestReport/Session/
+    Config carry the commonly-used attribute surface) are auto-renamed
+    pytest_X -> ctrlrunner_X, body preserved, with a caveat TODO to
+    verify attribute usage against docs/hooks.md. @pytest.hookimpl
+    decorators are stripped (ctrlrunner hooks are matched by name, not
+    registered). Hooks with NO equivalent still get the generic TODO
+    HookAndAsyncTests.test_pytest_hook_reported covers."""
+
+    _RENAMES = {
+        "pytest_configure": (
+            "ctrlrunner_configure",
+            "def pytest_configure(config):\n    config.getoption('--env')\n",
+        ),
+        "pytest_sessionfinish": (
+            "ctrlrunner_sessionfinish",
+            "def pytest_sessionfinish(session, exitstatus):\n    print(session.testscollected)\n",
+        ),
+        "pytest_runtest_setup": (
+            "ctrlrunner_runtest_setup",
+            "def pytest_runtest_setup(item):\n    item.get_closest_marker('mac_only')\n",
+        ),
+        "pytest_runtest_teardown": (
+            "ctrlrunner_runtest_teardown",
+            "def pytest_runtest_teardown(item, nextitem):\n    pass\n",
+        ),
+        "pytest_runtest_logstart": (
+            "ctrlrunner_runtest_logstart",
+            "def pytest_runtest_logstart(nodeid, location):\n    pass\n",
+        ),
+        "pytest_runtest_logreport": (
+            "ctrlrunner_runtest_logreport",
+            "def pytest_runtest_logreport(report):\n    print(report.outcome)\n",
+        ),
+        "pytest_sessionstart": (
+            "ctrlrunner_sessionstart",
+            "def pytest_sessionstart(session):\n    pass\n",
+        ),
+        "pytest_unconfigure": (
+            "ctrlrunner_unconfigure",
+            "def pytest_unconfigure(config):\n    pass\n",
+        ),
+        "pytest_report_header": (
+            "ctrlrunner_report_header",
+            "def pytest_report_header(config):\n    return 'x'\n",
+        ),
+        "pytest_terminal_summary": (
+            "ctrlrunner_terminal_summary",
+            "def pytest_terminal_summary(terminalreporter):\n    pass\n",
+        ),
+        "pytest_ignore_collect": (
+            "ctrlrunner_ignore_collect",
+            "def pytest_ignore_collect(collection_path, config):\n    return None\n",
+        ),
+        "pytest_itemcollected": (
+            "ctrlrunner_itemcollected",
+            "def pytest_itemcollected(item):\n    pass\n",
+        ),
+        "pytest_collection_modifyitems": (
+            "ctrlrunner_collection_modifyitems",
+            "def pytest_collection_modifyitems(items):\n    pass\n",
+        ),
+        "pytest_collection_finish": (
+            "ctrlrunner_collection_finish",
+            "def pytest_collection_finish(session):\n    pass\n",
+        ),
+        "pytest_deselected": (
+            "ctrlrunner_deselected",
+            "def pytest_deselected(items):\n    pass\n",
+        ),
+        "pytest_runtest_call": (
+            "ctrlrunner_runtest_call",
+            "def pytest_runtest_call(item):\n    pass\n",
+        ),
+        "pytest_runtest_makereport": (
+            "ctrlrunner_runtest_makereport",
+            "def pytest_runtest_makereport(item, call):\n    return None\n",
+        ),
+        "pytest_exception_interact": (
+            "ctrlrunner_exception_interact",
+            "def pytest_exception_interact(node, call, report):\n    pass\n",
+        ),
+        "pytest_runtest_logfinish": (
+            "ctrlrunner_runtest_logfinish",
+            "def pytest_runtest_logfinish(nodeid, location):\n    pass\n",
+        ),
+        "pytest_warning_recorded": (
+            "ctrlrunner_warning_recorded",
+            "def pytest_warning_recorded(warning_message, when, nodeid, location):\n    pass\n",
+        ),
+        "pytest_assertrepr_compare": (
+            "ctrlrunner_assertrepr_compare",
+            "def pytest_assertrepr_compare(config, op, left, right):\n    return None\n",
+        ),
+        "pytest_report_teststatus": (
+            "ctrlrunner_report_teststatus",
+            "def pytest_report_teststatus(report, config):\n    return None\n",
+        ),
+        "pytest_make_parametrize_id": (
+            "ctrlrunner_make_parametrize_id",
+            "def pytest_make_parametrize_id(config, val, argname):\n    return None\n",
+        ),
+        "pytest_fixture_setup": (
+            "ctrlrunner_fixture_setup",
+            "def pytest_fixture_setup(fixturedef, request):\n    pass\n",
+        ),
+        "pytest_fixture_post_finalizer": (
+            "ctrlrunner_fixture_post_finalizer",
+            "def pytest_fixture_post_finalizer(fixturedef, request):\n    pass\n",
+        ),
+        "pytest_generate_tests": (
+            "ctrlrunner_generate_tests",
+            "def pytest_generate_tests(metafunc):\n    pass\n",
+        ),
+    }
+
+    def test_all_hooks_with_a_compatible_equivalent_are_covered(self):
+        # Guards against the test fixture drifting out of sync with
+        # hookcompat's PYTEST_HOOK_EQUIVALENTS (the migrate tool's
+        # actual source of truth) as more hooks are added.
+        from ctrlrunner.core.hookcompat import PYTEST_HOOK_EQUIVALENTS
+
+        renamed_elsewhere = {"pytest_addoption"}  # its own dedicated test class
+        expected = set(PYTEST_HOOK_EQUIVALENTS) - renamed_elsewhere
+        self.assertEqual(set(self._RENAMES), expected)
+
+    def test_all_renamed_hooks_get_compat_caveat_todo(self):
+        for pytest_name, (ctrlrunner_name, source) in self._RENAMES.items():
+            with self.subTest(pytest_name):
+                report, out = self.migrate({"conftest.py": source})
+                code = out["conftest.py"]
+                self.assertIn(f"def {ctrlrunner_name}(", code)
+                self.assertNotIn(pytest_name, code)
+                self.assertTrue(
+                    any(
+                        ctrlrunner_name in msg and "hooks.md" in msg
+                        for f in report.files
+                        for _, msg in f.todos
+                    )
+                )
+                self.assertEqual(report.totals()["hooks"], 1)
+
+    def test_hookimpl_decorator_stripped_on_rename(self):
+        report, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n"
+                    "@pytest.hookimpl\n"
+                    "def pytest_runtest_setup(item):\n"
+                    "    if item.get_closest_marker('mac_only'):\n"
+                    "        pytest.skip('macOS only')\n"
+                )
+            }
+        )
+        code = out["conftest.py"]
+        self.assertIn("def ctrlrunner_runtest_setup(item):", code)
+        self.assertNotIn("hookimpl", code)
+        # pytest.skip inside the body is rewritten by the existing
+        # runtime-call conversion, so with the decorator gone nothing
+        # uses pytest anymore -- the import must drop with it (guards
+        # against the TODO comment text itself matching the \bpytest\b
+        # usage scan in fix_imports and pinning the import).
+        self.assertIn("skip(", code)
+        self.assertNotIn("pytest.skip", code)
+        self.assertNotIn("import pytest", code)
+
+    def test_hookimpl_with_arguments_stripped_too(self):
+        _, out = self.migrate(
+            {
+                "conftest.py": (
+                    "import pytest\n\n"
+                    "@pytest.hookimpl(tryfirst=True)\n"
+                    "def pytest_sessionfinish(session, exitstatus):\n"
+                    "    pass\n"
+                )
+            }
+        )
+        code = out["conftest.py"]
+        self.assertIn("def ctrlrunner_sessionfinish(session, exitstatus):", code)
+        self.assertNotIn("hookimpl", code)
+
+    def test_reapplying_migration_is_idempotent_for_new_hooks(self):
+        source = {
+            "conftest.py": (
+                "def pytest_configure(config):\n    pass\n\n"
+                "def pytest_sessionfinish(session, exitstatus):\n    pass\n\n"
+                "def pytest_runtest_logreport(report):\n    pass\n"
+            )
         }
         _, out1 = self.migrate(dict(source))
         _, out2 = self.migrate(dict(out1))

@@ -271,7 +271,10 @@ def _ui(argv):
     guessed_root = _guess_root(argv, base_parser)
 
     try:
-        shim = collect_declarations([guessed_root or config_a.get("root") or "tests"])
+        shim = collect_declarations(
+            [guessed_root or config_a.get("root") or "tests"],
+            allow_unknown_hooks=bool(config_a.get("allow_unknown_hooks")),
+        )
     except AddoptionError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(2)
@@ -743,7 +746,10 @@ def _parse_run_args():
         return roots
 
     try:
-        shim = collect_declarations(declaration_roots())
+        shim = collect_declarations(
+            declaration_roots(),
+            allow_unknown_hooks=bool(config_a.get("allow_unknown_hooks")),
+        )
     except AddoptionError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(2)
@@ -804,6 +810,59 @@ def _run_main(args, shim):
     cli_option_values = shim.cli_values(args)
     options = {**base_options, **cli_option_values}
     set_options(options)
+
+    # ctrlrunner_configure: once, main process, before anything runs --
+    # a broken hook aborts the whole invocation with a clear message,
+    # same handling as AddoptionError above, since nothing real can
+    # have happened yet (no worker spawned, no test executed). The hook
+    # receives a pytest-Config-shaped Mapping (core/hookcompat.py):
+    # config.getoption() answered from the options store seeded just
+    # above, and config.addinivalue_line("markers", ...) mutating the
+    # raw dict BEFORE load_tag_registry below reads it -- which is why
+    # this runs here and not later. Skipped for --list: a pure
+    # discovery-time view must not start real infrastructure.
+    from .core.hookcompat import Config as HookConfig
+    from .core.hookcompat import Session as HookSession
+    from .core.hookcompat import TerminalReporter, bind_hook_args
+
+    hook_config = HookConfig(config, args=sys.argv[1:])
+    if not args.list:
+        for configure_hook in shim.configure_hooks:
+            try:
+                configure_hook(**bind_hook_args(configure_hook, {"config": hook_config}))
+            except Exception as e:
+                print(f"Error: ctrlrunner_configure raised: {e}", file=sys.stderr)
+                sys.exit(1)
+        # ctrlrunner_sessionstart: pytest_sessionstart's slot -- after
+        # configure, before discovery/collection; the session has no
+        # results yet. Broken hook aborts, same as configure.
+        start_session = HookSession(config=hook_config)
+        for sessionstart_hook in shim.hooks["ctrlrunner_sessionstart"]:
+            try:
+                sessionstart_hook(**bind_hook_args(sessionstart_hook, {"session": start_session}))
+            except Exception as e:
+                print(f"Error: ctrlrunner_sessionstart raised: {e}", file=sys.stderr)
+                sys.exit(1)
+        # ctrlrunner_report_header: extra run-header lines (str or list
+        # of str), printed before collection -- pytest's placement.
+        for header_hook in shim.hooks["ctrlrunner_report_header"]:
+            try:
+                lines = header_hook(
+                    **bind_hook_args(header_hook, {"config": hook_config, "start_path": Path.cwd()})
+                )
+            except Exception as e:
+                print(f"Error: ctrlrunner_report_header raised: {e}", file=sys.stderr)
+                sys.exit(1)
+            if isinstance(lines, str):
+                print(lines)
+            elif lines:
+                for line in lines:
+                    print(line)
+        # ctrlrunner_report_teststatus: consulted by DotsReporter for a
+        # custom per-test symbol, as results stream in during the run.
+        from .reporting.reporters import set_report_teststatus_hooks
+
+        set_report_teststatus_hooks(shim.hooks["ctrlrunner_report_teststatus"], hook_config)
 
     root = args.root or config.get("root") or "tests"
     num_workers, worker_constraints, fully_parallel = _resolve_worker_settings(args, config)
@@ -1261,6 +1320,7 @@ def _run_main(args, shim):
                 playwright_config=playwright_config,
                 base_options=base_options,
                 cli_option_values=cli_option_values,
+                raw_config=config,
                 tag_registry=tag_registry,
                 grouping_dimensions=grouping_dimensions,
                 fail_policy=fail_policy,
@@ -1335,6 +1395,7 @@ def _run_main(args, shim):
             import_timeout=import_timeout,
             order=order,
             seed=seed,
+            raw_config=config,
         )
         try:
             reporter = orch.run()
@@ -1458,6 +1519,64 @@ def _run_main(args, shim):
 
     if history_store is not None:
         history_store.close()
+
+    # ctrlrunner_sessionfinish: once, main process, after the run
+    # finishes -- results are already final, so a broken hook must
+    # never corrupt the exit status; print a warning and move on,
+    # same "never silent, never fatal" rule capture_artifacts() in
+    # worker.py follows for a broken on_failure callback. The hook
+    # receives pytest's (session, exitstatus) shape (session carries
+    # .results/.duration/.testscollected/.testsfailed); trim_args lets
+    # a hook declare just (session). See core/hookcompat.py.
+    sessionfinish_exitstatus = 1 if any(r.outcome == "failed" for r in reporter.results) else 0
+
+    # ctrlrunner_terminal_summary: pytest_terminal_summary's slot --
+    # extra summary sections before the final counts. Results are
+    # final, so failures degrade to warnings (like sessionfinish).
+    terminal_summary_hooks = shim.hooks["ctrlrunner_terminal_summary"]
+    if terminal_summary_hooks:
+        summary_stats: dict = {}
+        for r in reporter.results:
+            summary_stats.setdefault(r.outcome, []).append(r)
+        terminalreporter = TerminalReporter(stats=summary_stats)
+        summary_available = {
+            "terminalreporter": terminalreporter,
+            "exitstatus": sessionfinish_exitstatus,
+            "config": hook_config,
+        }
+        for summary_hook in terminal_summary_hooks:
+            try:
+                summary_hook(**bind_hook_args(summary_hook, summary_available))
+            except Exception as e:
+                print(
+                    f"Warning: ctrlrunner_terminal_summary raised {type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+
+    hook_session = HookSession(
+        reporter.results, run_duration_value, sessionfinish_exitstatus, config=hook_config
+    )
+    sessionfinish_available = {"session": hook_session, "exitstatus": sessionfinish_exitstatus}
+    for sessionfinish_hook in shim.sessionfinish_hooks:
+        try:
+            sessionfinish_hook(**bind_hook_args(sessionfinish_hook, sessionfinish_available))
+        except Exception as e:
+            print(
+                f"Warning: ctrlrunner_sessionfinish raised {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    # ctrlrunner_unconfigure: pytest_unconfigure's slot -- the very
+    # last hook, teardown of what configure set up. Results are final;
+    # failures degrade to warnings.
+    for unconfigure_hook in shim.hooks["ctrlrunner_unconfigure"]:
+        try:
+            unconfigure_hook(**bind_hook_args(unconfigure_hook, {"config": hook_config}))
+        except Exception as e:
+            print(
+                f"Warning: ctrlrunner_unconfigure raised {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
 
     if not reporter.results and not rerun_requested:
         print(

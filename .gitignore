@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 reports/
 ctrlrunner-artifacts/
+.ctrlrunner_cache/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
