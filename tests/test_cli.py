@@ -2043,5 +2043,26 @@ class NoCaptureFlagTests(unittest.TestCase):
         self.assertFalse(args.no_capture)
 
 
+class VerbosityFlagTests(unittest.TestCase):
+    def test_verbose_and_quiet_flags_parse(self):
+        parser = _build_run_parser()
+        self.assertTrue(parser.parse_args(["-v"]).verbose)
+        self.assertTrue(parser.parse_args(["-q"]).quiet)
+
+    def test_verbose_and_quiet_together_is_an_error(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            with (
+                patch.object(sys, "argv", ["ctrlrunner", str(root), "-v", "-q"]),
+                self.assertRaises(SystemExit) as ctx,
+            ):
+                main()
+            self.assertEqual(ctx.exception.code, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

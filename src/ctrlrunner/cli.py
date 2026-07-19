@@ -127,9 +127,9 @@ def _resolve_strict_teardown(config) -> bool:
     return strict_teardown
 
 
-def _build_reporters_or_exit(names, json_output):
+def _build_reporters_or_exit(names, json_output, verbosity="normal"):
     try:
-        return build_reporters(names, json_output=json_output)
+        return build_reporters(names, json_output=json_output, verbosity=verbosity)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -510,6 +510,20 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         help="Disable output capturing: test stdout/stderr/logging is echoed "
         "live to the terminal again (pytest's -s). Default: captured output "
         "only appears in a failed test's summary block.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print a persisted PASSED/FAILED/SKIPPED line for every test "
+        "instead of the overwritten progress line.",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress per-test output; print only the final totals line and "
+        "failure test ids (no error text) unless -r asks for more.",
     )
     parser.add_argument(
         "--junit-logs",
@@ -1171,6 +1185,10 @@ def _run_main(args, shim):
         sys.exit(1)
     full_trace = bool(args.full_trace) or bool(config.get("full_trace", False))
     no_capture = bool(args.no_capture) or bool(config.get("no_capture", False))
+    if args.verbose and args.quiet:
+        print("Error: -v/--verbose and -q/--quiet are mutually exclusive", file=sys.stderr)
+        sys.exit(1)
+    verbosity = "verbose" if args.verbose else "quiet" if args.quiet else "normal"
 
     html_report_arg = (
         args.html_report if args.html_report is not None else config.get("html_report")
@@ -1238,6 +1256,7 @@ def _run_main(args, shim):
     console_reporters = _build_reporters_or_exit(
         [n for n in reporter_names if n != "json"] if json_deferred else reporter_names,
         json_output,
+        verbosity=verbosity,
     )
 
     # history_config was already resolved (and validated) above the
@@ -1287,7 +1306,9 @@ def _run_main(args, shim):
         # data. Exclude it here; write the combined JSON once at the
         # end instead, same pattern JUnit already uses.
         per_project_names = [n for n in reporter_names if n != "json"]
-        per_project_console_reporters = _build_reporters_or_exit(per_project_names, json_output)
+        per_project_console_reporters = _build_reporters_or_exit(
+            per_project_names, json_output, verbosity=verbosity
+        )
         if history_reporter is not None:
             per_project_console_reporters.append(history_reporter)
         # Reset per-run progress state (e.g. LineReporter._seen) at
