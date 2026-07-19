@@ -849,6 +849,7 @@ def _run_serial_group(
                         None,
                         None,
                         skip_started_at,
+                        None,
                     )
                 )
                 continue
