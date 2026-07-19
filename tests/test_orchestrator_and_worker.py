@@ -961,6 +961,27 @@ class Phase3HookTests(unittest.TestCase):
         self.assertEqual(suffixes, ["qa", "staging"])
 
 
+class CaptureSuppressionTests(unittest.TestCase):
+    def test_passed_test_output_does_not_leak_and_failed_test_output_is_attached(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "@test()\ndef test_quiet_pass():\n"
+                "    print('should not leak')\n\n"
+                "@test()\ndef test_noisy_fail():\n"
+                "    print('should be attached to failure')\n"
+                "    assert False\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0)
+            reporter = orch.run()
+
+        by_id = {r.test_id.split("::")[-1]: r for r in reporter.results}
+        self.assertIsNone(by_id["test_quiet_pass"].console_captured)
+        self.assertIn("should be attached to failure", by_id["test_noisy_fail"].console_captured)
+
+
 class RuntestHooksTests(unittest.TestCase):
     """ctrlrunner_runtest_logstart/setup/teardown/logreport: conftest-
     discovered per-test hooks, fired once per attempt inside the

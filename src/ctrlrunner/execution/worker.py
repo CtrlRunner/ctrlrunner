@@ -347,6 +347,7 @@ def _execute_test(
     coverage_config,
     strict_teardown: bool = True,
     next_item=None,
+    no_capture: bool = False,
 ):
     """Runs one test -- fixture resolution, the per-test retry loop,
     artifact/log capture -- and RETURNS its 13-field "finished" tuple
@@ -397,6 +398,7 @@ def _execute_test(
     captured_logs: list = []
     all_warnings: list = []
     teardown_failed = False
+    console_captured = None
 
     if cov is not None and coverage_config is not None and coverage_config.contexts:
         cov.switch_context(test_id)
@@ -454,7 +456,7 @@ def _execute_test(
             )
 
         attempt_cm = step(f"attempt {attempt}") if wrap_attempts else nullcontext()
-        log_cm = log_capture.capture_logs() if logs_mode != "off" else nullcontext(None)
+        log_cm = log_capture.capture_logs(forward_live=no_capture)
         # record=True collects every warning raised during the
         # attempt (they surface in reports/summary instead of stderr);
         # "always" so repeat warnings from loops are not deduped away.
@@ -591,6 +593,16 @@ def _execute_test(
                 error = f"Test passed but fixture teardown failed:\n\n{td_text}"
             elif outcome == "failed":
                 error = f"{error or ''}\n\nAdditionally, fixture teardown failed:\n\n{td_text}"
+
+        if outcome == "failed":
+            parts = []
+            if captured.get("stdout"):
+                parts.append(f"----- Captured stdout -----\n{captured['stdout']}")
+            if captured.get("stderr"):
+                parts.append(f"----- Captured stderr -----\n{captured['stderr']}")
+            console_captured = "\n".join(parts) or None
+        else:
+            console_captured = None
 
         report_sections = []
         if captured:
@@ -762,6 +774,7 @@ def _execute_test(
         final_logs,
         all_warnings or None,
         first_attempt_start,
+        console_captured,
     )
 
 
@@ -778,6 +791,7 @@ def _run_serial_group(
     coverage_config,
     strict_teardown: bool = True,
     next_item_after_group=None,
+    no_capture: bool = False,
 ):
     """Runs a @test_class(serial=True) group: members in definition
     order; a failure restarts the WHOLE group from its first test while
@@ -858,6 +872,7 @@ def _run_serial_group(
                 coverage_config,
                 strict_teardown,
                 next_item=member_next,
+                no_capture=no_capture,
             )
             # members report the GROUP attempt number (a member that
             # passed on group attempt 2 reports attempts=2 even though
@@ -890,6 +905,7 @@ def run_worker(
     full_trace: bool = False,
     options: dict | None = None,
     raw_config: dict | None = None,
+    no_capture: bool = False,
 ):
     # Put THIS process in its own new process group (pgid == its
     # own pid) before anything else -- in particular before any
@@ -1019,6 +1035,7 @@ def run_worker(
                     coverage_config,
                     strict_teardown,
                     next_item=tests_by_id.get(next_id) if next_id else None,
+                    no_capture=no_capture,
                 )
             )
             index += 1
@@ -1041,6 +1058,7 @@ def run_worker(
             coverage_config,
             strict_teardown,
             next_item_after_group=tests_by_id.get(test_ids[end]) if end < len(test_ids) else None,
+            no_capture=no_capture,
         )
         index = end
 
