@@ -1,16 +1,16 @@
 # Graph Report - pyrunner  (2026-07-19)
 
 ## Corpus Check
-- 174 files · ~175,998 words
+- 176 files · ~188,012 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3562 nodes · 7986 edges · 228 communities (124 shown, 104 thin omitted)
-- Extraction: 67% EXTRACTED · 33% INFERRED · 0% AMBIGUOUS · INFERRED: 2674 edges (avg confidence: 0.63)
+- 3671 nodes · 8235 edges · 231 communities (128 shown, 103 thin omitted)
+- Extraction: 66% EXTRACTED · 34% INFERRED · 0% AMBIGUOUS · INFERRED: 2798 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2e847399`
+- Built from commit: `3574eceb`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -160,6 +160,7 @@
 - ui_server.py
 - Config Package Docstring
 - Fixture Session Teardown
+- warn_unregistered_cli_tags
 - Execution Package Docstring
 - Playwright Package Docstring
 - Reporting Package Docstring
@@ -208,13 +209,15 @@
 - graphify --update (incremental re-extraction)
 - graphify structural + semantic extraction (Step 3)
 - FlakyFlagTests
+- load_tag_registry
 - TerminalReporter
+- GrepCliTests
 - pytest -> ctrlrunner automatic conversion table
 - ctrlrunner.migrate (pytest -> ctrlrunner migration tool)
 - projects.py
 - HookAndAsyncTests
 - FixtureConversionTests
-- ListRiskFlagTests
+- ReportCharsThreadingTests
 - DeterministicOrderTests
 - JunitInfraErrorsTests
 - MultiProjectJUnitTests
@@ -243,16 +246,16 @@
 - Writing tests with ctrlrunner (skill)
 
 ## God Nodes (most connected - your core abstractions)
-1. `Orchestrator` - 253 edges
-2. `Result` - 177 edges
-3. `HistoryStore` - 136 edges
-4. `TestItem` - 98 edges
-5. `FailPolicyState` - 94 edges
-6. `TagRegistry` - 92 edges
-7. `ProjectConfig` - 88 edges
-8. `QuarantineConfig` - 81 edges
-9. `CoverageConfig` - 78 edges
-10. `GroupingDimension` - 78 edges
+1. `Orchestrator` - 257 edges
+2. `Result` - 208 edges
+3. `HistoryStore` - 144 edges
+4. `TestItem` - 100 edges
+5. `FailPolicyState` - 96 edges
+6. `TagRegistry` - 94 edges
+7. `ProjectConfig` - 90 edges
+8. `QuarantineConfig` - 83 edges
+9. `CoverageConfig` - 80 edges
+10. `GroupingDimension` - 80 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_skipped_via_runtime_condition()` --calls--> `skip()`  [INFERRED]
@@ -272,15 +275,15 @@
 ## Hyperedges (group relationships)
 - **graphify skill pipeline stages (query, update, extraction spec, github merge)** — claude_skills_graphify_skill_graphify, claude_skills_graphify_references_query_query_expansion, claude_skills_graphify_references_update_incremental_update, claude_skills_graphify_references_extraction_spec_subagent_prompt, claude_skills_graphify_references_github_and_merge_clone_flow [EXTRACTED 1.00]
 
-## Communities (228 total, 104 thin omitted)
+## Communities (231 total, 103 thin omitted)
 
 ### Community 0 - "JobObject & Fixture Core"
 Cohesion: 0.07
-Nodes (24): BaseException, CallInfo, ExceptionInfo, ExitCode, Item, Marker, What Item.get_closest_marker returns -- pytest.Mark's shape.     ctrlrunner tags, The object for ctrlrunner_runtest_makereport's `call` argument --     pytest Cal (+16 more)
+Nodes (28): BaseException, CallInfo, _CallSpec, ExceptionInfo, ExitCode, Item, Marker, What Item.get_closest_marker returns -- pytest.Mark's shape.     ctrlrunner tags (+20 more)
 
 ### Community 1 - "Test Orchestrator Core"
 Cohesion: 0.04
-Nodes (27): Orchestrator, Reads every message currently available on slot.queue without         blocking,, Index of the first pending batch allowed to spawn right now,         or None. En, Reporting + requeue decision for a hard-killed slot. Returns         the ExecUni, One live worker process and everything the scheduler needs to     supervise it:, Crossing a fail-policy threshold reuses the exact same         cancel_event/hard, Returns (effective_outcome, is_quarantined, reason).          A quarantined test, Builds an EventEnvelope and hands it to every registered         EventSubscriber (+19 more)
+Nodes (21): Orchestrator, CallPhaseHooksTests, CollectionHooksTests, ParamMetadataExecutionTests, Phase3HookTests, ProfilingIntegrationTests, ctrlrunner_runtest_logstart/setup/teardown/logreport: conftest-     discovered p, The file-grouped default and the cap-mode worker constraints:     a file's tests (+13 more)
 
 ### Community 2 - "Historical Timing & Reporter"
 Cohesion: 0.07
@@ -290,29 +293,33 @@ Nodes (16): compute_near_timeout_test_ids(), HistoryReporter, HistoryStore, `CRE
 Cohesion: 0.16
 Nodes (5): load_grouping_dimensions(), Returns DEFAULT_DIMENSIONS (just "file") if `[grouping]` is     absent from conf, ConfigNestingGotchaTests, Regression test for a real gotcha hit during manual verification:     a bare `[g, LoadGroupingDimensionsTests
 
+### Community 4 - "Live Run Controller & Event Reporter"
+Cohesion: 0.05
+Nodes (13): LiveEventReporter, Every test's most recent result keyed by test id, accumulated         across run, Returns False (does nothing) if a run is already in progress., Shared shape between the live `test_end` SSE event and     RunController.last_re, Test helper: blocks until the current run finishes or timeout         elapses. R, Turns orchestrator lifecycle hooks into plain dict events, handed     to a broad, _result_to_event(), RunController (+5 more)
+
 ### Community 5 - "Worker Count & Project Loading"
-Cohesion: 0.12
-Nodes (8): EventEnvelope, EventSubscriber, A versioned, serializable event envelope -- the stable public shape for anything, The stable, envelope-based observation interface -- what hooks     and reporter-, EventEnvelopeTests, EventSubscriberTests, Real Orchestrator.run() verification with a genuinely seeded     HistoryStore --, ShardingIntegrationTests
+Cohesion: 0.13
+Nodes (8): EventEnvelope, EventSubscriber, A versioned, serializable event envelope -- the stable public shape for anything, The stable, envelope-based observation interface -- what hooks     and reporter-, EventEnvelopeTests, EventSubscriberTests, CustomOptionsEndToEndTests, The options dict passed to Orchestrator reaches get_option() in     a spawned wo
 
 ### Community 6 - "Named Projects & Tag Registry"
-Cohesion: 0.10
-Nodes (10): load_tag_registry(), Returns None (no validation at all) if `registered_tags` isn't in     config --, AbsentConfigDefaultsToOffTests, NoHistoryStoreRoundRobinUnchangedTests, Dedicated backward-compatibility suite. This is the single most important test c, Every opt-in [ctrlrunner.*] section, when absent entirely, must     resolve to i, A single-project or no-project run must keep today's exact     unprefixed test_i, Orchestrator without a history_store still runs every test to     completion -- (+2 more)
+Cohesion: 0.09
+Nodes (9): AbsentConfigDefaultsToOffTests, CliEndToEndBackwardCompatibilityTests, NoHistoryStoreRoundRobinUnchangedTests, Dedicated backward-compatibility suite. This is the single most important test c, Same guarantees as SingleProjectRunUnchangedTests, verified     through the real, Every opt-in [ctrlrunner.*] section, when absent entirely, must     resolve to i, A single-project or no-project run must keep today's exact     unprefixed test_i, Orchestrator without a history_store still runs every test to     completion -- (+1 more)
 
 ### Community 7 - "Multi-Project Execution"
-Cohesion: 0.07
-Nodes (29): ProjectConfig, Named projects.  A project is a named override bundle over base config -- resolv, Runs each named project as its own Orchestrator.run() within this     process, m, Only strict mode needs this early pass -- warning-mode     validation happens fi, Gives every test in a project that never got to start (an     earlier project's, _report_project_not_run(), run_projects(), _validate_all_projects_tags_upfront() (+21 more)
+Cohesion: 0.08
+Nodes (18): ProjectConfig, Runs each named project as its own Orchestrator.run() within this     process, m, run_projects(), Real end-to-end verification via actual Orchestrator.run() calls     -- this is, RunProjectsIntegrationTests, CoverageConfigThreadingTests, FixtureRegistryClearedBetweenProjectsTests, ModuleCollisionAcrossProjectsTests (+10 more)
 
 ### Community 8 - "Flaky Test Analytics"
 Cohesion: 0.13
 Nodes (12): compute_flake_score(), compute_flaky_report(), FlakyStats, format_flaky_report(), Flaky analytics.  "Flaky" is already latent in existing history data: a run wher, outcome_rows: HistoryStore.get_outcomes()'s own shape. Returns     (flake_score,, One row per test_id with history, sorted most-flaky-first (an     unknown/no-sam, ComputeFlakeScoreTests (+4 more)
 
 ### Community 9 - "CLI History DB Path Tests"
-Cohesion: 0.10
-Nodes (12): DotsReporter, LineReporter, One character per test: '.' pass, 'F' fail, 's' skip, 'f' fixme,     'x' expecte, Overwrites a single progress line as tests run, printing failures     as they ha, Clears per-run progress state. The reporter instance is         reused across pr, _summary_lines(), BuildReportersTests, DotsReporterTests (+4 more)
+Cohesion: 0.12
+Nodes (8): DotsReporter, LineReporter, One character per test: '.' pass, 'F' fail, 's' skip, 'f' fixme,     'x' expecte, Overwrites a single progress line as tests run, printing failures     as they ha, Clears per-run progress state. The reporter instance is         reused across pr, DotsReporterTests, LineReporterTests, VerbosityTests
 
 ### Community 10 - "Assert Details & Event Integration Tests"
-Cohesion: 0.06
-Nodes (32): Metafunc, The object for ctrlrunner_generate_tests -- pytest Metafunc's     most-used surf, _apply_generate_tests_hooks(), _cartesian(), _ClassProxy, _collect_parametrized_fixtures(), _fixture_closure(), param (+24 more)
+Cohesion: 0.13
+Nodes (14): Metafunc, The object for ctrlrunner_generate_tests -- pytest Metafunc's     most-used surf, _apply_generate_tests_hooks(), _cartesian(), param, parametrize(), _ParamSet, Any (+6 more)
 
 ### Community 11 - "Coverage.py Integration"
 Cohesion: 0.14
@@ -323,20 +330,20 @@ Cohesion: 0.05
 Nodes (14): ClosableFakeContext, ConfigureTests, ContextFixtureTeardownTests, ContextSetupTracingDecisionTests, CrashingPage, FakeBrowser, FakeContext, FakePage (+6 more)
 
 ### Community 13 - "HTML Report Artifacts"
-Cohesion: 0.15
-Nodes (6): report_dir: where artifacts get copied to (as <report_dir>/artifacts/).     If N, render_html(), Result, ArtifactModeTests, _extract_embedded_data(), HtmlReportTests
+Cohesion: 0.12
+Nodes (5): report_dir: where artifacts get copied to (as <report_dir>/artifacts/).     If N, render_html(), ArtifactModeTests, _extract_embedded_data(), HtmlReportTests
 
 ### Community 15 - "Deterministic Report Ordering"
-Cohesion: 0.20
-Nodes (8): _build_reporters_or_exit(), The @test_class class object, resolved by name from the         test's own modul, build_reporters(), _load_custom_reporter(), Loads a user-supplied reporter from a 'module.path:ClassName'     spec (--report, CustomReporterLoaderTests, --reporter accepts 'module.path:ClassName'     specs -- the class is imported an, ValueError
+Cohesion: 0.18
+Nodes (7): The @test_class class object, resolved by name from the         test's own modul, build_reporters(), _load_custom_reporter(), Loads a user-supplied reporter from a 'module.path:ClassName'     spec (--report, BuildReportersTests, CustomReporterLoaderTests, --reporter accepts 'module.path:ClassName'     specs -- the class is imported an
 
 ### Community 16 - "Fixture Dependency Resolution"
-Cohesion: 0.05
-Nodes (22): ExitStack, _call_fixture_hooks(), FixtureRequest, FixtureResolver, Tears down module- and session-scoped fixtures. Call once when         the worke, Passed to fixtures that declare a `request` parameter, so a     parametrized fix, Call before running each test. Tears down module-scoped         fixtures when th, Returns (values, resolved_all).          `values` has one entry per name in `nam (+14 more)
+Cohesion: 0.06
+Nodes (18): ExitStack, _call_fixture_hooks(), FixtureRequest, FixtureResolver, Tears down module- and session-scoped fixtures. Call once when         the worke, Passed to fixtures that declare a `request` parameter, so a     parametrized fix, Call before running each test. Tears down module-scoped         fixtures when th, Returns (values, resolved_all).          `values` has one entry per name in `nam (+10 more)
 
 ### Community 18 - "Test Grouping Dimensions"
-Cohesion: 0.12
-Nodes (16): TestItem, A one-line "what did we collect" summary printed before a real run starts, regar, compute_groups(), group_by_file(), _group_by_path(), _group_by_property(), _group_by_tag_prefix(), GroupingDimension (+8 more)
+Cohesion: 0.15
+Nodes (14): TestItem, A one-line "what did we collect" summary printed before a real run starts, regar, compute_groups(), group_by_file(), _group_by_path(), _group_by_property(), _group_by_tag_prefix(), GroupingDimension (+6 more)
 
 ### Community 19 - "Biome Lint Config"
 Cohesion: 0.06
@@ -348,7 +355,7 @@ Nodes (22): applyTheme(), cycleTheme(), resolved(), setThemeSetting(), apiPost()
 
 ### Community 21 - "Rerun Workflows"
 Cohesion: 0.07
-Nodes (27): expand_serial_groups(), load_failed_test_ids(), match_changed_files_to_test_ids(), match_rerun_ids(), Exception, Path, Rerun workflows -- --last-failed, --failed-from, --changed-since. All three are, Returns the absolute repo root via `git rev-parse --show-toplevel`     -- `git d (+19 more)
+Nodes (25): expand_serial_groups(), load_failed_test_ids(), match_changed_files_to_test_ids(), match_rerun_ids(), Exception, Path, Rerun workflows -- --last-failed, --failed-from, --changed-since. All three are, File-level granularity: a test whose source_path resolves to one     of the chan (+17 more)
 
 ### Community 22 - "Test Detail Markdown Export"
 Cohesion: 0.12
@@ -371,8 +378,8 @@ Cohesion: 0.11
 Nodes (14): duration_weights(), lookup_median_durations(), lpt_shard(), _lpt_shard_weighted(), Longest-processing-time-first (LPT) greedy bin-packing across workers, using eac, Generic LPT greedy bin-packer over (item, weight) pairs. With     all-equal weig, (key, weight) pairs for _lpt_shard_weighted: a known median is     used as-is; N, durations: test_id -> known median duration, or None/absent for a     test with (+6 more)
 
 ### Community 27 - "Frontend Build & Metrics Plans"
-Cohesion: 0.07
-Nodes (8): AssertDetailsIntegrationTests, EventEnvelopeIntegrationTests, LogCaptureIntegrationTests, Verifies the two-tier design through a real Orchestrator.run():     EventSubscri, An exception from an EventSubscriber or ConsoleReporter must     never orphan a, Safety belt for the exactly-once result contract:     a selected test that someh, ReconciliationInvariantTests, SchedulerCrashSafetyTests
+Cohesion: 0.05
+Nodes (12): TagRegistry, AssertDetailsIntegrationTests, EventEnvelopeIntegrationTests, LogCaptureIntegrationTests, Verifies validation actually happens where the plan specifies:     immediately a, Verifies the two-tier design through a real Orchestrator.run():     EventSubscri, An exception from an EventSubscriber or ConsoleReporter must     never orphan a, Safety belt for the exactly-once result contract:     a selected test that someh (+4 more)
 
 ### Community 28 - "Report Directory Resolution"
 Cohesion: 0.14
@@ -383,7 +390,7 @@ Cohesion: 0.17
 Nodes (7): format_list(), _format_scalar(), --list output formatting. A pure view over already-selected TestItems: never a s, fmt: "text" | "json" | "md". `fields` only affects text/md --     json always in, _row(), FormatListTests, _item()
 
 ### Community 30 - "JUnit XML Reporter"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (3): JUnitReporter, Emits standard JUnit XML so the existing JUnit-XML-to-Teams pipeline     keeps w, ReporterTests
 
 ### Community 31 - "Migration Import Rewriting Tests"
@@ -399,12 +406,12 @@ Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
 ### Community 34 - "ctrlrunner.toml Config Loading"
-Cohesion: 0.13
-Nodes (11): CoverageConfig, prepare_data_dir(), Resolved, run-scoped coverage configuration. The SAME instance is     passed to, Purge and recreate the per-run data directory. Call once, before     any worker, PrepareDataDirTests, CoverageIntegrationTests, EventOrderingTests, test_end for a test a worker was killed/crashed over must     precede that worke (+3 more)
+Cohesion: 0.14
+Nodes (12): CoverageConfig, prepare_data_dir(), Resolved, run-scoped coverage configuration. The SAME instance is     passed to, Purge and recreate the per-run data directory. Call once, before     any worker, discover_modules(), root may be a directory (globbed for test_*.py) or a single file     (pytest-sty, PrepareDataDirTests, CoverageIntegrationTests (+4 more)
 
 ### Community 35 - "Step Tree Recording"
 Cohesion: 0.13
-Nodes (9): _BoundedBuffer, capture_logs(), _CaptureHandler, Buffered stdout/stderr + logging capture for one test attempt, used by worker.py, Captures stdout, stderr, and Python logging records for the     duration of the, A tail-keeping, byte-capped text buffer -- a chatty test must     not OOM the wo, Writes to both the bounded buffer and the original stream, so     worker output, Appends one dict per log record to a plain list. Never raises:     record.getMes (+1 more)
+Nodes (9): _BoundedBuffer, capture_logs(), _CaptureHandler, Buffered stdout/stderr + logging capture for one test attempt, used by worker.py, Captures stdout, stderr, and Python logging records for the     duration of the, A tail-keeping, byte-capped text buffer -- a chatty test must     not OOM the wo, Writes to the bounded buffer, and to the original stream too when     forward_li, Appends one dict per log record to a plain list. Never raises:     record.getMes (+1 more)
 
 ### Community 36 - "Migration Function Plan Builder"
 Cohesion: 0.15
@@ -427,8 +434,8 @@ Cohesion: 0.11
 Nodes (21): Counter, pytest -> ctrlrunner source migration.  Usage:     python -m ctrlrunner.migrate, FileReport, MigrationReport, Migration report model + rendering (console and markdown)., _alias_local_name(), fix_imports(), _import_module_name() (+13 more)
 
 ### Community 43 - "Migration CST Transformer"
-Cohesion: 0.16
-Nodes (6): JsonReporter, Machine-readable summary, loosely modeled on Playwright TS's json     reporter (, Optional capability, duck-typed via hasattr() at the call site         (same pat, Same duck-typed optional-capability pattern as         set_coverage_summary: the, JsonReporterTests, _results()
+Cohesion: 0.14
+Nodes (7): JsonReporter, Machine-readable summary, loosely modeled on Playwright TS's json     reporter (, Optional capability, duck-typed via hasattr() at the call site         (same pat, Same duck-typed optional-capability pattern as         set_coverage_summary: the, JsonReporterTests, _results(), _results_with_annotations()
 
 ### Community 44 - "Frontend Test Filter Parsing"
 Cohesion: 0.22
@@ -439,16 +446,16 @@ Cohesion: 0.18
 Nodes (23): StatNav(), labelColorIndex(), LabelsContext, LabelsRow(), LabelsRowStatic(), TagLabel(), useApplyToken(), hashFor() (+15 more)
 
 ### Community 46 - "Coverage Integration Tests"
-Cohesion: 0.15
-Nodes (5): QuarantineConfig, CollectionHooksTests, QuarantineIntegrationTests, Real Orchestrator.run() verification for section 4.9's     quarantine mechanism, ctrlrunner_itemcollected / ctrlrunner_collection_modifyitems /     ctrlrunner_co
+Cohesion: 0.14
+Nodes (6): _chunk(), QuarantineConfig, ChunkTests, QuarantineIntegrationTests, Real Orchestrator.run() verification for section 4.9's     quarantine mechanism, QuarantineConfigTests
 
 ### Community 47 - "Playwright Auto-Step Tests"
-Cohesion: 0.19
-Nodes (5): Quarantine.  A config-driven allowlist, populated by a human after reviewing `ct, Returns None if [ctrlrunner.quarantine] is absent entirely -- zero     behavior, resolve_quarantine_config(), QuarantineConfigTests, ResolveQuarantineConfigTests
+Cohesion: 0.29
+Nodes (4): Quarantine.  A config-driven allowlist, populated by a human after reviewing `ct, Returns None if [ctrlrunner.quarantine] is absent entirely -- zero     behavior, resolve_quarantine_config(), ResolveQuarantineConfigTests
 
 ### Community 48 - "JSON Reporter"
-Cohesion: 0.08
-Nodes (14): auto_step(), AutoStepPage, _looks_like_locator(), Wraps a Playwright Page (or Locator) so common actions are automatically recorde, Wrap a Playwright Page (or Locator) so its actions are     automatically recorde, _capture_trace(), configure(), get_config() (+6 more)
+Cohesion: 0.12
+Nodes (8): auto_step(), AutoStepPage, _looks_like_locator(), Wraps a Playwright Page (or Locator) so common actions are automatically recorde, Wrap a Playwright Page (or Locator) so its actions are     automatically recorde, AutoStepTests, FakeLocator, FakePage
 
 ### Community 49 - "ExecUnit Ordering & Requeue"
 Cohesion: 0.05
@@ -515,12 +522,12 @@ Cohesion: 0.13
 Nodes (6): DryRunWriteAndIdempotencyTests, MigrateTestCase, pytest's record_property/record_testsuite_property fixtures now     have direct, RecordPropertyMigrationTests, RuntimeCallTests, TestClassConversionTests
 
 ### Community 65 - "Parametrize Helper Tests"
-Cohesion: 0.23
-Nodes (4): Serves the directory containing `path` (or `path` itself if it's     already a d, serve_report(), NoPortProbeTests, ServeReportTests
+Cohesion: 0.13
+Nodes (10): Reads every message currently available on slot.queue without         blocking,, Index of the first pending batch allowed to spawn right now,         or None. En, Reporting + requeue decision for a hard-killed slot. Returns         the ExecUni, Crossing a fail-policy threshold reuses the exact same         cancel_event/hard, Returns (effective_outcome, is_quarantined, reason).          A quarantined test, Builds an EventEnvelope and hands it to every registered         EventSubscriber, Runs one ConsoleReporter method call, catching any         exception so a broken, A cancelled/not_run/hard-killed/crashed test_end can fire         for a test tha (+2 more)
 
 ### Community 67 - "resolve_coverage_config"
-Cohesion: 0.13
-Nodes (9): Mapping, _CallSpec, Config, item.callspec -- pytest's per-parametrize-combination object.     Only ever atta, The object for ctrlrunner_sessionfinish (full, with results) and     for item.se, The object for ctrlrunner_configure (and item.config /     session.config) -- a, Session, ConfigTests (+1 more)
+Cohesion: 0.12
+Nodes (5): Mapping, Config, The object for ctrlrunner_configure (and item.config /     session.config) -- a, ConfigTests, SessionAndConfigWideSurfaceTests
 
 ### Community 68 - "Empty Selection Exit Code Tests"
 Cohesion: 0.19
@@ -543,12 +550,12 @@ Cohesion: 0.29
 Nodes (4): HistoryConfig, Historical timing store (storage half; smart sharding is a separate follow-up th, resolve_history_config(), ResolveHistoryConfigTests
 
 ### Community 73 - "Static Report Server"
-Cohesion: 0.06
-Nodes (44): Fixture dependency resolution. Fixtures are resolved recursively by parameter na, Core test/fixture primitives: registration, dependency injection, steps, runtime, clear_tests(), get_fixtures(), get_tests(), set_generate_tests_hooks(), set_make_parametrize_id_hooks(), begin_test() (+36 more)
+Cohesion: 0.05
+Nodes (42): Fixture dependency resolution. Fixtures are resolved recursively by parameter na, Core test/fixture primitives: registration, dependency injection, steps, runtime, clear_tests(), _collect_parametrized_fixtures(), _fixture_closure(), get_fixtures(), get_tests(), Test/fixture registration. This replaces pytest's collection machinery. No file- (+34 more)
 
 ### Community 74 - "Contributing"
-Cohesion: 0.31
-Nodes (3): BaseHTTPRequestHandler, Serves failure screenshots/other artifacts the frontend         links to (`<a hr, UIRequestHandler
+Cohesion: 0.15
+Nodes (9): Result, _custom_status_symbol(), Consults ctrlrunner_report_teststatus for a custom dots/line     symbol -- pytes, _resolve_report_chars(), _summary_lines(), ReportCharsTests, SummaryLinesConsoleCapturedTests, SummaryLinesFileBreakdownTests (+1 more)
 
 ### Community 75 - "Absent-Config Defaults Tests"
 Cohesion: 0.19
@@ -575,8 +582,8 @@ Cohesion: 0.20
 Nodes (8): build_manifest(), _ctrlrunner_version(), _git_sha(), A lightweight reproducibility bundle written next to results.json -- ctrlrunner/, Same atomic-write contract as JsonReporter/JUnitReporter: a crash     mid-write, write_manifest(), BuildManifestTests, WriteManifestTests
 
 ### Community 82 - "Report Server Host Validation"
-Cohesion: 0.20
-Nodes (6): host_allowed(), True only if the Host header is one of this server's own loopback     names. A m, A tiny local static file server for viewing a generated HTML report (and any art, SimpleHTTPRequestHandler already strips `..` from URL paths, but     adds two th, _ReportRequestHandler, HostAllowedTests
+Cohesion: 0.05
+Nodes (25): BaseHTTPRequestHandler, allowed_hosts(), allowed_origins(), host_allowed(), new_session_token(), origin_allowed(), Shared localhost-server hardening for ctrlrunner's two stdlib http.server based, The exact Host header values this loopback server answers to.     Anything else (+17 more)
 
 ### Community 84 - "Event Envelope Model"
 Cohesion: 0.20
@@ -607,8 +614,8 @@ Cohesion: 0.13
 Nodes (3): ListProjectScopingTests, ProjectCliIntegrationTests, First CLI-level tests in this project (prior verification was all     manual `py
 
 ### Community 94 - "ParamMetadataExecutionTests"
-Cohesion: 0.09
-Nodes (7): Imports test/conftest modules once at startup so list_tests()         works befo, Takes effect on the next start_run() call -- each run         constructs a fresh, Returns False (does nothing) if a run is already in progress., Test helper: blocks until the current run finishes or timeout         elapses. R, RunController, LastResultsThreadSafetyTests, _last_results is written from the background run thread and     read from last_r
+Cohesion: 0.18
+Nodes (4): Appends `item` to the registry, raising loudly on a duplicate test     id instea, _register_item(), Takes effect on the next start_run() call -- each run         constructs a fresh, ValueError
 
 ### Community 95 - "Security & UI Mode Plan Docs"
 Cohesion: 0.25
@@ -623,20 +630,20 @@ Cohesion: 0.29
 Nodes (6): [0.1.0] - 2026-07-15, Added, Added, Changelog, Fixed, [Unreleased]
 
 ### Community 100 - "Config file, tags & test metadata reference"
-Cohesion: 0.23
-Nodes (6): bind_hook_args(), pluggy-style call-by-parameter-NAME: returns the kwargs for     `hook(**bound)`, _custom_status_symbol(), Consults ctrlrunner_report_teststatus for a custom dots/line     symbol -- pytes, BindHookArgsTests, pluggy-style call-by-parameter-NAME: each hook impl receives     exactly the nam
+Cohesion: 0.16
+Nodes (8): bind_hook_args(), CompatibilityError, A migrated hook touched something ctrlrunner doesn't model. The     message alwa, pluggy-style call-by-parameter-NAME: returns the kwargs for     `hook(**bound)`, BindHookArgsTests, CompatErrorTests, Attributes the compat layer doesn't model FAIL LOUDLY: a     CompatibilityError, pluggy-style call-by-parameter-NAME: each hook impl receives     exactly the nam
 
 ### Community 101 - "Parametrize Cartesian Product"
-Cohesion: 0.36
-Nodes (3): origin_allowed(), Defense against a malicious page fetch()ing state-changing     endpoints. Reject, OriginAllowedTests
+Cohesion: 0.22
+Nodes (5): _raise_key_error(), Failure tracebacks start at the user's code -- frames     from inside the ctrlru, TbFilterTests, _user_code_chained(), _user_code_that_raises()
 
 ### Community 102 - "test_backward_compatibility.py"
-Cohesion: 0.10
-Nodes (26): _build_run_parser(), _build_ui_parser(), _flaky_report(), _guess_root(), main(), _num_workers_arg(), _parse_run_args(), ArgumentParser (+18 more)
+Cohesion: 0.08
+Nodes (31): _build_reporters_or_exit(), _build_run_parser(), _build_ui_parser(), _flaky_report(), _guess_root(), main(), _num_workers_arg(), _parse_run_args() (+23 more)
 
 ### Community 103 - "Origin Validation Tests"
 Cohesion: 0.10
-Nodes (12): Exposes the current test's id/attempt number to fixture code, so built-in Playwr, pytest-record_property equivalent: call from a test     body or fixture to attac, record_property(), get_option(), get_options(), _normalize(), Per-process store for user-declared run options (ctrlrunner_addoption).  The CLI, Replaces the whole store (None clears it). Called once per     process by the CL (+4 more)
+Nodes (16): Exposes the current test's id/attempt number to fixture code, so built-in Playwr, pytest-record_property equivalent: call from a test     body or fixture to attac, record_property(), get_option(), get_options(), _normalize(), Per-process store for user-declared run options (ctrlrunner_addoption).  The CLI, Replaces the whole store (None clears it). Called once per     process by the CL (+8 more)
 
 ### Community 104 - "Coverage CLI Integration Tests"
 Cohesion: 0.17
@@ -647,32 +654,32 @@ Cohesion: 0.43
 Nodes (5): build_parser(), main(), ArgumentParser, CLI: python -m ctrlrunner.migrate <paths> [--write] [--no-diff] [--report FILE], render_diffs()
 
 ### Community 108 - "ConfigValidationTests"
-Cohesion: 0.18
-Nodes (8): Guards the UI / report servers against being exposed on a network     by acciden, _resolve_bind_host(), _show_report(), _ui(), BindHostGuardCliTests, `--headed` used to be a store_true flag defaulting to False --     there was no, _resolve_bind_host is the only thing standing between the     auth-light UI/repo, UICliHeadedFlagOverrideTests
+Cohesion: 0.17
+Nodes (9): Guards the UI / report servers against being exposed on a network     by acciden, _resolve_bind_host(), _show_report(), _ui(), get_config(), BindHostGuardCliTests, `--headed` used to be a store_true flag defaulting to False --     there was no, _resolve_bind_host is the only thing standing between the     auth-light UI/repo (+1 more)
 
 ### Community 109 - "Rerun ID Matching"
 Cohesion: 0.22
 Nodes (9): Manual conversion recipes, Marker-driven guard fixtures, Migrating from pytest to ctrlrunner, pyproject.toml -> ctrlrunner.toml, Recommended workflow, Semantics to double-check after migration, Usage, What is converted automatically (+1 more)
 
 ### Community 110 - "JunitLogsTests"
-Cohesion: 0.13
-Nodes (8): _Cache, _InvocationParams, _OptionNamespace, Path, config.invocation_params -- pytest's raw-argv snapshot., config.option -- pytest's parsed-args namespace, answered from     the ctrlrunne, config.cache -- pytest's Cache API, implemented for real: a     JSON-backed stor, pytest's marker/ini registration, mapped for real where it         has a ctrlrun
+Cohesion: 0.09
+Nodes (11): AttributeError, _Cache, _InvocationParams, _OptionNamespace, Path, config.invocation_params -- pytest's raw-argv snapshot., config.option -- pytest's parsed-args namespace, answered from     the ctrlrunne, config.cache -- pytest's Cache API, implemented for real: a     JSON-backed stor (+3 more)
 
 ### Community 111 - "ExecUnit"
 Cohesion: 0.04
-Nodes (41): JobObject, Hard-kills every process currently in the job., Batch, Worker-count resolution and scoped worker-budget planning.  `num_workers` accept, One worker process's workload: an ordered list of ExecUnits.     `group`/`dedica, One parsed [ctrlrunner.workers] entry, before matching against tests., ShardPlan, _specificity() (+33 more)
+Nodes (47): Exception, Raised only in strict mode, only from the CLI run path -- see     Orchestrator.r, TagValidationError, JobObject, Hard-kills every process currently in the job., One live worker process and everything the scheduler needs to     supervise it:, _WorkerSlot, Batch (+39 more)
 
 ### Community 113 - "Atomic JUnit Write Tests"
 Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
 ### Community 114 - "XmlSanitizationTests"
-Cohesion: 0.15
-Nodes (5): LiveEventReporter, Every test's most recent result keyed by test id, accumulated         across run, Shared shape between the live `test_end` SSE event and     RunController.last_re, Turns orchestrator lifecycle hooks into plain dict events, handed     to a broad, _result_to_event()
+Cohesion: 0.12
+Nodes (15): Global Constraints, Task 10: `-r <chars>` CLI flag, Task 11: `--tb=<style>` — `tb_format.py`, Task 12: `--tb` CLI flag + threading through worker startup, Task 13: Full regression pass + manual smoke test, Task 1: `log_capture.py` — `forward_live` parameter, Task 2: `Result.console_captured` field, Task 3: `worker.py` — always-on capture, `console_captured` computation, `no_capture` threading (+7 more)
 
 ### Community 117 - "Worker Module Import"
-Cohesion: 0.10
-Nodes (12): Returns the sorted list of unregistered tags found across every     collected te, Separate, always-warning-only check (never blocking, even in     strict mode) fo, TagRegistry, validate_tags(), warn_unregistered_cli_tags(), Verifies validation actually happens where the plan specifies:     immediately a, TagRegistryOrchestratorIntegrationTests, FormatUnregisteredTagsWarningTests (+4 more)
+Cohesion: 0.09
+Nodes (24): Named projects.  A project is a named override bundle over base config -- resolv, Only strict mode needs this early pass -- warning-mode     validation happens fi, Gives every test in a project that never got to start (an     earlier project's, _report_project_not_run(), _validate_all_projects_tags_upfront(), format_unregistered_tags_warning(), Optional tag registry (ctrlrunner.toml `registered_tags`) -- catches typos in @t, Returns the sorted list of unregistered tags found across every     collected te (+16 more)
 
 ### Community 118 - "add_marker Migration Tests"
 Cohesion: 0.14
@@ -683,8 +690,8 @@ Cohesion: 0.27
 Nodes (5): Deterministic report order (JUnit + JSON writers): worker     completion timing, multi_project=True wraps output in <testsuites> with one         <testsuite> per, _render_steps_text(), result_sort_key(), _sanitize_xml_text()
 
 ### Community 120 - "tb_format.py"
-Cohesion: 0.33
-Nodes (5): _filter_chain(), format_filtered_exc(), Failure tracebacks shown to test authors should start at THEIR code, not at the, Drops ctrlrunner-internal frames from every link of the exception     chain (__c, traceback.format_exc() with ctrlrunner-internal frames removed.     Call from an
+Cohesion: 0.21
+Nodes (9): _filter_chain(), format_filtered_exc(), _format_line(), Failure tracebacks shown to test authors should start at THEIR code, not at the, Drops ctrlrunner-internal frames from every link of the exception     chain (__c, --tb=short: keeps only the single frame closest to where the     exception was a, --tb=line: pytest's single-line style, 'file:lineno: ExcType: msg'., traceback.format_exc() with ctrlrunner-internal frames removed     (or reshaped (+1 more)
 
 ### Community 121 - "Backward-Compat CLI Tests"
 Cohesion: 0.14
@@ -695,12 +702,16 @@ Cohesion: 0.13
 Nodes (7): load_config(), Optional ctrlrunner.toml config file. CLI flags always take precedence over it;, ConfigTests, ConfigValidationTests, NestedGroupingTableTests, A typo'd key or mis-nested table used to be silently     ignored -- the run proc, Regression test for a real gotcha hit during manual verification:     a bare `[g
 
 ### Community 123 - "Multi-Project Line Reporter Tests"
-Cohesion: 0.05
-Nodes (10): AllSixHooksEndToEndTests, GrepCliTests, HistoryDbPathDerivationTests, HtmlReportTimelineFieldsTests, MainProcessLifecycleHooksTests, The full main-process hook sequence around a run: configure ->     sessionstart, One conftest.py defining all six pytest-analogue hooks, one real     CLI invocat, ReportTimestampCliOverrideTests (+2 more)
+Cohesion: 0.04
+Nodes (12): AllSixHooksEndToEndTests, HistoryDbPathDerivationTests, HtmlReportTimelineFieldsTests, ListRiskFlagTests, --tag-not drops tests carrying any of the     excluded tags, AND-ed after the in, One conftest.py defining all six pytest-analogue hooks, one real     CLI invocat, ReportCharsFlagTests, ReportTimestampCliOverrideTests (+4 more)
 
 ### Community 124 - "AddMarkerTests"
 Cohesion: 0.36
 Nodes (3): discover_conftests(), Finds every conftest.py that applies to `root`: every ANCESTOR     directory's c, DiscoverConftestsTests
+
+### Community 125 - "record_property Migration Tests"
+Cohesion: 0.17
+Nodes (11): 1. Capture becomes default-on, non-forwarding, 2. `-v` / `--verbose` and `-q` / `--quiet`, 3. `-r <chars>` — end-of-run summary control, 4. `--tb=<style>` — traceback detail, 5. Scope boundary, Current state (verified against source), Design, Out of scope (+3 more)
 
 ### Community 127 - "match_rerun_ids"
 Cohesion: 0.44
@@ -710,33 +721,33 @@ Nodes (3): format_collection_summary(), FormatCollectionSummaryTests, _item()
 Cohesion: 0.15
 Nodes (11): ExecUnit, order_units(), The schedulable atom: an ordered list of test ids that must stay     together in, Reorders ExecUnits -- NEVER the tests inside one -- so a serial     group's memb, module_name_for_path(), The sys.modules DICT KEY for `path` -- a hash of its resolved     absolute path,, AncestorConftestImportResolutionTests, DottedNameAliasTests (+3 more)
 
+### Community 134 - "CoverageCliIntegrationTests"
+Cohesion: 0.20
+Nodes (5): _capture_trace(), configure(), page(), Built-in Playwright fixtures with trace/screenshot capture controlled entirely b, Registered with always_capture=True so this always runs, then     decides for it
+
 ### Community 136 - "Param Metadata Execution Tests"
 Cohesion: 0.13
 Nodes (15): 1a. `CompatibilityError` for unmodeled attributes, 1b. Unknown-hook detection at startup, 1c. Migrate tool alignment, Already implemented (20, Phases 0–2), Argument status table, Call mechanics: name-based argument binding (Phase 1, blocking), Done — Phase 3: advanced parity (7 hooks + ordering/wrapper mechanics), Part 1 — Policy reversal: fail loudly (Phase 0, do first) (+7 more)
 
 ### Community 137 - "SingleProjectRunUnchangedTests"
-Cohesion: 0.17
-Nodes (10): Fixture, Decorator to register a fixture. Supports plain-return and     generator (yield-, _chunk(), _call_on_failure(), capture_artifacts(), Calls on_failure with (value, prefix) for older 2-arg callbacks,     or (value,, Calls on_failure for every resolved fixture that defines one.     When only_alwa, ArtifactCaptureTests (+2 more)
-
-### Community 140 - "import_module_by_path"
-Cohesion: 0.25
-Nodes (4): AtomicWriteTests, JUnitGoldenBytesTests, The JUnit XML is byte-compatible with a named external Teams     parser -- until, junit.xml must be written write-once (tmp + os.replace,     the same pattern Jso
+Cohesion: 0.16
+Nodes (10): Fixture, Decorator to register a fixture. Supports plain-return and     generator (yield-, _call_on_failure(), capture_artifacts(), Calls on_failure with (value, prefix) for older 2-arg callbacks,     or (value,, Calls on_failure for every resolved fixture that defines one.     When only_alwa, ArtifactCaptureTests, CallOnFailureTests (+2 more)
 
 ### Community 142 - "ui_server.py"
-Cohesion: 0.13
-Nodes (14): allowed_hosts(), allowed_origins(), new_session_token(), Shared localhost-server hardening for ctrlrunner's two stdlib http.server based, The exact Host header values this loopback server answers to.     Anything else, A fresh, unguessable per-launch token. token_urlsafe(32) is 256     bits of CSPR, Constant-time comparison so a wrong token can't be narrowed down     by response, token_matches() (+6 more)
+Cohesion: 0.38
+Nodes (5): The UI Mode frontend.  The page is a prebuilt React app (frontend/src/ui/ in the, Injects the per-launch session token (see localsec.py) into the     served page., render_ui_html(), Local HTTP server exposing RunController over a small JSON API, plus a Server-Se, serve_ui()
 
 ### Community 144 - "Fixture Session Teardown"
 Cohesion: 0.33
 Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
 
+### Community 145 - "warn_unregistered_cli_tags"
+Cohesion: 0.31
+Nodes (3): Separate, always-warning-only check (never blocking, even in     strict mode) fo, warn_unregistered_cli_tags(), WarnUnregisteredCliTagsTests
+
 ### Community 155 - "Core concepts"
 Cohesion: 0.13
 Nodes (15): Core concepts, CtrlRunner, Custom options (`pytest_addoption` equivalent), Documentation, `@fixture`, `indirect=` — per-test fixture parametrization, Install, `param()` — per-combination metadata (+7 more)
-
-### Community 157 - "ItemTests"
-Cohesion: 0.12
-Nodes (7): AttributeError, CompatibilityError, A migrated hook touched something ctrlrunner doesn't model. The     message alwa, CompatErrorTests, ItemTests, ItemWideSurfaceTests, Attributes the compat layer doesn't model FAIL LOUDLY: a     CompatibilityError
 
 ### Community 158 - "Session & test hooks"
 Cohesion: 0.13
@@ -762,25 +773,33 @@ Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphif
 Cohesion: 0.50
 Nodes (3): ctrlrunner frontend, Layout, Workflow
 
+### Community 196 - "load_tag_registry"
+Cohesion: 0.39
+Nodes (3): load_tag_registry(), Returns None (no validation at all) if `registered_tags` isn't in     config --, LoadTagRegistryTests
+
+### Community 208 - "DeterministicOrderTests"
+Cohesion: 0.17
+Nodes (5): ConsoleCapturedFieldTests, DeterministicOrderTests, JUnitGoldenBytesTests, The JUnit XML is byte-compatible with a named external Teams     parser -- until, Testcase order must not depend on worker completion     timing -- two identical
+
 ## Knowledge Gaps
-- **263 isolated node(s):** `$schema`, `enabled`, `src/**`, `*.ts`, `index.html` (+258 more)
+- **285 isolated node(s):** `$schema`, `enabled`, `src/**`, `*.ts`, `index.html` (+280 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **104 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **103 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Orchestrator` connect `Test Orchestrator Core` to `AbsentConfigDefaultsToOffTests`, `Worker Budget & Sharding Units`, `Worker Count & Project Loading`, `Named Projects & Tag Registry`, `Multi-Project Execution`, `SingleProjectRunUnchangedTests`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `Frontend Build & Metrics Plans`, `LineReporter`, `load_projects`, `ctrlrunner.toml Config Loading`, `WallClockParallelismTests`, `Coverage Integration Tests`, `UnifiedResultShapeTests`, `FlakyFlagTests`, `Static Report Server`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `ParamMetadataExecutionTests`, `HTML Report Artifact Embedding`, `test_backward_compatibility.py`, `ExecUnit`, `XmlSanitizationTests`, `Worker Module Import`, `AddMarkerTests`, `record_property Migration Tests`, `Sharding Integration Tests`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
-- **Why does `HistoryStore` connect `Historical Timing & Reporter` to `FlakyReportCliTests`, `Test Orchestrator Core`, `AbsentConfigDefaultsToOffTests`, `Worker Count & Project Loading`, `CoverageCliIntegrationTests`, `Multi-Project Execution`, `SingleProjectRunUnchangedTests`, `CLI Entry Point & Argument Parsing`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `CtrlRunner`, `Frontend Build & Metrics Plans`, `TbFilterTests`, `ctrlrunner.toml Config Loading`, `MultiProjectDurationTests`, `WallClockParallelismTests`, `Coverage Integration Tests`, `FlakyFlagTests`, `Empty Selection Exit Code Tests`, `Worker Config CLI Tests`, `lpt_shard`, `ListRiskFlagTests`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `Project CLI Integration Tests`, `HTML Report Artifact Embedding`, `test_backward_compatibility.py`, `ConfigValidationTests`, `ExecUnit`, `PytestParamConversionTests`, `RunProjectsIntegrationTests`, `Worker Module Import`, `Multi-Project Line Reporter Tests`, `AddMarkerTests`, `record_property Migration Tests`, `Sharding Integration Tests`?**
+- **Why does `Orchestrator` connect `Test Orchestrator Core` to `AbsentConfigDefaultsToOffTests`, `Live Run Controller & Event Reporter`, `Worker Budget & Sharding Units`, `Named Projects & Tag Registry`, `Multi-Project Execution`, `Worker Count & Project Loading`, `SingleProjectRunUnchangedTests`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `Frontend Build & Metrics Plans`, `load_projects`, `ctrlrunner.toml Config Loading`, `WallClockParallelismTests`, `Coverage Integration Tests`, `UnifiedResultShapeTests`, `Parametrize Helper Tests`, `FlakyFlagTests`, `Static Report Server`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `HTML Report Artifact Embedding`, `test_backward_compatibility.py`, `ExecUnit`, `Worker Module Import`, `AddMarkerTests`, `Sharding Integration Tests`?**
+  _High betweenness centrality (0.098) - this node is a cross-community bridge._
+- **Why does `Result` connect `Contributing` to `JobObject & Fixture Core`, `FlakyReportCliTests`, `Historical Timing & Reporter`, `AbsentConfigDefaultsToOffTests`, `PlaywrightAndImportTests`, `Worker Count & Project Loading`, `Test Orchestrator Core`, `Multi-Project Execution`, `CLI History DB Path Tests`, `SingleProjectRunUnchangedTests`, `HTML Report Artifacts`, `Deterministic Report Ordering`, `CLI Entry Point & Argument Parsing`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `Log Secret Redaction`, `CtrlRunner`, `Frontend Build & Metrics Plans`, `LineReporter`, `ItemTests`, `JUnit XML Reporter`, `TbFilterTests`, `ctrlrunner.toml Config Loading`, `MultiProjectDurationTests`, `WallClockParallelismTests`, `Migration CST Transformer`, `Coverage Integration Tests`, `Local Server Security Helpers`, `UnifiedResultShapeTests`, `resolve_coverage_config`, `Empty Selection Exit Code Tests`, `Worker Config CLI Tests`, `GrepCliTests`, `FlakyFlagTests`, `lpt_shard`, `FixtureConversionTests`, `ReportCharsThreadingTests`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `Project CLI Integration Tests`, `HTML Report Artifact Embedding`, `Config file, tags & test metadata reference`, `test_backward_compatibility.py`, `ConfigValidationTests`, `ExecUnit`, `PytestParamConversionTests`, `RunProjectsIntegrationTests`, `add_marker Migration Tests`, `Flaky Flag Tests`, `Multi-Project Line Reporter Tests`, `AddMarkerTests`, `Sharding Integration Tests`?**
   _High betweenness centrality (0.082) - this node is a cross-community bridge._
-- **Why does `Result` connect `HTML Report Artifacts` to `JobObject & Fixture Core`, `FlakyReportCliTests`, `Historical Timing & Reporter`, `AbsentConfigDefaultsToOffTests`, `PlaywrightAndImportTests`, `Worker Count & Project Loading`, `CoverageCliIntegrationTests`, `Test Orchestrator Core`, `Multi-Project Execution`, `CLI History DB Path Tests`, `SingleProjectRunUnchangedTests`, `Deterministic Report Ordering`, `CLI Entry Point & Argument Parsing`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `Log Secret Redaction`, `CtrlRunner`, `Frontend Build & Metrics Plans`, `ItemTests`, `JUnit XML Reporter`, `TbFilterTests`, `ctrlrunner.toml Config Loading`, `MultiProjectDurationTests`, `WallClockParallelismTests`, `Migration CST Transformer`, `Coverage Integration Tests`, `Local Server Security Helpers`, `UnifiedResultShapeTests`, `resolve_coverage_config`, `Empty Selection Exit Code Tests`, `Worker Config CLI Tests`, `FlakyFlagTests`, `lpt_shard`, `ListRiskFlagTests`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `Project CLI Integration Tests`, `HTML Report Artifact Embedding`, `Config file, tags & test metadata reference`, `test_backward_compatibility.py`, `ConfigValidationTests`, `ExecUnit`, `PytestParamConversionTests`, `RunProjectsIntegrationTests`, `Worker Module Import`, `add_marker Migration Tests`, `Flaky Flag Tests`, `Multi-Project Line Reporter Tests`, `AddMarkerTests`, `record_property Migration Tests`, `Sharding Integration Tests`?**
-  _High betweenness centrality (0.070) - this node is a cross-community bridge._
-- **Are the 224 inferred relationships involving `Orchestrator` (e.g. with `FailPolicyState` and `JobObject`) actually correct?**
-  _`Orchestrator` has 224 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 166 inferred relationships involving `Result` (e.g. with `ConsoleReporter` and `DotsReporter`) actually correct?**
-  _`Result` has 166 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 121 inferred relationships involving `HistoryStore` (e.g. with `ConsoleReporter` and `AddoptionCliIntegrationTests`) actually correct?**
-  _`HistoryStore` has 121 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 86 inferred relationships involving `TestItem` (e.g. with `Metafunc` and `FormatCollectionSummaryTests`) actually correct?**
-  _`TestItem` has 86 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `HistoryStore` connect `Historical Timing & Reporter` to `FlakyReportCliTests`, `Test Orchestrator Core`, `AbsentConfigDefaultsToOffTests`, `Worker Count & Project Loading`, `Multi-Project Execution`, `SingleProjectRunUnchangedTests`, `CLI Entry Point & Argument Parsing`, `Test Grouping Dimensions`, `Fail Policy State Tracking`, `CtrlRunner`, `Frontend Build & Metrics Plans`, `LineReporter`, `TbFilterTests`, `ctrlrunner.toml Config Loading`, `MultiProjectDurationTests`, `WallClockParallelismTests`, `Coverage Integration Tests`, `FlakyFlagTests`, `Empty Selection Exit Code Tests`, `Worker Config CLI Tests`, `GrepCliTests`, `lpt_shard`, `FixtureConversionTests`, `ReportCharsThreadingTests`, `Grep Filter & Order Seed Tests`, `Worker Reservation Batch Tests`, `Project CLI Integration Tests`, `HTML Report Artifact Embedding`, `test_backward_compatibility.py`, `ConfigValidationTests`, `ExecUnit`, `PytestParamConversionTests`, `RunProjectsIntegrationTests`, `Multi-Project Line Reporter Tests`, `AddMarkerTests`, `Sharding Integration Tests`?**
+  _High betweenness centrality (0.082) - this node is a cross-community bridge._
+- **Are the 228 inferred relationships involving `Orchestrator` (e.g. with `FailPolicyState` and `JobObject`) actually correct?**
+  _`Orchestrator` has 228 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 197 inferred relationships involving `Result` (e.g. with `ConsoleReporter` and `DotsReporter`) actually correct?**
+  _`Result` has 197 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 129 inferred relationships involving `HistoryStore` (e.g. with `ConsoleReporter` and `AddoptionCliIntegrationTests`) actually correct?**
+  _`HistoryStore` has 129 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 88 inferred relationships involving `TestItem` (e.g. with `Metafunc` and `FormatCollectionSummaryTests`) actually correct?**
+  _`TestItem` has 88 INFERRED edges - model-reasoned connections that need verification._
