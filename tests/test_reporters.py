@@ -708,6 +708,47 @@ class ReportCharsTests(unittest.TestCase):
             reporter.on_run_end(results, 1.0)
         self.assertIn("not ready", buf.getvalue())
 
+    def test_capital_p_prints_captured_stdout_for_passed_test(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        # Review gap (Task 9): the "P" in chars and r.logs branch that
+        # walks Result.logs entries and prints entry["stdout"] had zero
+        # coverage. Build a Result the way worker.py's captured_logs /
+        # final_logs would populate it -- a list of per-attempt dicts.
+        results = [
+            Result(
+                "t::test_a",
+                "passed",
+                None,
+                0.1,
+                logs=[{"attempt": 1, "stdout": "hello from a passed test", "stderr": ""}],
+            )
+        ]
+        lines = _summary_lines(results, 1.0, report_chars="P")
+        joined = "\n".join(lines)
+        self.assertIn("test_a", joined)
+        self.assertIn("hello from a passed test", joined)
+
+    def test_lowercase_p_does_not_print_captured_stdout(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        # Proves the capital/lowercase distinction is real: lowercase "p"
+        # lists the passed test id but must never dump its logs, even
+        # when logs are populated.
+        results = [
+            Result(
+                "t::test_a",
+                "passed",
+                None,
+                0.1,
+                logs=[{"attempt": 1, "stdout": "hello from a passed test", "stderr": ""}],
+            )
+        ]
+        lines = _summary_lines(results, 1.0, report_chars="p")
+        joined = "\n".join(lines)
+        self.assertIn("test_a", joined)
+        self.assertNotIn("hello from a passed test", joined)
+
 
 if __name__ == "__main__":
     unittest.main()
