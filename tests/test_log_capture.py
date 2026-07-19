@@ -35,12 +35,24 @@ class CaptureLogsTests(unittest.TestCase):
         self.assertIs(sys.stderr, original_stderr)
         self.assertEqual(root.handlers, handlers_before)
 
-    def test_tees_to_the_original_stdout(self):
+    def test_does_not_forward_to_original_stdout_by_default(self):
         fake_stdout = io.StringIO()
         old_stdout = sys.stdout
         sys.stdout = fake_stdout
         try:
             with log_capture.capture_logs() as result:
+                print("captured only")
+        finally:
+            sys.stdout = old_stdout
+        self.assertNotIn("captured only", fake_stdout.getvalue())
+        self.assertIn("captured only", result["stdout"])
+
+    def test_forwards_to_original_stdout_when_forward_live_true(self):
+        fake_stdout = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = fake_stdout
+        try:
+            with log_capture.capture_logs(forward_live=True) as result:
                 print("visible on both")
         finally:
             sys.stdout = old_stdout

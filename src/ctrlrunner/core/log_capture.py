@@ -1,6 +1,7 @@
 """
 Buffered stdout/stderr + logging capture for one test attempt, used by
-worker.py when logs != "off". Follows the same "capture
+worker.py for every test attempt; forward_live controls whether output also
+reaches the real stream live. Follows the same "capture
 unconditionally during the attempt, decide what to keep after the
 outcome is known" two-phase shape as capture_artifacts() -- the
 decision of whether to keep or discard a buffer lives in worker.py,
@@ -57,21 +58,25 @@ class _BoundedBuffer:
 
 
 class _Tee:
-    """Writes to both the bounded buffer and the original stream, so
-    worker output printed directly to stdout/stderr (outside any
-    captured test) stays visible in the real console/log, not just
-    captured. Implements write/flush explicitly and delegates
-    everything else (isatty, encoding, buffer, ...) to the original
-    stream via __getattr__, so code that probes those attributes
-    doesn't break."""
+    """Writes to the bounded buffer, and to the original stream too when
+    forward_live is True -- worker output printed directly to
+    stdout/stderr during a captured test only reaches the real
+    console/log when the caller explicitly asked for it (-s /
+    --capture=no); the default is buffer-only. Implements write/flush
+    explicitly and delegates everything else (isatty, encoding, buffer,
+    ...) to the original stream via __getattr__, so code that probes
+    those attributes doesn't break."""
 
-    def __init__(self, original, buffer: _BoundedBuffer):
+    def __init__(self, original, buffer: _BoundedBuffer, forward_live: bool):
         self._original = original
         self._buffer = buffer
+        self._forward_live = forward_live
 
     def write(self, text):
         self._buffer.write(text)
-        return self._original.write(text)
+        if self._forward_live:
+            return self._original.write(text)
+        return len(text)
 
     def flush(self):
         self._original.flush()
@@ -107,11 +112,13 @@ class _CaptureHandler(logging.Handler):
 
 
 @contextmanager
-def capture_logs(max_stream_bytes: int = _MAX_STREAM_BYTES):
+def capture_logs(max_stream_bytes: int = _MAX_STREAM_BYTES, forward_live: bool = False):
     """Captures stdout, stderr, and Python logging records for the
     duration of the `with` block. Yields a dict that is filled in as
     output arrives and is fully populated only once the block exits:
     {"stdout": str, "stderr": str, "records": [...], "truncated": bool}.
+    forward_live=False (default) means captured output does NOT reach
+    the real stream live -- only the buffer sees it.
     """
     stdout_buffer = _BoundedBuffer(max_stream_bytes)
     stderr_buffer = _BoundedBuffer(max_stream_bytes)
@@ -121,17 +128,13 @@ def capture_logs(max_stream_bytes: int = _MAX_STREAM_BYTES):
     result: dict = {"stdout": "", "stderr": "", "records": records, "truncated": False}
 
     root_logger = logging.getLogger()
-    # Defensive: clear any handler left behind by a previous capture
-    # that somehow didn't get torn down (should be unreachable given
-    # the try/finally below, but keeps handler count bounded across
-    # many attempts even if it ever happens).
     for existing in list(root_logger.handlers):
         if getattr(existing, _HANDLER_MARKER, False):
             root_logger.removeHandler(existing)
 
     original_stdout, original_stderr = sys.stdout, sys.stderr
-    sys.stdout = _Tee(original_stdout, stdout_buffer)
-    sys.stderr = _Tee(original_stderr, stderr_buffer)
+    sys.stdout = _Tee(original_stdout, stdout_buffer, forward_live)
+    sys.stderr = _Tee(original_stderr, stderr_buffer, forward_live)
     root_logger.addHandler(handler)
     try:
         yield result
