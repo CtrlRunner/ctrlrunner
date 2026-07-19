@@ -237,8 +237,13 @@ class ItemWideSurfaceTests(unittest.TestCase):
         return Item(**defaults)
 
     def test_module_resolves_from_func(self):
+        # __name__ here is whatever this test module was actually imported
+        # as -- "tests.test_hookcompat" under `python -m unittest
+        # tests.test_hookcompat`, but bare "test_hookcompat" under
+        # `python -m unittest discover -s tests` (CI). item.module must
+        # match the real import, not a hardcoded assumption about it.
         item = self._item()
-        self.assertEqual(item.module.__name__, "tests.test_hookcompat")
+        self.assertEqual(item.module.__name__, __name__)
 
     def test_cls_resolves_from_module_by_name(self):
         item = self._item(cls_name="ItemWideSurfaceTests")
