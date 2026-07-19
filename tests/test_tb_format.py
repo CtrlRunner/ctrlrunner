@@ -1,3 +1,4 @@
+import traceback
 import unittest
 from contextlib import ExitStack
 
@@ -79,6 +80,69 @@ class TbFilterTests(unittest.TestCase):
 
     def test_no_active_exception_returns_empty(self):
         self.assertEqual(tb_format.format_filtered_exc(), "")
+
+    def test_tb_style_auto_matches_todays_default(self):
+        tb_format.set_tb_style("auto")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertIn("user-level boom", text)
+        self.assertNotIn("ctrlrunner/core/di.py", text)
+
+    def test_tb_style_long_shows_full_unfiltered_trace(self):
+        tb_format.set_tb_style("long")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertIn("di.py", text)
+
+    def test_tb_style_native_matches_long(self):
+        tb_format.set_tb_style("native")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        native_text = self._formatted_through_di(_user_code_that_raises)
+        tb_format.set_tb_style("long")
+        long_text = self._formatted_through_di(_user_code_that_raises)
+        self.assertIn("di.py", native_text)
+        self.assertEqual(native_text.count("di.py"), long_text.count("di.py"))
+
+    def test_tb_style_short_keeps_only_the_last_frame(self):
+        tb_format.set_tb_style("short")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertIn("user-level boom", text)
+        self.assertNotIn("boom_fixture", text)
+
+    def test_tb_style_line_is_a_single_line_with_file_and_message(self):
+        tb_format.set_tb_style("line")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertEqual(len(text.strip().splitlines()), 1)
+        self.assertIn("ValueError: user-level boom", text)
+
+    def test_tb_style_no_returns_empty(self):
+        tb_format.set_tb_style("no")
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertEqual(text, "")
+
+    def test_full_trace_flag_still_works_when_tb_style_is_auto(self):
+        # backward compatibility: --full-trace alone (no --tb) still means
+        # "full unfiltered" via the pre-existing set_full_trace() path.
+        tb_format.set_full_trace(True)
+        tb_format.set_tb_style("auto")
+        self.addCleanup(tb_format.set_full_trace, False)
+        self.addCleanup(tb_format.set_tb_style, "auto")
+        text = self._formatted_through_di(_user_code_that_raises)
+        self.assertIn("di.py", text)
+
+    def test_format_line_falls_back_to_exc_only_when_stack_is_empty(self):
+        # _format_line's "if not te.stack" branch is unreachable through
+        # format_filtered_exc() in practice (a real except block always has
+        # at least one frame, and _filter_chain never empties a stack it
+        # can't refill) -- so it's exercised directly here, the same way
+        # test_all_internal_stack_kept_whole hand-builds a TracebackException.
+        te = traceback.TracebackException.from_exception(ValueError("bare"))
+        te.stack = traceback.StackSummary.from_list([])
+        line = tb_format._format_line(te)
+        self.assertEqual(line, "ValueError: bare")
 
 
 if __name__ == "__main__":
