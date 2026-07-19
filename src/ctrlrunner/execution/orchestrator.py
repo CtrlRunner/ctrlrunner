@@ -430,6 +430,7 @@ class Orchestrator:
         strict_teardown: bool = True,
         full_trace: bool = False,
         no_capture: bool = False,
+        tb_style: str = "auto",
         import_timeout: float = IMPORT_PHASE_TIMEOUT,
         order: str = "declared",
         seed: int | None = None,
@@ -461,6 +462,9 @@ class Orchestrator:
         # test stdout/stderr/logging is tee'd live to the real stream
         # again, same as before this feature existed.
         self.no_capture = no_capture
+        # --tb=<style>; "auto" (default) means "defer to self.full_trace",
+        # exactly matching tb_format.format_filtered_exc()'s own resolution.
+        self.tb_style = tb_style
         # The suite-import watchdog budget --
         # IMPORT_PHASE_TIMEOUT is only the default; heavy-deps suites on
         # cold-AV-scanned CI can legitimately need more.
@@ -1153,6 +1157,7 @@ class Orchestrator:
                 self.options,
                 self.raw_config,
                 self.no_capture,
+                self.tb_style,
             ),
         )
         proc.start()

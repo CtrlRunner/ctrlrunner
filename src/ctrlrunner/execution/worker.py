@@ -907,6 +907,7 @@ def run_worker(
     options: dict | None = None,
     raw_config: dict | None = None,
     no_capture: bool = False,
+    tb_style: str = "auto",
 ):
     # Put THIS process in its own new process group (pgid == its
     # own pid) before anything else -- in particular before any
@@ -924,6 +925,7 @@ def run_worker(
             os.setpgid(0, 0)
 
     tb_format.set_full_trace(full_trace)
+    tb_format.set_tb_style(tb_style)
 
     if playwright_config:
         from ..playwright import playwright_fixtures

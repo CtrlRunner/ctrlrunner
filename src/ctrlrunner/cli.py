@@ -506,6 +506,16 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         "(default: internal frames are filtered out for readability).",
     )
     parser.add_argument(
+        "--tb",
+        choices=["auto", "long", "short", "line", "no", "native"],
+        default=None,
+        help="Traceback style: auto (filtered, default), long (full "
+        "unfiltered), short (last frame only), line (one line), no "
+        "(suppress body). native is accepted for pytest muscle memory and "
+        "behaves identically to long. Overrides --full-trace when both are "
+        "given.",
+    )
+    parser.add_argument(
         "-s",
         "--no-capture",
         action="store_true",
@@ -1196,6 +1206,9 @@ def _run_main(args, shim):
         sys.exit(1)
     full_trace = bool(args.full_trace) or bool(config.get("full_trace", False))
     no_capture = bool(args.no_capture) or bool(config.get("no_capture", False))
+    tb_style = args.tb or config.get("tb")
+    if tb_style is None:
+        tb_style = "long" if full_trace else "auto"
     if args.verbose and args.quiet:
         print("Error: -v/--verbose and -q/--quiet are mutually exclusive", file=sys.stderr)
         sys.exit(1)
@@ -1387,6 +1400,7 @@ def _run_main(args, shim):
                 strict_teardown=strict_teardown,
                 full_trace=full_trace,
                 no_capture=no_capture,
+                tb_style=tb_style,
                 import_timeout=import_timeout,
                 order=order,
                 seed=seed,
@@ -1446,6 +1460,7 @@ def _run_main(args, shim):
             strict_teardown=strict_teardown,
             full_trace=full_trace,
             no_capture=no_capture,
+            tb_style=tb_style,
             import_timeout=import_timeout,
             order=order,
             seed=seed,

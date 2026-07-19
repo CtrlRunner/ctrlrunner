@@ -985,6 +985,38 @@ class CaptureSuppressionTests(unittest.TestCase):
         self.assertIn("should be attached to failure", by_id["test_noisy_fail"].console_captured)
 
 
+class TbStyleThreadingTests(unittest.TestCase):
+    def setUp(self):
+        # Sibling of CaptureSuppressionTests above -- same registry.reset()
+        # isolation, needed so a prior test's discovered modules (e.g. a
+        # stale "tests.test_demo" left registered by an unrelated suite)
+        # can't leak into this run's own "test_demo" discovery.
+        registry.reset()
+
+    def test_tb_style_short_reaches_the_worker_and_trims_the_traceback(self):
+        # helper() gives the traceback two real frames (test_fails ->
+        # helper) so --tb=short's one-frame trim is actually observable --
+        # a single-frame call chain would make "short" and the "auto"
+        # default byte-identical, per tb_format.py's own tests
+        # (test_tb_style_short_trims_every_link_of_a_chained_exception
+        # asserts the same count('File "') shape).
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n"
+                "def helper():\n"
+                "    assert 1 == 2\n\n"
+                "@test()\ndef test_fails():\n"
+                "    helper()\n"
+            )
+            orch = Orchestrator(str(root), 1, 10.0, tb_style="short")
+            reporter = orch.run()
+
+        result = reporter.results[0]
+        self.assertEqual(result.error.count('File "'), 1)
+
+
 class RuntestHooksTests(unittest.TestCase):
     """ctrlrunner_runtest_logstart/setup/teardown/logreport: conftest-
     discovered per-test hooks, fired once per attempt inside the

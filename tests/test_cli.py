@@ -2044,6 +2044,78 @@ class NoCaptureFlagTests(unittest.TestCase):
         self.assertFalse(args.no_capture)
 
 
+class TbStyleFlagTests(unittest.TestCase):
+    def test_tb_flag_parses(self):
+        parser = _build_run_parser()
+        self.assertEqual(parser.parse_args(["--tb", "short"]).tb, "short")
+
+    def test_tb_defaults_to_none(self):
+        parser = _build_run_parser()
+        self.assertIsNone(parser.parse_args([]).tb)
+
+
+class TbStyleResolutionIntegrationTests(unittest.TestCase):
+    """cli.py's --tb/--full-trace resolution (right after the existing
+    full_trace resolution): --tb explicit wins over --full-trace,
+    --full-trace alone still resolves to "long", and neither given keeps
+    today's filtered "auto" behavior. Exercised end-to-end through
+    main() (not just parser.parse_args) against a two-frame call chain
+    (test_fails -> helper) so --tb=short's one-frame trim and
+    --full-trace's un-filtered internal frame are each independently
+    observable in the JSON report's error text -- a single-frame chain
+    would make "auto" and "short" byte-identical (see
+    TbStyleThreadingTests in test_orchestrator_and_worker.py for the
+    same reasoning)."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit):
+            main()
+
+    def _error_text(self, tmp, argv):
+        root = Path(tmp) / "tests"
+        root.mkdir()
+        (root / "test_demo.py").write_text(
+            "from ctrlrunner import test\n\n"
+            "def helper():\n"
+            "    assert 1 == 2\n\n"
+            "@test()\ndef test_fails():\n"
+            "    helper()\n"
+        )
+        os.chdir(tmp)
+        self._run_cli(argv + ["--reporter", "json"])
+        data = json.loads(Path("reports/html-report/results.json").read_text())
+        return data["tests"][0]["error"]
+
+    def test_neither_flag_keeps_filtered_auto_default(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            error = self._error_text(tmp, [])
+        self.assertEqual(error.count('File "'), 2)
+        self.assertNotIn("ctrlrunner/execution/worker.py", error)
+
+    def test_full_trace_alone_resolves_to_long(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            error = self._error_text(tmp, ["--full-trace"])
+        self.assertIn("ctrlrunner/execution/worker.py", error)
+
+    def test_tb_alone_applies_short_trimming(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            error = self._error_text(tmp, ["--tb", "short"])
+        self.assertEqual(error.count('File "'), 1)
+
+    def test_tb_wins_over_full_trace_when_both_given(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            error = self._error_text(tmp, ["--tb", "short", "--full-trace"])
+        self.assertEqual(error.count('File "'), 1)
+        self.assertNotIn("ctrlrunner/execution/worker.py", error)
+
+
 class VerbosityFlagTests(unittest.TestCase):
     def test_verbose_and_quiet_flags_parse(self):
         parser = _build_run_parser()
