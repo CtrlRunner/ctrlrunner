@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
+import ctrlrunner.cli as cli
 from ctrlrunner.cli import _build_run_parser, main
 from ctrlrunner.core import registry
 
@@ -2062,6 +2063,97 @@ class VerbosityFlagTests(unittest.TestCase):
             ):
                 main()
             self.assertEqual(ctx.exception.code, 1)
+
+
+class ReportCharsFlagTests(unittest.TestCase):
+    def test_r_flag_parses(self):
+        parser = _build_run_parser()
+        self.assertEqual(parser.parse_args(["-r", "fs"]).report_chars, "fs")
+
+    def test_unknown_r_char_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            old_argv = sys.argv
+            sys.argv = ["ctrlrunner", str(root), "-r", "z"]
+            try:
+                with self.assertRaises(SystemExit) as ctx:
+                    cli.main()
+                self.assertEqual(ctx.exception.code, 1)
+            finally:
+                sys.argv = old_argv
+
+
+class ReportCharsThreadingTests(unittest.TestCase):
+    """Neither of the two ReportCharsFlagTests exercises a *valid* -r
+    value reaching build_reporters -- one only parses (never calls
+    main()), the other only checks the invalid-char error path, which
+    exits before either _build_reporters_or_exit call site runs. cli.py
+    has two such call sites (single-project and per-project/multi-project);
+    spy on _build_reporters_or_exit to confirm a real report_chars value
+    is threaded through at both, rather than silently dropped at one."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def test_report_chars_reaches_single_project_call_site(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp) / "suite"
+            root.mkdir()
+            (root / "test_demo.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_a():\n    pass\n"
+            )
+            with (
+                patch.object(
+                    cli, "_build_reporters_or_exit", wraps=cli._build_reporters_or_exit
+                ) as spy,
+                patch.object(sys, "argv", ["ctrlrunner", str(root), "-r", "fs"]),
+                self.assertRaises(SystemExit),
+            ):
+                cli.main()
+            self.assertEqual(spy.call_args.kwargs["report_chars"], "fs")
+
+    def test_report_chars_reaches_per_project_call_site(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root_a = Path(tmp) / "tests_a"
+            root_a.mkdir()
+            (root_a / "test_a.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    pass\n"
+            )
+            root_b = Path(tmp) / "tests_b"
+            root_b.mkdir()
+            (root_b / "test_b.py").write_text(
+                "from ctrlrunner import test\n\n@test()\ndef test_one():\n    pass\n"
+            )
+            (Path(tmp) / "ctrlrunner.toml").write_text(
+                '[ctrlrunner.projects.a]\ntests_dir = ["tests_a"]\n\n'
+                '[ctrlrunner.projects.b]\ntests_dir = ["tests_b"]\n'
+            )
+            old_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                with (
+                    patch.object(
+                        cli, "_build_reporters_or_exit", wraps=cli._build_reporters_or_exit
+                    ) as spy,
+                    patch.object(sys, "argv", ["ctrlrunner", "--project", "a,b", "-r", "fs"]),
+                    self.assertRaises(SystemExit),
+                ):
+                    cli.main()
+            finally:
+                os.chdir(old_cwd)
+            # The per-project call site is the second call to
+            # _build_reporters_or_exit (the first builds the
+            # single/aggregate console_reporters before project dispatch).
+            self.assertEqual(len(spy.call_args_list), 2)
+            self.assertEqual(spy.call_args_list[1].kwargs["report_chars"], "fs")
 
 
 if __name__ == "__main__":

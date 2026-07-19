@@ -127,9 +127,11 @@ def _resolve_strict_teardown(config) -> bool:
     return strict_teardown
 
 
-def _build_reporters_or_exit(names, json_output, verbosity="normal"):
+def _build_reporters_or_exit(names, json_output, verbosity="normal", report_chars=None):
     try:
-        return build_reporters(names, json_output=json_output, verbosity=verbosity)
+        return build_reporters(
+            names, json_output=json_output, verbosity=verbosity, report_chars=report_chars
+        )
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -524,6 +526,15 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress per-test output; print only the final totals line and "
         "failure test ids (no error text) unless -r asks for more.",
+    )
+    parser.add_argument(
+        "-r",
+        dest="report_chars",
+        default=None,
+        help="Show extra summary sections: f=failed, s=skipped, x=expected "
+        "failures, p=passed, P=passed with captured output, w=warnings, "
+        "a=all except passed, A=all. E.g. -rfs. Default: f (matches today's "
+        "output).",
     )
     parser.add_argument(
         "--junit-logs",
@@ -1190,6 +1201,16 @@ def _run_main(args, shim):
         sys.exit(1)
     verbosity = "verbose" if args.verbose else "quiet" if args.quiet else "normal"
 
+    _VALID_RCHARS = set("fsxpPwaA")
+    report_chars = args.report_chars
+    if report_chars is not None and not set(report_chars) <= _VALID_RCHARS:
+        bad = "".join(sorted(set(report_chars) - _VALID_RCHARS))
+        print(
+            f"Error: -r contains unknown character(s) {bad!r}. Valid: f,s,x,p,P,w,a,A",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     html_report_arg = (
         args.html_report if args.html_report is not None else config.get("html_report")
     )
@@ -1257,6 +1278,7 @@ def _run_main(args, shim):
         [n for n in reporter_names if n != "json"] if json_deferred else reporter_names,
         json_output,
         verbosity=verbosity,
+        report_chars=report_chars,
     )
 
     # history_config was already resolved (and validated) above the
@@ -1307,7 +1329,7 @@ def _run_main(args, shim):
         # end instead, same pattern JUnit already uses.
         per_project_names = [n for n in reporter_names if n != "json"]
         per_project_console_reporters = _build_reporters_or_exit(
-            per_project_names, json_output, verbosity=verbosity
+            per_project_names, json_output, verbosity=verbosity, report_chars=report_chars
         )
         if history_reporter is not None:
             per_project_console_reporters.append(history_reporter)
