@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
-from ctrlrunner.cli import main
+from ctrlrunner.cli import _build_run_parser, main
 from ctrlrunner.core import registry
 
 
@@ -2029,6 +2029,18 @@ class AllSixHooksEndToEndTests(unittest.TestCase):
                 "sessionfinish:1:0",
             ],
         )
+
+
+class NoCaptureFlagTests(unittest.TestCase):
+    def test_no_capture_flag_parses(self):
+        parser = _build_run_parser()
+        args = parser.parse_args(["-s"])
+        self.assertTrue(args.no_capture)
+
+    def test_no_capture_defaults_false(self):
+        parser = _build_run_parser()
+        args = parser.parse_args([])
+        self.assertFalse(args.no_capture)
 
 
 if __name__ == "__main__":

@@ -504,6 +504,14 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         "(default: internal frames are filtered out for readability).",
     )
     parser.add_argument(
+        "-s",
+        "--no-capture",
+        action="store_true",
+        help="Disable output capturing: test stdout/stderr/logging is echoed "
+        "live to the terminal again (pytest's -s). Default: captured output "
+        "only appears in a failed test's summary block.",
+    )
+    parser.add_argument(
         "--junit-logs",
         choices=["off", "system-out", "split"],
         default=None,
@@ -1162,6 +1170,7 @@ def _run_main(args, shim):
         )
         sys.exit(1)
     full_trace = bool(args.full_trace) or bool(config.get("full_trace", False))
+    no_capture = bool(args.no_capture) or bool(config.get("no_capture", False))
 
     html_report_arg = (
         args.html_report if args.html_report is not None else config.get("html_report")
@@ -1334,6 +1343,7 @@ def _run_main(args, shim):
                 junit_infra_errors=junit_infra_errors,
                 strict_teardown=strict_teardown,
                 full_trace=full_trace,
+                no_capture=no_capture,
                 import_timeout=import_timeout,
                 order=order,
                 seed=seed,
@@ -1392,6 +1402,7 @@ def _run_main(args, shim):
             junit_infra_errors=junit_infra_errors,
             strict_teardown=strict_teardown,
             full_trace=full_trace,
+            no_capture=no_capture,
             import_timeout=import_timeout,
             order=order,
             seed=seed,

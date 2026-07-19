@@ -148,6 +148,7 @@ KNOWN_KEYS = frozenset(
         "junit_logs",
         "strict_teardown",
         "full_trace",
+        "no_capture",
         "junit_infra_errors",
     }
 )
