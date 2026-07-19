@@ -108,6 +108,14 @@ existing invocations that don't pass `-r`.
 `flaky` has no dedicated letter (pytest has no analogous concept); the
 existing unconditional flaky count line in the summary is unchanged.
 
+`-rP`'s captured-output replay is sourced from the existing `--logs`-gated
+`Result.logs` (not the new always-buffered failure path in section 1) —
+buffering every passing test's output indefinitely just in case `-rP` is
+later requested would reintroduce the memory cost section 1 exists to avoid.
+`-rP` without `--logs on` shows the passed-test id with no output, same as
+today when no logs were captured; this is a deliberate, documented scope
+trim, not a gap.
+
 ### 4. `--tb=<style>` — traceback detail
 
 Extends `tb_format.py`'s binary filtered/full into five named styles:
@@ -128,11 +136,22 @@ Extends `tb_format.py`'s binary filtered/full into five named styles:
 
 ### 5. Scope boundary
 
-`-v`/`-q`/`-r`/`--tb` are **console-only** — they change what
+`-v`/`-q`/`-r` are **console-only** — they change what
 `LineReporter`/`DotsReporter` print to the terminal. HTML, JSON, and JUnit
 reports are unaffected and keep including full per-test data regardless,
 consistent with how `--reporter` and `--logs` already each govern only their
-own output channel today. No cross-channel coupling is introduced.
+own output channel today.
+
+`--tb` is the one exception, and deliberately so: it extends `--full-trace`,
+which today already formats `Result.error` globally, before any channel sees
+it (`tb_format.format_filtered_exc()` is the single source of that string for
+console, JUnit, HTML, and JSON alike — there's no per-channel traceback
+formatting to hook into separately). Splitting that into a console-only copy
+and an unfiltered channel copy would be a materially bigger change with no
+clear demand for it, so `--tb` stays global, matching `--full-trace`'s
+existing behavior exactly. `--tb=no` therefore also empties `<failure>` text
+in JUnit and the HTML report, not just the console — documented here as an
+intentional consequence, not an oversight.
 
 ## Testing
 
