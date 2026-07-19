@@ -384,6 +384,32 @@ class SummaryLinesFlakyTests(unittest.TestCase):
         self.assertNotIn("flaky", lines[0])
 
 
+class SummaryLinesConsoleCapturedTests(unittest.TestCase):
+    def test_console_captured_appears_indented_under_the_failure(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [
+            Result(
+                "t::test_a",
+                "failed",
+                "AssertionError: boom",
+                0.1,
+                console_captured="----- Captured stdout -----\nhello",
+            )
+        ]
+        lines = _summary_lines(results, 1.0)
+        self.assertIn("      ----- Captured stdout -----", lines)
+        self.assertIn("      hello", lines)
+
+    def test_no_console_captured_section_when_none(self):
+        from ctrlrunner.reporting.reporters import _summary_lines
+
+        results = [Result("t::test_a", "failed", "boom", 0.1)]
+        lines = _summary_lines(results, 1.0)
+        joined = "\n".join(lines)
+        self.assertNotIn("Captured stdout", joined)
+
+
 class SummaryLinesFileBreakdownTests(unittest.TestCase):
     def test_breakdown_table_appears_with_two_or_more_files(self):
         from ctrlrunner.reporting.reporters import _summary_lines

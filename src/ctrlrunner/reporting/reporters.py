@@ -98,6 +98,8 @@ def _summary_lines(results, duration):
             lines.append(f"  \u2717 {r.test_id}{suffix}")
             if r.error:
                 lines.extend(f"      {line}" for line in r.error.splitlines())
+            if r.console_captured:
+                lines.extend(f"      {line}" for line in r.console_captured.splitlines())
 
     by_file: dict[str, list] = {}
     for r in results:
