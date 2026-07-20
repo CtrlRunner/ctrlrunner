@@ -212,7 +212,11 @@ def import_module_by_path(path, dotted_name: str, force_reload: bool = False) ->
 
 
 def _safe_test_dir(test_id: str) -> str:
-    return test_id.replace("::", "__").replace("[", "_").replace("]", "").replace("/", "_")
+    s = test_id.replace("::", "__").replace("[", "_").replace("]", "").replace("/", "_")
+    # Strip characters that are illegal in Windows file/directory names.
+    for ch in '<>:"|?*\\':
+        s = s.replace(ch, "")
+    return s
 
 
 def _call_on_failure(on_failure, value, prefix, outcome):
@@ -837,8 +841,7 @@ def _run_serial_group(
                         worker_id,
                         tid,
                         "skipped",
-                        f"skipped: earlier test '{failed_at}' in serial group "
-                        f"'{class_label}' failed",
+                        f"skipped: earlier test '{failed_at}' in serial group '{class_label}' failed",
                         0.0,
                         g_attempt,
                         [],

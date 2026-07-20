@@ -29,6 +29,7 @@ Fixture model:
 
 import functools
 import inspect
+import types
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,7 +57,21 @@ class _ClassProxy:
         object.__setattr__(self, "_cls", cls)
 
     def __getattr__(self, name: str) -> object:
-        return getattr(object.__getattribute__(self, "_cls"), name)
+        cls = object.__getattribute__(self, "_cls")
+        attr = getattr(cls, name)
+        # Regular functions defined on the class are returned unbound by
+        # getattr(cls, name); bind them so helper methods that declare
+        # `self` as their first parameter receive the proxy as `self`.
+        # Skip binding for @staticmethod / @classmethod descriptors --
+        # those are already callable without a bound self.
+        if isinstance(attr, types.FunctionType):
+            for base in cls.__mro__:
+                if name in base.__dict__:
+                    if isinstance(base.__dict__[name], (staticmethod, classmethod)):
+                        return attr  # already correct, no binding needed
+                    break
+            return types.MethodType(attr, self)
+        return attr
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(
@@ -920,8 +935,7 @@ def test_class(
                 )
             if workers_mode not in ("cap", "dedicated"):
                 raise ValueError(
-                    f"@test_class on '{cls.__name__}': workers_mode must be 'cap' or "
-                    f"'dedicated', got {workers_mode!r}"
+                    f"@test_class on '{cls.__name__}': workers_mode must be 'cap' or 'dedicated', got {workers_mode!r}"
                 )
         if (
             serial
@@ -929,8 +943,7 @@ def test_class(
             and (isinstance(retries, bool) or not isinstance(retries, int) or retries < 0)
         ):
             raise ValueError(
-                f"@test_class on '{cls.__name__}': serial retries must be an "
-                f"integer >= 0, got {retries!r}"
+                f"@test_class on '{cls.__name__}': serial retries must be an integer >= 0, got {retries!r}"
             )
 
         nested_classes = [name for name, attr in cls.__dict__.items() if isinstance(attr, type)]
