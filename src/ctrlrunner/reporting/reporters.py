@@ -161,30 +161,6 @@ def _summary_lines(results, duration, verbosity="normal", report_chars=None):
                 for w in r.warnings:
                     lines.append(f"  {r.test_id}: {w.get('category')}: {w.get('message')}")
 
-    if verbosity == "quiet":
-        return lines
-
-    by_file: dict[str, list] = {}
-    for r in results:
-        file_key = r.groups.get("file") if r.groups else None
-        if file_key is None:
-            continue
-        by_file.setdefault(file_key, []).append(r)
-
-    if len(by_file) >= 2:
-        lines.append("")
-        lines.append("By file:")
-        name_width = max(len(f) for f in by_file) if by_file else 0
-        for file_key in sorted(by_file):
-            file_results = by_file[file_key]
-            m_total = len(file_results)
-            m_passed = sum(1 for r in file_results if r.outcome == "passed")
-            m_failed = sum(1 for r in file_results if r.outcome == "failed")
-            lines.append(
-                f"  {file_key.ljust(name_width)}  {m_total:>3} total  "
-                f"{m_passed:>3} passed  {m_failed:>3} failed"
-            )
-
     return lines
 
 

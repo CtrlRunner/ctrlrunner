@@ -410,62 +410,6 @@ class SummaryLinesConsoleCapturedTests(unittest.TestCase):
         self.assertNotIn("Captured stdout", joined)
 
 
-class SummaryLinesFileBreakdownTests(unittest.TestCase):
-    def test_breakdown_table_appears_with_two_or_more_files(self):
-        from ctrlrunner.reporting.reporters import _summary_lines
-
-        results = [
-            Result(
-                test_id="mod_a::test_1",
-                outcome="passed",
-                error=None,
-                duration=0.1,
-                groups={"file": "mod_a.py"},
-            ),
-            Result(
-                test_id="mod_a::test_2",
-                outcome="failed",
-                error="x",
-                duration=0.1,
-                groups={"file": "mod_a.py"},
-            ),
-            Result(
-                test_id="mod_b::test_1",
-                outcome="passed",
-                error=None,
-                duration=0.1,
-                groups={"file": "mod_b.py"},
-            ),
-        ]
-        lines = _summary_lines(results, 1.0)
-        joined = "\n".join(lines)
-        self.assertIn("mod_a", joined)
-        self.assertIn("mod_b", joined)
-
-    def test_no_breakdown_table_with_a_single_file(self):
-        from ctrlrunner.reporting.reporters import _summary_lines
-
-        results = [
-            Result(
-                test_id="mod_a::test_1",
-                outcome="passed",
-                error=None,
-                duration=0.1,
-                groups={"file": "mod_a.py"},
-            ),
-        ]
-        lines = _summary_lines(results, 1.0)
-        joined = "\n".join(lines)
-        self.assertNotIn("mod_a", joined)
-
-    def test_no_breakdown_table_when_groups_missing(self):
-        from ctrlrunner.reporting.reporters import _summary_lines
-
-        results = [Result(test_id="m::t", outcome="passed", error=None, duration=0.1)]
-        lines = _summary_lines(results, 1.0)
-        self.assertTrue(lines)
-
-
 class CustomReporterLoaderTests(unittest.TestCase):
     """--reporter accepts 'module.path:ClassName'
     specs -- the class is imported and instantiated with no arguments.
