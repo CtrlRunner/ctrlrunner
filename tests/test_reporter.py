@@ -273,6 +273,21 @@ class MultiProjectJUnitTests(unittest.TestCase):
             self.assertEqual(case.get("classname"), "[smoke] pkg.mod")
             self.assertEqual(case.get("name"), "test_x")
 
+    def test_class_based_id_splits_classname_and_bare_method_name(self):
+        # module::ClassName::method[suffix] -- rpartition on the LAST
+        # "::" puts the class name into classname (alongside the
+        # module) and leaves name as just the bare method+params, not
+        # "ClassName::method[suffix]".
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            path = Path(tmp) / "report.xml"
+            reporter = JUnitReporter()
+            reporter.add_result("pkg.mod::LoginTests::test_valid_login[x]", "passed", None, 0.1)
+            reporter.write(str(path))
+            root = ET.parse(path).getroot()
+            case = root.find("testcase")
+            self.assertEqual(case.get("classname"), "pkg.mod::LoginTests")
+            self.assertEqual(case.get("name"), "test_valid_login[x]")
+
     def test_multi_project_missing_project_falls_back_to_suite_name(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "report.xml"

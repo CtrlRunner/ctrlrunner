@@ -224,19 +224,19 @@ class AssignWorkerGroupsTests(unittest.TestCase):
 
     def test_class_qualified_spec_matches_only_that_class(self):
         tests = [
-            _item("mod::Login.test_a", class_name="Login"),
-            _item("mod::Other.test_b", class_name="Other"),
+            _item("mod::Login::test_a", class_name="Login"),
+            _item("mod::Other::test_b", class_name="Other"),
             _item("mod::test_plain"),
         ]
         result = assign_worker_groups(
             tests, [_spec("tests/test_a.py", class_name="Login", count=1)]
         )
-        self.assertIn("mod::Login.test_a", result)
-        self.assertNotIn("mod::Other.test_b", result)
+        self.assertIn("mod::Login::test_a", result)
+        self.assertNotIn("mod::Other::test_b", result)
         self.assertNotIn("mod::test_plain", result)
 
     def test_class_qualified_exact_beats_exact_file(self):
-        tests = [_item("mod::Login.test_a", class_name="Login")]
+        tests = [_item("mod::Login::test_a", class_name="Login")]
         result = assign_worker_groups(
             tests,
             [
@@ -244,7 +244,7 @@ class AssignWorkerGroupsTests(unittest.TestCase):
                 _spec("tests/test_a.py", class_name="Login", count=1, order=1),
             ],
         )
-        self.assertEqual(result["mod::Login.test_a"].count, 1)
+        self.assertEqual(result["mod::Login::test_a"].count, 1)
 
     def test_exact_file_beats_glob(self):
         tests = [_item("mod::test_a", path="tests/test_a.py")]
@@ -258,7 +258,7 @@ class AssignWorkerGroupsTests(unittest.TestCase):
         self.assertEqual(result["mod::test_a"].count, 1)
 
     def test_class_qualified_glob_beats_exact_file(self):
-        tests = [_item("mod::Login.test_a", class_name="Login")]
+        tests = [_item("mod::Login::test_a", class_name="Login")]
         result = assign_worker_groups(
             tests,
             [
@@ -266,7 +266,7 @@ class AssignWorkerGroupsTests(unittest.TestCase):
                 _spec("tests/*.py", class_name="Login", count=1, order=1),
             ],
         )
-        self.assertEqual(result["mod::Login.test_a"].count, 1)
+        self.assertEqual(result["mod::Login::test_a"].count, 1)
 
     def test_specificity_tie_first_declared_wins(self):
         tests = [_item("mod::test_a", path="tests/test_a.py")]
@@ -280,16 +280,16 @@ class AssignWorkerGroupsTests(unittest.TestCase):
         self.assertEqual(result["mod::test_a"].count, 2)
 
     def test_config_beats_decorator(self):
-        tests = [_item("mod::Login.test_a", class_name="Login", workers=5, workers_mode="cap")]
+        tests = [_item("mod::Login::test_a", class_name="Login", workers=5, workers_mode="cap")]
         result = assign_worker_groups(tests, [_spec("tests/test_a.py", count=1)])
-        self.assertEqual(result["mod::Login.test_a"].count, 1)
+        self.assertEqual(result["mod::Login::test_a"].count, 1)
 
     def test_decorator_fallback_when_no_config_matches(self):
         tests = [
-            _item("mod::Login.test_a", class_name="Login", workers=2, workers_mode="dedicated")
+            _item("mod::Login::test_a", class_name="Login", workers=2, workers_mode="dedicated")
         ]
         result = assign_worker_groups(tests, [])
-        constraint = result["mod::Login.test_a"]
+        constraint = result["mod::Login::test_a"]
         self.assertEqual(constraint.count, 2)
         self.assertEqual(constraint.mode, "dedicated")
         self.assertEqual(constraint.group, "tests/test_a.py::Login")
@@ -337,8 +337,8 @@ class BuildUnitsTests(unittest.TestCase):
 
     def test_class_level_fully_parallel_overrides_grouped_default(self):
         tests = [
-            _item("a::Par.test_1", path="tests/test_a.py", class_name="Par", fully_parallel=True),
-            _item("a::Par.test_2", path="tests/test_a.py", class_name="Par", fully_parallel=True),
+            _item("a::Par::test_1", path="tests/test_a.py", class_name="Par", fully_parallel=True),
+            _item("a::Par::test_2", path="tests/test_a.py", class_name="Par", fully_parallel=True),
             _item("a::test_3", path="tests/test_a.py"),
         ]
         units, _ = build_units(tests, {}, fully_parallel_default=False)
@@ -351,7 +351,7 @@ class BuildUnitsTests(unittest.TestCase):
     def test_class_level_fully_parallel_false_overrides_parallel_default(self):
         tests = [
             _item(
-                "a::Grouped.test_1",
+                "a::Grouped::test_1",
                 path="tests/test_a.py",
                 class_name="Grouped",
                 fully_parallel=False,
@@ -362,20 +362,20 @@ class BuildUnitsTests(unittest.TestCase):
         kinds = sorted(u.kind for u in units)
         self.assertEqual(kinds, ["file", "single"])
         file_unit = next(u for u in units if u.kind == "file")
-        self.assertEqual(file_unit.test_ids, ("a::Grouped.test_1",))
+        self.assertEqual(file_unit.test_ids, ("a::Grouped::test_1",))
 
     def test_serial_class_is_extracted_into_its_own_unit(self):
         tests = [
             _item("a::test_1", path="tests/test_a.py"),
             _item(
-                "a::Flow.test_2",
+                "a::Flow::test_2",
                 path="tests/test_a.py",
                 class_name="Flow",
                 serial_group="a::Flow",
                 serial_retries=2,
             ),
             _item(
-                "a::Flow.test_3",
+                "a::Flow::test_3",
                 path="tests/test_a.py",
                 class_name="Flow",
                 serial_group="a::Flow",
@@ -386,15 +386,15 @@ class BuildUnitsTests(unittest.TestCase):
         units, _ = build_units(tests, {}, fully_parallel_default=False)
         serial = next(u for u in units if u.kind == "serial")
         self.assertEqual(serial.key, "a::Flow")
-        self.assertEqual(serial.test_ids, ("a::Flow.test_2", "a::Flow.test_3"))
+        self.assertEqual(serial.test_ids, ("a::Flow::test_2", "a::Flow::test_3"))
         self.assertEqual(serial.serial_retries, 2)
         file_unit = next(u for u in units if u.kind == "file")
         self.assertEqual(file_unit.test_ids, ("a::test_1", "a::test_4"))
 
     def test_serial_wins_even_under_fully_parallel_default(self):
         tests = [
-            _item("a::Flow.test_1", class_name="Flow", serial_group="a::Flow"),
-            _item("a::Flow.test_2", class_name="Flow", serial_group="a::Flow"),
+            _item("a::Flow::test_1", class_name="Flow", serial_group="a::Flow"),
+            _item("a::Flow::test_2", class_name="Flow", serial_group="a::Flow"),
         ]
         units, _ = build_units(tests, {}, fully_parallel_default=True)
         self.assertEqual(len(units), 1)
@@ -408,14 +408,14 @@ class BuildUnitsTests(unittest.TestCase):
         constraint = WorkerConstraint(group="tests/test_a.py::Login", count=1)
         tests = [
             _item("a::test_1", path="tests/test_a.py"),
-            _item("a::Login.test_2", path="tests/test_a.py", class_name="Login"),
+            _item("a::Login::test_2", path="tests/test_a.py", class_name="Login"),
             _item("a::test_3", path="tests/test_a.py"),
         ]
-        constraints_by_id = {"a::Login.test_2": constraint}
+        constraints_by_id = {"a::Login::test_2": constraint}
         units, cbu = build_units(tests, constraints_by_id, fully_parallel_default=False)
         self.assertEqual(len(units), 2)
         constrained = next(u for u in units if cbu.get(u.key) is not None)
-        self.assertEqual(constrained.test_ids, ("a::Login.test_2",))
+        self.assertEqual(constrained.test_ids, ("a::Login::test_2",))
         self.assertEqual(cbu[constrained.key], constraint)
         pool = next(u for u in units if cbu.get(u.key) is None)
         self.assertEqual(pool.test_ids, ("a::test_1", "a::test_3"))
@@ -427,7 +427,7 @@ class BuildUnitsTests(unittest.TestCase):
         tests = [
             _item("a::test_1", path="tests/test_a.py", fully_parallel=True),
             _item(
-                "a::Flow.test_2",
+                "a::Flow::test_2",
                 path="tests/test_a.py",
                 class_name="Flow",
                 serial_group="a::Flow",
@@ -435,7 +435,7 @@ class BuildUnitsTests(unittest.TestCase):
         ]
         constraints_by_id = {
             "a::test_1": constraint,
-            "a::Flow.test_2": constraint,
+            "a::Flow::test_2": constraint,
         }
         units, cbu = build_units(tests, constraints_by_id, fully_parallel_default=False)
         for unit in units:

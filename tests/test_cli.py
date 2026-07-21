@@ -692,7 +692,7 @@ class ConfigValidationCliTests(unittest.TestCase):
                     {
                         "tests": [
                             {
-                                "id": "tests.test_serialrerun_demo::Flow.test_second",
+                                "id": "tests.test_serialrerun_demo::Flow::test_second",
                                 "outcome": "failed",
                             }
                         ]
@@ -715,8 +715,8 @@ class ConfigValidationCliTests(unittest.TestCase):
             self.assertEqual(
                 ran,
                 [
-                    "tests.test_serialrerun_demo::Flow.test_first",
-                    "tests.test_serialrerun_demo::Flow.test_second",
+                    "tests.test_serialrerun_demo::Flow::test_first",
+                    "tests.test_serialrerun_demo::Flow::test_second",
                 ],
             )
 
@@ -1416,6 +1416,73 @@ class GrepCliTests(unittest.TestCase):
             ):
                 main()
         self.assertEqual(ctx.exception.code, 2)
+
+
+class PositionalNodeIdCliTests(unittest.TestCase):
+    """A '::'-suffixed root positional is a pytest-style node id
+    (path/to/file.py::Class::test[params]) selecting exactly one test,
+    not a bare directory/file -- see the 'root' positional handling in
+    cli.py's _run_main."""
+
+    def setUp(self):
+        registry.reset()
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    def _run_cli(self, argv):
+        with patch.object(sys, "argv", ["ctrlrunner"] + argv), self.assertRaises(SystemExit) as ctx:
+            main()
+        return ctx.exception.code
+
+    def _make_suite(self, tmp):
+        root = Path(tmp) / "tests"
+        root.mkdir()
+        path = root / "test_node_id_cli_demo.py"
+        path.write_text(
+            "from ctrlrunner import parametrize, test, test_class\n\n"
+            "@test_class()\n"
+            "class Flow:\n"
+            "    @test()\n"
+            '    @parametrize("value", [("a", [1])])\n'
+            "    def test_thing(self, value):\n        pass\n\n"
+            "    @test()\n"
+            "    def test_other(self):\n        pass\n"
+        )
+        return path
+
+    def test_pytest_style_node_id_runs_exactly_one_test(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            path = self._make_suite(tmp)
+            os.chdir(tmp)
+            node_id = f"{path.relative_to(tmp)}::Flow::test_thing[value0]"
+            code = self._run_cli([node_id, "--reporter", "dots,json"])
+            data = json.loads(Path("reports/html-report/results.json").read_text())
+        self.assertEqual(code, 0)
+        ids = {t["id"] for t in data["tests"]}
+        self.assertEqual(ids, {"test_node_id_cli_demo::Flow::test_thing[value0]"})
+
+    def test_unmatched_node_id_exits_with_clear_error_not_zero_tests_silently(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            path = self._make_suite(tmp)
+            os.chdir(tmp)
+            node_id = f"{path.relative_to(tmp)}::Flow::test_nonexistent"
+            buf = io.StringIO()
+            with contextlib.redirect_stderr(buf):
+                code = self._run_cli([node_id])
+        self.assertEqual(code, 1)
+        self.assertIn("no test matches", buf.getvalue())
+
+    def test_bad_file_before_double_colon_exits_with_clear_error(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            self._make_suite(tmp)
+            os.chdir(tmp)
+            buf = io.StringIO()
+            with contextlib.redirect_stderr(buf):
+                code = self._run_cli(["tests/does_not_exist.py::Flow::test_thing"])
+        self.assertEqual(code, 1)
+        self.assertIn("is not a file", buf.getvalue())
 
 
 class UnknownReporterCliTests(unittest.TestCase):

@@ -176,6 +176,13 @@ KNOWN_TABLES = frozenset(
     }
 )
 
+# Subset of KNOWN_TABLES whose own keys are a fixed, known set of names
+# rather than user-chosen strings ("projects" sub-tables intentionally
+# reuse top-level names like timeout/num_workers as per-project
+# overrides; "workers" keys are file/glob/class patterns; "options" is
+# free-form user data) -- see the misplaced-key check in load_config().
+_FIXED_SCHEMA_TABLES = KNOWN_TABLES - {"projects", "workers", "options"}
+
 
 def _default_warn(message: str) -> None:
     print(f"ctrlrunner: config warning: {message}", file=sys.stderr)
@@ -213,4 +220,30 @@ def load_config(path: str, warn=None) -> dict:
             continue
         if key not in KNOWN_KEYS:
             warn(f"unknown key {key!r} in [ctrlrunner] is ignored (typo?)")
+
+    # TOML scopes a bare "key = value" line to whichever [table] header
+    # appears most recently above it -- a top-level setting written
+    # AFTER a [ctrlrunner.<name>] header (with no later [ctrlrunner]
+    # header to return to the parent table) silently becomes part of
+    # that nested table instead, and silently falls back to its
+    # hardcoded default with no error. _FIXED_SCHEMA_TABLES have a
+    # known, fixed set of their OWN key names, so a KNOWN_KEY turning up
+    # inside one is almost certainly this exact mistake, not a
+    # legitimate same-named nested setting -- unlike "projects" (each
+    # sub-table intentionally reuses names like timeout/num_workers as
+    # per-project overrides) or "workers"/"options" (keys are arbitrary
+    # user-chosen strings), which are excluded to avoid false positives.
+    for table_name in _FIXED_SCHEMA_TABLES:
+        table = section.get(table_name)
+        if not isinstance(table, dict):
+            continue
+        for key in table:
+            if key in KNOWN_KEYS:
+                warn(
+                    f"key {key!r} found inside [ctrlrunner.{table_name}], not "
+                    f"[ctrlrunner] -- if this was meant to be a top-level "
+                    f"setting, move it ABOVE the [ctrlrunner.{table_name}] "
+                    f"header (TOML scopes 'key = value' lines to whichever "
+                    f"[table] header appears above them, not below)."
+                )
     return section

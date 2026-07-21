@@ -64,6 +64,15 @@ class ItemTests(unittest.TestCase):
     def test_location_without_func(self):
         self.assertEqual(self._item().location, (None, None, "test_a"))
 
+    def test_name_and_location_for_class_based_id_is_bare_method_name(self):
+        # module::ClassName::method[suffix] -- .name/.location's 3rd
+        # element must be just "method[suffix]", matching real pytest's
+        # own Item.name semantics (the class lives on item.cls, not
+        # baked into name), not "ClassName::method[suffix]".
+        item = self._item(test_id="suite.test_demo::LoginTests::test_valid_login[x]")
+        self.assertEqual(item.name, "test_valid_login[x]")
+        self.assertEqual(item.location, (None, None, "test_valid_login[x]"))
+
 
 class TestReportTests(unittest.TestCase):
     def test_passed_outcome(self):

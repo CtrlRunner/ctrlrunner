@@ -56,6 +56,14 @@ def _split_csv(value):
     return [v.strip() for v in value.split(",") if v.strip()] if value else None
 
 
+def _strip_node_id(value):
+    """A root positional may carry a pytest-style '::Class::test[id]'
+    node-id suffix (see the 'root' positional's node-id handling in
+    _run_main) -- conftest discovery only ever needs the file/directory
+    part before the first '::'."""
+    return value.partition("::")[0] if value else value
+
+
 def _num_workers_arg(value: str):
     """argparse type for -n/--num-workers: 'auto' and 'N%' pass through
     as strings (resolved later by resolve_num_workers), an int string
@@ -432,8 +440,9 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
         "root",
         nargs="?",
         default=None,
-        help="Directory to discover test_*.py files in, or a single test file "
-        "(falls back to ctrlrunner.toml's 'root', then 'tests')",
+        help="Directory to discover test_*.py files in, a single test file, or a "
+        "pytest-style path/to/file.py::Class::test[params] node id to run one "
+        "exact test (falls back to ctrlrunner.toml's 'root', then 'tests')",
     )
     parser.add_argument("-n", "--num-workers", type=_num_workers_arg, default=None)
     parser.add_argument("--timeout", type=float, default=None, help="Default per-test timeout (s)")
@@ -636,7 +645,7 @@ def _build_run_parser(add_help: bool = True) -> argparse.ArgumentParser:
     parser.add_argument(
         "--grep",
         type=_regex_arg,
-        help="Regex matched against each test's full id (module::[Class.]func[params]); "
+        help="Regex matched against each test's full id (module::[Class::]func[params]); "
         "only matching tests run",
     )
     parser.add_argument(
@@ -773,7 +782,7 @@ def _parse_run_args():
     base_parser = _build_run_parser(add_help=False)
     args_a, _unknown = base_parser.parse_known_args()
     config_a = load_config(args_a.config)
-    guessed_root = _guess_root(sys.argv[1:], base_parser)
+    guessed_root = _strip_node_id(_guess_root(sys.argv[1:], base_parser))
 
     def declaration_roots() -> list[str]:
         roots = [guessed_root or config_a.get("root") or "tests"]
@@ -907,7 +916,44 @@ def _run_main(args, shim):
 
         set_report_teststatus_hooks(shim.hooks["ctrlrunner_report_teststatus"], hook_config)
 
-    root = args.root or config.get("root") or "tests"
+    # A root positional containing "::" is a pytest-style node-id
+    # selector (path/to/file.py::Class::test[params]) rather than a
+    # bare directory/file -- ctrlrunner's own generated TestItem.id is
+    # module::[Class::]func[params] (see registry.py's
+    # _merge_class_metadata), so once the file part is stripped off,
+    # everything after the first "::" already matches ctrlrunner's own
+    # id format verbatim, with no translation needed.
+    node_selector = None
+    if args.root and "::" in args.root:
+        file_part, _, node_selector = args.root.partition("::")
+        if not Path(file_part).is_file():
+            print(
+                f"Error: {file_part!r} is not a file -- a '::' node-id selector "
+                f"(path/to/file.py::Class::test[params]) requires an existing "
+                f"test file before the first '::'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        root = file_part
+    else:
+        root = args.root or config.get("root") or "tests"
+
+    if node_selector is not None:
+        discover_and_import(root, force_reload=True)
+        positional_matches = [t.id for t in get_tests() if t.id.partition("::")[2] == node_selector]
+        if not positional_matches:
+            print(
+                f"Error: no test matches {node_selector!r} in {root} -- check the "
+                f"exact node id (as printed by --list or a previous run).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        args.test_id = (
+            ",".join([args.test_id, *positional_matches])
+            if args.test_id
+            else ",".join(positional_matches)
+        )
+
     num_workers, worker_constraints, fully_parallel = _resolve_worker_settings(args, config)
     timeout = args.timeout if args.timeout is not None else config.get("timeout", 30.0)
     import_timeout = (

@@ -1,3 +1,4 @@
+import enum
 import unittest
 
 from ctrlrunner.core import registry
@@ -188,6 +189,27 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(any(i.endswith("[Plain0]") for i in ids))
         self.assertTrue(any(i.endswith("[Plain1]") for i in ids))
 
+    def test_parametrize_id_suffix_uses_argname_for_container_values(self):
+        # A single-argname indirect parametrize whose value is a tuple
+        # (e.g. (PersonaType.GEPM, [FeatureFlags.X])) used to render via
+        # str(value), producing the raw repr of everything inside it --
+        # unreadable, and containing characters ('<', '>', ',', ':')
+        # that break naive comma-split CLI selection. Real pytest falls
+        # back to f"{argname}{index}" for values it can't render as a
+        # plain scalar; ctrlrunner must match that for containers too.
+        class Flag(enum.Enum):
+            A = "A_flag"
+
+        @registry.test()
+        @registry.parametrize("graphql_features_enabled", [("GEPM", [Flag.A])])
+        def sample(graphql_features_enabled):
+            pass
+
+        item = registry.get_tests()[0]
+        self.assertTrue(item.id.endswith("[graphql_features_enabled0]"))
+        self.assertNotIn(",", item.id)
+        self.assertNotIn("<", item.id)
+
     def test_retries_default_and_explicit(self):
         @registry.test()
         def default_retries():
@@ -284,7 +306,7 @@ class TestClassTests(unittest.TestCase):
                 pass
 
         item = registry.get_tests()[0]
-        self.assertTrue(item.id.endswith("::LoginTests.test_valid_login"))
+        self.assertTrue(item.id.endswith("::LoginTests::test_valid_login"))
         self.assertEqual(item.class_name, "LoginTests")
 
     def test_two_classes_same_method_name_no_longer_collide(self):
@@ -305,8 +327,8 @@ class TestClassTests(unittest.TestCase):
 
         ids = {i.id for i in registry.get_tests()}
         self.assertEqual(len(ids), 2)
-        self.assertTrue(any(i.endswith("SuiteA.test_a") for i in ids))
-        self.assertTrue(any(i.endswith("SuiteB.test_a") for i in ids))
+        self.assertTrue(any(i.endswith("SuiteA::test_a") for i in ids))
+        self.assertTrue(any(i.endswith("SuiteB::test_a") for i in ids))
 
     def test_applies_to_every_test_method_in_the_class(self):
         @registry.test_class(tags={"smoke"})

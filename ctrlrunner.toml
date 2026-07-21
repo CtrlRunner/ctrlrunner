@@ -8,28 +8,11 @@ timeout = 30.0
 reporter = ["line"]      # 'json' is always appended (results.json is written by
                          # every run); custom reporters: "module.path:ClassName"
 
-[ctrlrunner.grouping]
-dimensions = [
-  { name = "file",   strategy = "file" },                     # today's default -- list explicitly to keep it alongside custom ones
-  { name = "suite",  strategy = "path", depth = 1 },          # tests/web/cases/... -> "cases"
-  { name = "team",   strategy = "tag_prefix", prefix = "team_" },
-]
-
 # Scheduling default: tests in one FILE run in order in one worker;
 # files run in parallel across workers. Set true to distribute every
 # test individually instead (@test_class(fully_parallel=...) overrides
 # per class, projects override per project).
 fully_parallel = true
-
-# Optional: scoped worker budgets by file/glob/class. Note the nesting --
-# [ctrlrunner.workers], not a bare [workers] (a sibling table, silently
-# ignored). Plain int = cap mode (at most N workers run that group's
-# tests concurrently; 1 serializes the group). mode = "dedicated"
-# reserves N workers exclusively for the group instead.
-# [ctrlrunner.workers]
-# "tests/test_checkout.py" = 1
-# "tests/api/test_rate_*.py" = 2
-# "tests/test_login.py::LoginTests" = { count = 2, mode = "dedicated" }
 
 # Reports (JUnit XML, JSON, HTML) all live together under:
 #   <reports_dir>/<report_name>[-<timestamp>]/
@@ -59,6 +42,31 @@ headed = false
 # junit_infra_errors = false    # true: timeout-kill/crash render as <error>, not <failure>
 # strict_teardown = true        # false: a broken fixture teardown no longer fails a passing test
 # full_trace = false            # true: keep ctrlrunner-internal frames in failure tracebacks
+
+# Every [ctrlrunner.<name>] table below MUST come after every plain
+# "key = value" setting above -- TOML scopes a bare "key = value" line
+# to whichever [table] header appears most recently above it, so a
+# setting placed after a [ctrlrunner.*] header (with no closing
+# [ctrlrunner] header to return to the parent table) silently becomes
+# part of THAT nested table instead of [ctrlrunner] itself, and quietly
+# falls back to its hardcoded default with no warning.
+
+[ctrlrunner.grouping]
+dimensions = [
+  { name = "file",   strategy = "file" },                     # today's default -- list explicitly to keep it alongside custom ones
+  { name = "suite",  strategy = "path", depth = 1 },          # tests/web/cases/... -> "cases"
+  { name = "team",   strategy = "tag_prefix", prefix = "team_" },
+]
+
+# Optional: scoped worker budgets by file/glob/class. Note the nesting --
+# [ctrlrunner.workers], not a bare [workers] (a sibling table, silently
+# ignored). Plain int = cap mode (at most N workers run that group's
+# tests concurrently; 1 serializes the group). mode = "dedicated"
+# reserves N workers exclusively for the group instead.
+# [ctrlrunner.workers]
+# "tests/test_checkout.py" = 1
+# "tests/api/test_rate_*.py" = 2
+# "tests/test_login.py::LoginTests" = { count = 2, mode = "dedicated" }
 
 # [ctrlrunner.fail_policy]
 # max_failures = 0

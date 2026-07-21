@@ -289,13 +289,13 @@ class ExpandSerialGroupsTests(unittest.TestCase):
 
     def test_partial_serial_selection_pulls_whole_group_in_registry_order(self):
         items = [
-            self._serial_item("m::C.a", "m::C"),
-            self._serial_item("m::C.b", "m::C"),
-            self._serial_item("m::C.c", "m::C"),
+            self._serial_item("m::C::a", "m::C"),
+            self._serial_item("m::C::b", "m::C"),
+            self._serial_item("m::C::c", "m::C"),
             _item("m::free"),
         ]
-        expanded = expand_serial_groups(["m::C.b"], items)
-        self.assertEqual(expanded, ["m::C.b", "m::C.a", "m::C.c"])
+        expanded = expand_serial_groups(["m::C::b"], items)
+        self.assertEqual(expanded, ["m::C::b", "m::C::a", "m::C::c"])
 
     def test_non_serial_ids_pass_through_unchanged(self):
         items = [_item("m::x"), _item("m::y")]
@@ -303,23 +303,23 @@ class ExpandSerialGroupsTests(unittest.TestCase):
 
     def test_untouched_serial_groups_not_pulled_in(self):
         items = [
-            self._serial_item("m::C.a", "m::C"),
-            self._serial_item("m::D.a", "m::D"),
-            self._serial_item("m::D.b", "m::D"),
+            self._serial_item("m::C::a", "m::C"),
+            self._serial_item("m::D::a", "m::D"),
+            self._serial_item("m::D::b", "m::D"),
         ]
-        expanded = expand_serial_groups(["m::C.a"], items)
-        self.assertEqual(expanded, ["m::C.a"])
+        expanded = expand_serial_groups(["m::C::a"], items)
+        self.assertEqual(expanded, ["m::C::a"])
 
     def test_no_duplicates_when_whole_group_already_selected(self):
         items = [
-            self._serial_item("m::C.a", "m::C"),
-            self._serial_item("m::C.b", "m::C"),
+            self._serial_item("m::C::a", "m::C"),
+            self._serial_item("m::C::b", "m::C"),
         ]
-        expanded = expand_serial_groups(["m::C.a", "m::C.b"], items)
-        self.assertEqual(expanded, ["m::C.a", "m::C.b"])
+        expanded = expand_serial_groups(["m::C::a", "m::C::b"], items)
+        self.assertEqual(expanded, ["m::C::a", "m::C::b"])
 
     def test_empty_selection_stays_empty(self):
-        items = [self._serial_item("m::C.a", "m::C")]
+        items = [self._serial_item("m::C::a", "m::C")]
         self.assertEqual(expand_serial_groups([], items), [])
 
 

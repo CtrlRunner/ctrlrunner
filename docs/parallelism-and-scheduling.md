@@ -119,7 +119,7 @@ express ordered, inter-dependent tests.
 
 All filters combine with AND; each accepts multiple comma-separated
 values (OR within that filter). `--grep`/`--grep-not` match against a
-test's full id (`module::[Class.]func[params]`) — named to match this
+test's full id (`module::[Class::]func[params]`) — named to match this
 project's own `--tag-not` negation convention rather than Playwright's
 `--grep-invert`. A bad regex fails immediately with a clean usage error
 (exit 2), before any discovery/execution work starts. A run whose

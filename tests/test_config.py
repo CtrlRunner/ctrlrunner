@@ -177,6 +177,43 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(warns, [])
         self.assertEqual(warns, [])
 
+    def test_misplaced_key_inside_fixed_schema_table_warns(self):
+        # A top-level setting written AFTER a [ctrlrunner.<name>] header
+        # (with no later [ctrlrunner] header to return to the parent
+        # table) silently becomes part of that nested table in TOML --
+        # this used to load with zero diagnostic and just silently fall
+        # back to the setting's hardcoded default (e.g. trace/screenshot
+        # landing inside [ctrlrunner.grouping] and never actually
+        # enabling capture).
+        cfg, warns = self._load(
+            "[ctrlrunner]\n"
+            'root = "tests"\n'
+            "[ctrlrunner.grouping]\n"
+            "dimensions = []\n"
+            'trace = "retain-on-failure"\n'
+            'screenshot = "only-on-failure"\n'
+        )
+        self.assertNotIn("trace", cfg)
+        self.assertEqual(cfg["grouping"]["trace"], "retain-on-failure")
+        self.assertTrue(any("'trace'" in w and "[ctrlrunner.grouping]" in w for w in warns), warns)
+        self.assertTrue(
+            any("'screenshot'" in w and "[ctrlrunner.grouping]" in w for w in warns), warns
+        )
+
+    def test_projects_subtable_reusing_a_known_key_name_is_not_flagged(self):
+        # [ctrlrunner.projects.<name>] sub-tables legitimately reuse
+        # top-level names (timeout, num_workers, ...) as per-project
+        # overrides -- this is NOT the misplaced-key mistake and must
+        # not warn.
+        _, warns = self._load(
+            "[ctrlrunner]\n"
+            "[ctrlrunner.projects.web]\n"
+            'root = "tests"\n'
+            "timeout = 15.0\n"
+            "num_workers = 2\n"
+        )
+        self.assertEqual(warns, [])
+
     def test_default_warn_goes_to_stderr(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "ctrlrunner.toml"

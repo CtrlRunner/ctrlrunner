@@ -2750,11 +2750,11 @@ class QuarantineIntegrationTests(unittest.TestCase):
                 "    @test()\n"
                 "    def test_c(self):\n        pass\n"
             )
-            qc = QuarantineConfig(test_ids={"quarantine_serial_suite.test_serial_q::Flow.test_b"})
+            qc = QuarantineConfig(test_ids={"quarantine_serial_suite.test_serial_q::Flow::test_b"})
             orch = Orchestrator(str(root), 1, 10.0, quarantine=qc)
             reporter = orch.run()
 
-            by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+            by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
             self.assertEqual(by_name["test_a"].outcome, "passed")
             self.assertEqual(by_name["test_b"].outcome, "quarantined_failure")
             self.assertTrue(by_name["test_b"].quarantined)
@@ -2976,7 +2976,7 @@ class SerialClassTests(unittest.TestCase):
             self.assertEqual(len(reporter.results), 3)
             self.assertTrue(all(r.outcome == "passed" for r in reporter.results))
             self.assertEqual(len({r.worker_id for r in reporter.results}), 1)
-            names = [r.test_id.rsplit(".", 1)[-1] for r in reporter.results]
+            names = [r.test_id.rsplit("::", 1)[-1] for r in reporter.results]
             self.assertEqual(names, ["test_c_first", "test_a_second", "test_b_third"])
 
     def test_failure_skips_all_subsequent_group_members(self):
@@ -2998,7 +2998,7 @@ class SerialClassTests(unittest.TestCase):
             orch = Orchestrator(str(root), 2, 10.0)
             reporter = orch.run()
 
-            by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+            by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
             self.assertEqual(len(reporter.results), 3)
             self.assertEqual(by_name["test_a"].outcome, "passed")
             self.assertEqual(by_name["test_b"].outcome, "failed")
@@ -3058,7 +3058,7 @@ class SerialClassTests(unittest.TestCase):
             orch = Orchestrator(str(root), 2, 10.0)
             reporter = orch.run()
 
-            by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+            by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
             self.assertEqual(len(reporter.results), 3)
             self.assertEqual(by_name["test_a"].outcome, "passed")
             self.assertEqual(by_name["test_b"].outcome, "failed")
@@ -3084,7 +3084,7 @@ class SerialClassTests(unittest.TestCase):
             orch = Orchestrator(str(root), 1, 2.0)
             reporter = orch.run()
 
-            by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+            by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
             self.assertEqual(len(reporter.results), 3, sorted(by_name))
             self.assertEqual(by_name["test_a"].outcome, "passed")
             self.assertEqual(by_name["test_b"].outcome, "failed")
@@ -3147,7 +3147,7 @@ class SerialClassTests(unittest.TestCase):
             orch = Orchestrator(str(root), 2, 10.0)
             reporter = orch.run()
 
-            by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+            by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
             self.assertEqual(by_name["test_a"].outcome, "skipped")
             self.assertEqual(by_name["test_b"].outcome, "passed")
 
@@ -4611,7 +4611,7 @@ class StartedAtThreadingTests(unittest.TestCase):
             reporter = orch.run()
             after = time.time()
 
-        by_name = {r.test_id.rsplit(".", 1)[-1]: r for r in reporter.results}
+        by_name = {r.test_id.rsplit("::", 1)[-1]: r for r in reporter.results}
         skipped = by_name["test_second_never_runs"]
         self.assertEqual(skipped.outcome, "skipped")
         self.assertIsNotNone(skipped.started_at)

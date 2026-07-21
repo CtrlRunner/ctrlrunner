@@ -33,7 +33,7 @@ def select_tests(
     - exclude_tags: DROP a test if it has at least one of the given tags
       (applied after every include filter; include and exclude are
       AND-ed like everything else)
-    - grep: regex matched against TestItem.id (module::[Class.]func[params]);
+    - grep: regex matched against TestItem.id (module::[Class::]func[params]);
       only tests whose id matches are kept
     - grep_not: regex matched against TestItem.id; matching tests are DROPPED
       (applied after grep, AND-ed like everything else)

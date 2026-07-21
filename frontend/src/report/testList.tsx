@@ -17,18 +17,17 @@ import {
 
 const AUTO_EXPAND_LIMIT = 200;
 
-// Strips the file/module prefix (before the first "::") and, for
-// class-based tests, the class name too (before the last "." that
-// precedes a parametrize "[...]" suffix, so params containing dots
-// like "[1.5]" are never mistaken for the class separator).
+// Strips the module prefix and, for class-based tests, the class name
+// too -- both are "::"-separated (module::ClassName::method[suffix]),
+// so the bare display name is everything after the LAST "::" that
+// precedes the parametrize "[...]" suffix (checked before the bracket
+// so a param value like "[1.5]" is never mistaken for a separator).
 function testDisplayName(id: string): string {
-  const idx = id.indexOf('::');
-  const afterFile = idx === -1 ? id : id.slice(idx + 2);
-  const bracketIdx = afterFile.indexOf('[');
-  const base = bracketIdx === -1 ? afterFile : afterFile.slice(0, bracketIdx);
-  const suffix = bracketIdx === -1 ? '' : afterFile.slice(bracketIdx);
-  const dotIdx = base.lastIndexOf('.');
-  return (dotIdx === -1 ? base : base.slice(dotIdx + 1)) + suffix;
+  const bracketIdx = id.indexOf('[');
+  const base = bracketIdx === -1 ? id : id.slice(0, bracketIdx);
+  const suffix = bracketIdx === -1 ? '' : id.slice(bracketIdx);
+  const lastSep = base.lastIndexOf('::');
+  return (lastSep === -1 ? base : base.slice(lastSep + 2)) + suffix;
 }
 
 function DimensionSwitcher({ model }: { model: ReportModel }) {

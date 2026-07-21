@@ -524,6 +524,20 @@ def _stable_param_str(value: Any, index: int, argname: str | None = None) -> str
     stable across runs (position in a fixed, code-defined list, not a
     memory address).
 
+    A tuple/list/dict/set is a different problem: it HAS its own
+    __repr__ (inherited from the container type, not object's), so it
+    would fall through to str(value) below and recursively repr() its
+    contents -- e.g. a single-argname indirect parametrize value like
+    (PersonaType.GEPM, [FeatureFlags.X]) renders as the raw
+    "('GEPM', [<FeatureFlags.X: 'X'>])", which is both unreadable and
+    contains characters (',', '<', '>', ':') that break naive
+    comma-split CLI selection. Real pytest's idmaker only renders a
+    fixed allowlist of scalar types directly and falls back to
+    f"{argname}{index}" for anything else (including containers) --
+    mirrored here, keyed on argname rather than the container's class
+    name (unlike the object-repr fallback above) since "tuple0" carries
+    no information where "graphql_features_enabled0" does.
+
     ctrlrunner_make_parametrize_id(config, val, argname) is consulted
     first when an argname is known (callers that don't have one -- rare
     internal fallback paths -- skip straight to the default logic)."""
@@ -538,6 +552,8 @@ def _stable_param_str(value: Any, index: int, argname: str | None = None) -> str
                 continue
             if result is not None:
                 return str(result)
+    if isinstance(value, (tuple, list, dict, set, frozenset)):
+        return f"{argname if argname is not None else 'param'}{index}"
     cls = type(value)
     if cls.__str__ is object.__str__ and cls.__repr__ is object.__repr__:
         return f"{cls.__name__}{index}"
@@ -844,7 +860,7 @@ def test_class(
 ):
     """Class decorator: applies default tags/properties/timeout/retries
     to every @test-decorated method inside the class, and rewrites each
-    method's test id to `module::ClassName.method_name[...]`.
+    method's test id to `module::ClassName::method_name[...]`.
 
     Must be the outermost decorator on the class (Python always runs
     class decorators after the class body has fully executed, so every
@@ -1050,7 +1066,7 @@ def _merge_class_metadata(
     module, sep, rest = item.id.partition("::")
     if sep:  # defensive; every TestItem id always has "::" today
         old_id = item.id
-        item.id = f"{module}::{class_name}.{rest}"
+        item.id = f"{module}::{class_name}::{rest}"
         # Keep the duplicate-id tracking set in sync with the rewrite --
         # otherwise the vacated pre-rewrite id (e.g. "module::test_a")
         # stays "reserved" forever and would wrongly block a later,

@@ -108,7 +108,7 @@ class LoginTests:
   [Parallelism, scheduling & test selection](parallelism-and-scheduling.md).
   `@test` deliberately has no equivalents (scheduling below
   class/file granularity has no meaning).
-- Test id becomes `module::LoginTests.test_valid_login`, and JUnit's
+- Test id becomes `module::LoginTests::test_valid_login`, and JUnit's
   `classname` reflects it correctly.
 
 `self` is always bound to `None`, never a real instance -- classes here

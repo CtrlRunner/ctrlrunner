@@ -1,7 +1,8 @@
 import time
 
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import Page
 from ctrlrunner import fixture, test, parametrize, step, skip, fail, fixme, slow
+from ctrlrunner.playwright.playwright_fixtures import playwright_instance
 
 calls = {"session_setup": 0, "session_teardown": 0}
 
@@ -137,11 +138,20 @@ def test_flaky_always_fails(fake_page):
 
 
 @fixture(scope="session")
-def custom_browser():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
+def custom_browser(playwright_instance):
+    # Depends on the built-in playwright_instance fixture (also
+    # session-scoped, one per worker) instead of opening a second,
+    # independent `sync_playwright()` connection -- Playwright's sync
+    # API only supports one such connection per thread/process at a
+    # time. A worker runs many tests in the same process, so a second
+    # `with sync_playwright()` here would stay open for the rest of
+    # this worker's life (session scope) alongside the built-in one,
+    # and the next test in this worker that uses page/browser/context
+    # would trip Playwright's "already inside a sync_playwright
+    # context" guard with a confusing asyncio-loop error.
+    browser = playwright_instance.chromium.launch(headless=True)
+    yield browser
+    browser.close()
 
 
 def _capture_custom_screenshot(page: Page, prefix):
