@@ -19,8 +19,12 @@ ctrlrunner is tested with the standard library `unittest`, not itself or pytest 
 avoids both the irony and a dependency on either:
 
 ```
-uv run python -m unittest discover -s tests
+uv run python scripts/run_tests_parallel.py
 ```
+
+This runs each test file in its own subprocess across parallel workers
+(default: CPU count, override with `-j`) — see
+[docs/development.md](docs/development.md) for details.
 
 ## Linting, formatting, type checking
 
@@ -39,7 +43,7 @@ failures surface locally in seconds instead of after a push.
 ## Before opening a PR
 
 - `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check`, and
-  `uv run python -m unittest discover -s tests` all pass.
+  `uv run python scripts/run_tests_parallel.py` all pass.
 - Write commit messages as [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`) where you reasonably can — `CHANGELOG.md`
   is generated from commit messages by [git-cliff](https://git-cliff.org) on every release, and

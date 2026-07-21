@@ -10,8 +10,16 @@ ctrlrunner is tested with the standard library `unittest`, not itself or
 pytest — avoids both the irony and a dependency on either:
 
 ```
-uv run python -m unittest discover -s tests
+uv run python scripts/run_tests_parallel.py
 ```
+
+`scripts/run_tests_parallel.py` runs each `tests/test_*.py` file as its own
+`python -m unittest tests.<module>` subprocess, spread across worker
+processes (default: CPU count, override with `-j`), to cut down the suite's
+wall-clock time. It's still plain stdlib `unittest` underneath — the script
+only adds process orchestration, no new dependency. For a plain serial run
+(e.g. to compare against), `uv run python -m unittest discover -s tests`
+still works as before.
 
 ## Dev tooling (uv / ruff / ty)
 
