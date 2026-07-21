@@ -39,7 +39,7 @@ def discover_files(tests_dir: Path) -> list[Path]:
 
 
 def _weight(path: Path) -> int:
-    return len(path.read_text().splitlines())
+    return len(path.read_text(encoding="utf-8").splitlines())
 
 
 def compute_buckets(files: list[Path], n: int) -> list[list[Path]]:
@@ -97,7 +97,14 @@ def run_one(path: Path, verbose: bool) -> FileResult:
     if verbose:
         cmd.append("-v")
     cmd.append(module)
-    proc = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    proc = subprocess.run(
+        cmd,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     output = proc.stdout + proc.stderr
     summary = parse_summary(output) or {}
     duration = summary.get("duration", 0.0)
