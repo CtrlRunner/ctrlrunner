@@ -2097,12 +2097,12 @@ class TbStyleResolutionIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             error = self._error_text(tmp, [])
         self.assertEqual(error.count('File "'), 2)
-        self.assertNotIn("ctrlrunner/execution/worker.py", error)
+        self.assertNotIn(os.path.join("ctrlrunner", "execution", "worker.py"), error)
 
     def test_full_trace_alone_resolves_to_long(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             error = self._error_text(tmp, ["--full-trace"])
-        self.assertIn("ctrlrunner/execution/worker.py", error)
+        self.assertIn(os.path.join("ctrlrunner", "execution", "worker.py"), error)
 
     def test_tb_alone_applies_short_trimming(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -2113,7 +2113,7 @@ class TbStyleResolutionIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             error = self._error_text(tmp, ["--tb", "short", "--full-trace"])
         self.assertEqual(error.count('File "'), 1)
-        self.assertNotIn("ctrlrunner/execution/worker.py", error)
+        self.assertNotIn(os.path.join("ctrlrunner", "execution", "worker.py"), error)
 
 
 class VerbosityFlagTests(unittest.TestCase):
