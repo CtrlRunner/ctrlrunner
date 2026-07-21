@@ -36,11 +36,11 @@ def _render_steps_text(steps, indent=0) -> str:
     for s in steps:
         marker = "\u2713" if s.get("outcome") == "passed" else "\u2717"
         lines.append(f"{'  ' * indent}{marker} {s.get('name')} ({s.get('duration', 0):.3f}s)")
-        if s.get("error"):
-            lines.append(f"{'  ' * (indent + 1)}{s['error']}")
         nested = _render_steps_text(s.get("children", []), indent + 1)
         if nested:
             lines.append(nested)
+        if s.get("error"):
+            lines.append(f"{'  ' * (indent + 1)}{s['error']}")
     return "\n".join(lines)
 
 

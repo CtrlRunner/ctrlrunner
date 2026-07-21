@@ -66,7 +66,6 @@ function StepNode({ step, needle }: { step: Step; needle: string }) {
         <span className="step-name">{step.name}</span>
         <span className="step-duration">{step.duration}s</span>
       </div>
-      {open && step.error ? <pre className="error-pre step-error">{step.error}</pre> : null}
       {open && children.length ? (
         <ul className="steps">
           {(step.children || []).map((c, i) =>
@@ -77,6 +76,7 @@ function StepNode({ step, needle }: { step: Step; needle: string }) {
           )}
         </ul>
       ) : null}
+      {open && step.error ? <pre className="error-pre step-error">{step.error}</pre> : null}
     </li>
   );
 }
